@@ -12,6 +12,7 @@ import OracleButton from '@/components/characters/OracleButton'
 import { getLevel, getLevelProgress, getTier } from '@/lib/xp'
 import { CHARACTERS, type Dimension } from '@/lib/character'
 import { getUserId } from '@/lib/user'
+import MoodTracker from '@/components/MoodTracker'
 
 interface OuraData {
   readiness_score: number | null
@@ -45,10 +46,27 @@ interface CalendarEvent {
   start: string
 }
 
-function getArcVerdict(oura: OuraData): { text: string; color: string } {
+function getArcVerdict(
+  oura: OuraData,
+  moodScore: number | null
+): { text: string; color: string } {
   const r = oura.readiness_score ?? 0
   const s = oura.sleep_score ?? 0
   const phase = oura.cycle_phase?.toLowerCase() ?? ''
+
+  if (moodScore !== null && moodScore <= 2 && r >= 70) {
+    return {
+      color: '#fb923c',
+      text: `Your body is recovered but you logged ${moodScore === 1 ? 'Depleted' : 'Drained'}. Rest your mind today — slow Forge tasks only.`,
+    }
+  }
+
+  if (moodScore === 5) {
+    return {
+      color: '#a855f7',
+      text: 'Transcendent mood — rare. Whatever you set out to do today, do it now.',
+    }
+  }
 
   if (phase === 'menstrual') {
     return {
@@ -455,6 +473,7 @@ export default function DashboardPage() {
   const [nextEvent, setNextEvent] = useState<CalendarEvent | null>(null)
   const [loading, setLoading] = useState(true)
   const [completingTaskId, setCompletingTaskId] = useState<string | null>(null)
+  const [todayMood, setTodayMood] = useState<number | null>(null)
   const [xpToast, setXpToast] = useState<{ xp: number; visible: boolean }>({
     xp: 0,
     visible: false,
@@ -464,10 +483,11 @@ export default function DashboardPage() {
     const uid = userId.current
     setLoading(true)
 
-    const [ouraRes, questsRes, calRes] = await Promise.allSettled([
+    const [ouraRes, questsRes, calRes, moodRes] = await Promise.allSettled([
       fetch(`/api/oura/sync?userId=${encodeURIComponent(uid)}`).then((r) => r.json()),
       fetch(`/api/quests/main?userId=${encodeURIComponent(uid)}`).then((r) => r.json()),
       fetch(`/api/calendar/next?userId=${encodeURIComponent(uid)}`).then((r) => r.json()),
+      fetch(`/api/mood?userId=${encodeURIComponent(uid)}`).then((r) => r.json()),
     ])
 
     if (ouraRes.status === 'fulfilled' && ouraRes.value?.data) {
@@ -478,6 +498,9 @@ export default function DashboardPage() {
     }
     if (calRes.status === 'fulfilled' && calRes.value?.event) {
       setNextEvent(calRes.value.event)
+    }
+    if (moodRes.status === 'fulfilled' && moodRes.value?.mood?.mood_score) {
+      setTodayMood(moodRes.value.mood.mood_score)
     }
     setLoading(false)
 
@@ -550,7 +573,7 @@ export default function DashboardPage() {
         ? protagonistTiers[1]
         : protagonistTiers[2]
 
-  const arc = oura ? getArcVerdict(oura) : null
+  const arc = oura ? getArcVerdict(oura, todayMood) : null
   const cycleLabel = oura ? formatCyclePhase(oura.cycle_phase, oura.cycle_day) : ''
 
   const ORDER: Dimension[] = ['career', 'social', 'wealth']
@@ -646,12 +669,12 @@ export default function DashboardPage() {
 
           <div style={{ display: 'flex', justifyContent: 'space-around', marginBottom: 14 }}>
             <ScoreRing
-              value={oura?.readiness_score ?? 0}
+              value={oura?.readiness_score ?? null}
               color="#34d399"
               label="Stamina"
             />
-            <ScoreRing value={oura?.sleep_score ?? 0} color="#60a5fa" label="Mana" />
-            <ScoreRing value={oura?.activity_score ?? 0} color="#fb923c" label="Power" />
+            <ScoreRing value={oura?.sleep_score ?? null} color="#60a5fa" label="Mana" />
+            <ScoreRing value={oura?.activity_score ?? null} color="#fb923c" label="Power" />
           </div>
 
           {arc && (
@@ -687,6 +710,11 @@ export default function DashboardPage() {
               </span>
             </div>
           )}
+
+          <MoodTracker
+            userId={userId.current}
+            onMoodChange={(score) => setTodayMood(score)}
+          />
         </div>
 
         <p

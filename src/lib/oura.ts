@@ -96,6 +96,11 @@ export function ouraToDashboardPayload(data: OuraDailyData): OuraDashboardData {
   }
 }
 
+/** Map a stored oura_daily row to the dashboard API shape (explicit field list). */
+export function ouraRowToDashboardPayload(row: OuraDbRow): OuraDashboardData {
+  return ouraToDashboardPayload(ouraRowToDailyData(row))
+}
+
 export function ouraRowToDailyData(row: OuraDbRow): OuraDailyData {
   const deep =
     row.deep_sleep_seconds ?? row.sleep_deep_seconds ?? null

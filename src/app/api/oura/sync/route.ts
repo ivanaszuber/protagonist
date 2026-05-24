@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import {
   fetchOuraDailyData,
-  ouraRowToDailyData,
+  ouraRowToDashboardPayload,
   ouraToDashboardPayload,
   refreshOuraTokens,
 } from '@/lib/oura'
@@ -88,7 +88,7 @@ export async function GET(request: Request) {
 
   const today = new Date().toISOString().split('T')[0]
   const row = await getOuraDaily(userId, today)
-  const data = row ? ouraToDashboardPayload(ouraRowToDailyData(row)) : null
+  const data = row ? ouraRowToDashboardPayload(row) : null
 
   return NextResponse.json({ connected: true, data })
 }
