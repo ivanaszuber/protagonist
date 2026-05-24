@@ -42,17 +42,54 @@ export function addXP(
   return updated
 }
 
+export const XP_PER_LEVEL = 500
+
+export const MILESTONE_XP_BONUS = 500
+
 export function getTotalXP(xp: DimensionXPState): number {
   return Object.values(xp).reduce((sum, v) => sum + v, 0)
 }
 
-export function getLevel(totalXP: number): number {
-  return Math.floor(totalXP / 500) + 1
+/** Account-wide level from summed XP across all dimensions (legacy UI). */
+export function getAccountLevel(totalXP: number): number {
+  return Math.floor(totalXP / XP_PER_LEVEL) + 1
 }
 
-export function getXPToNextLevel(totalXP: number): { current: number; needed: number } {
-  const xpInCurrentLevel = totalXP % 500
-  return { current: xpInCurrentLevel, needed: 500 }
+export function getAccountXPToNextLevel(totalXP: number): {
+  current: number
+  needed: number
+} {
+  const xpInCurrentLevel = totalXP % XP_PER_LEVEL
+  return { current: xpInCurrentLevel, needed: XP_PER_LEVEL }
+}
+
+/** Quest-system level for a single dimension (500 XP per level). */
+export function getLevel(xp: number): number {
+  return Math.floor(xp / XP_PER_LEVEL) + 1
+}
+
+export function getLevelProgress(xp: number): number {
+  return (xp % XP_PER_LEVEL) / XP_PER_LEVEL
+}
+
+export function getXpToNextLevel(xp: number): number {
+  return XP_PER_LEVEL - (xp % XP_PER_LEVEL)
+}
+
+export function getTier(xp: number): 1 | 2 | 3 {
+  const level = getLevel(xp)
+  if (level >= 8) return 3
+  if (level >= 4) return 2
+  return 1
+}
+
+export function getTierLabel(dimension: string, tier: 1 | 2 | 3): string {
+  const labels: Record<string, [string, string, string]> = {
+    career: ['Apprentice', 'Craftsman', 'Master Maker'],
+    social: ['Newcomer', 'Connector', 'Community Weaver'],
+    wealth: ['Saver', 'Strategist', 'Wealth Architect'],
+  }
+  return (labels[dimension] ?? ['Novice', 'Adept', 'Master'])[tier - 1]
 }
 
 export function getDimensionLevel(xp: number): number {

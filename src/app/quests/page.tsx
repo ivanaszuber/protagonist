@@ -1,461 +1,434 @@
 'use client'
 
-import { useState, useEffect, Component, type ReactNode } from 'react'
+import { useEffect, useState, useRef } from 'react'
+import { getUserId } from '@/lib/user'
 import {
-  Quest,
-  DimensionXPState,
-  INITIAL_XP,
-  DimensionId,
-  CheckInData,
-} from '@/types'
-import { VoiceCheckin } from '@/components/checkin/VoiceCheckin'
-import OuraWidget from '@/components/oura/OuraWidget'
-import CalendarWidget from '@/components/calendar/CalendarWidget'
-import GmailWidget from '@/components/gmail/GmailWidget'
-import { QuestCard } from '@/components/quests/QuestCard'
-import { QuestProof } from '@/components/quests/QuestProof'
-import { DimensionBars } from '@/components/xp/DimensionBars'
-import {
-  getTotalXP,
   getLevel,
-  getXPToNextLevel,
+  getLevelProgress,
+  getXpToNextLevel,
+  getTier,
+  getTierLabel,
 } from '@/lib/xp'
-import {
-  loadDimensionXP,
-  getCompletedQuestIds,
-  getTodayQuests,
-  saveQuests,
-  markQuestComplete,
-  addDimensionXP,
-  saveCheckIn,
-  getTodayCheckIn,
-  deleteTodayQuests,
-} from '@/lib/db'
-import { isSupabaseConfigured } from '@/lib/supabase'
-import {
-  loadXP,
-  loadCompletedQuests,
-  loadTodayQuests,
-  saveTodayQuests,
-  clearTodayQuestProgress,
-  addXP,
-  saveCompletedQuest,
-} from '@/lib/xp'
+
+interface MainQuest {
+  id: string
+  dimension: string
+  character_name: string
+  character_class: string
+  vision: string
+  active_milestone: Milestone | null
+  todays_tasks: Task[]
+  xp: number
+}
+
+interface Milestone {
+  id: string
+  title: string
+  target_date: string | null
+  completed: boolean
+}
+
+interface Task {
+  id: string
+  dimension: string
+  title: string
+  xp_reward: number
+  task_date: string
+  completed: boolean
+}
 
 interface XPToast {
   id: string
-  amount: number
-  dimensionId: string
-  x: number
-  y: number
+  xp: number
+  leveledUp: boolean
+  newLevel: number
+  dimension: string
 }
 
-class ErrorBoundary extends Component<
-  { children: ReactNode },
-  { hasError: boolean }
-> {
-  constructor(props: { children: ReactNode }) {
-    super(props)
-    this.state = { hasError: false }
-  }
-
-  static getDerivedStateFromError() {
-    return { hasError: true }
-  }
-
-  render() {
-    if (this.state.hasError) return null
-    return this.props.children
-  }
+const DIM_COLORS: Record<string, { accent: string; bg: string; border: string }> = {
+  career: { accent: '#fbbf24', bg: 'rgba(232,148,26,0.09)', border: 'rgba(232,148,26,0.28)' },
+  social: { accent: '#6ee7a4', bg: 'rgba(46,204,113,0.09)', border: 'rgba(46,204,113,0.28)' },
+  wealth: { accent: '#FFB347', bg: 'rgba(255,179,71,0.09)', border: 'rgba(255,179,71,0.30)' },
 }
 
 export default function QuestsPage() {
-  const [quests, setQuests] = useState<Quest[]>([])
-  const [activeQuest, setActiveQuest] = useState<Quest | null>(null)
-  const [completedIds, setCompletedIds] = useState<Set<string>>(new Set())
-  const [dimensionXP, setDimensionXP] = useState<DimensionXPState>(INITIAL_XP)
-  const [xpToasts, setXpToasts] = useState<XPToast[]>([])
-  const [highlightDimension, setHighlightDimension] = useState<string | null>(null)
-  const [showCheckin, setShowCheckin] = useState(false)
-  const [lastCheckIn, setLastCheckIn] = useState<CheckInData | null>(null)
-  const [mounted, setMounted] = useState(false)
+  const [quests, setQuests] = useState<MainQuest[]>([])
+  const [loading, setLoading] = useState(true)
+  const [xpToast, setXpToast] = useState<XPToast | null>(null)
+  const [addingTask, setAddingTask] = useState<{ dimension: string } | null>(null)
+  const [newTaskTitle, setNewTaskTitle] = useState('')
+  const [newTaskXp, setNewTaskXp] = useState(50)
+  const [savingTask, setSavingTask] = useState(false)
+  const userId = useRef(getUserId())
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    const ouraStatus = params.get('oura')
-    const calendarStatus = params.get('calendar')
-    if (
-      ouraStatus === 'connected' ||
-      ouraStatus === 'error' ||
-      calendarStatus === 'connected' ||
-      calendarStatus === 'error'
-    ) {
-      window.history.replaceState({}, '', '/quests')
-    }
+    void loadQuests()
   }, [])
 
-  useEffect(() => {
-    async function loadFromDatabase() {
-      if (isSupabaseConfigured()) {
-        const [xp, completedQuestIds, todayQuests, todayCheckIn] = await Promise.all([
-          loadDimensionXP(),
-          getCompletedQuestIds(),
-          getTodayQuests(),
-          getTodayCheckIn(),
-        ])
-        setDimensionXP(xp)
-        setCompletedIds(completedQuestIds)
-        if (todayQuests.length > 0) {
-          setQuests(todayQuests)
-        }
-        if (todayCheckIn) {
-          setLastCheckIn(todayCheckIn)
-        }
-      } else {
-        setDimensionXP(loadXP())
-        setCompletedIds(loadCompletedQuests())
-        const savedQuests = loadTodayQuests()
-        if (savedQuests.length > 0) {
-          setQuests(savedQuests)
-        }
-      }
-      setMounted(true)
-    }
-    void loadFromDatabase()
-  }, [])
-
-  const handleQuestsGenerated = async (
-    newQuests: Quest[],
-    checkIn: CheckInData,
-    transcript: string
-  ) => {
-    setCompletedIds(new Set())
-    setQuests(newQuests)
-    setLastCheckIn(checkIn)
-    setShowCheckin(false)
-
-    if (isSupabaseConfigured()) {
-      await saveCheckIn({ ...checkIn, transcript })
-      await deleteTodayQuests()
-      await saveQuests(newQuests)
-    } else {
-      clearTodayQuestProgress()
-      saveTodayQuests(newQuests)
+  async function loadQuests() {
+    const uid = userId.current
+    setLoading(true)
+    try {
+      const res = await fetch(`/api/quests/main?userId=${encodeURIComponent(uid)}`)
+      const data = await res.json()
+      if (data.quests) setQuests(data.quests)
+    } finally {
+      setLoading(false)
     }
   }
 
-  const handleCompleteClick = (quest: Quest) => {
-    setActiveQuest(quest)
-  }
-
-  const handleProofComplete = async (
-    xpAwarded: number,
-    dimensionId: string,
-    proofTranscript: string,
-    arcResponse: string
-  ) => {
-    if (!activeQuest) return
-
-    setCompletedIds((prev) => {
-      const next = new Set(prev)
-      next.add(activeQuest.id)
-      return next
+  async function completeTask(taskId: string, dimension: string) {
+    const uid = userId.current
+    const res = await fetch(`/api/quests/tasks/${taskId}/complete`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: uid }),
     })
+    const data = await res.json()
 
-    if (isSupabaseConfigured()) {
-      await markQuestComplete(
-        activeQuest.id,
-        xpAwarded,
-        proofTranscript,
-        arcResponse
-      )
-    } else {
-      saveCompletedQuest(activeQuest.id)
-    }
-
-    if (xpAwarded > 0) {
-      if (isSupabaseConfigured()) {
-        await addDimensionXP(dimensionId as DimensionId, xpAwarded)
-        setDimensionXP((prev) => ({
-          ...prev,
-          [dimensionId]: (prev[dimensionId as DimensionId] || 0) + xpAwarded,
+    if (res.ok) {
+      setQuests((prev) =>
+        prev.map((q) => ({
+          ...q,
+          xp: q.dimension === dimension ? q.xp + data.xp_earned : q.xp,
+          todays_tasks: q.todays_tasks.map((t) =>
+            t.id === taskId ? { ...t, completed: true } : t
+          ),
         }))
-      } else {
-        setDimensionXP((prev) => addXP(prev, dimensionId as DimensionId, xpAwarded))
-      }
+      )
 
-      setHighlightDimension(dimensionId)
-      setTimeout(() => setHighlightDimension(null), 3000)
-
-      const toast: XPToast = {
-        id: `${Date.now()}`,
-        amount: xpAwarded,
-        dimensionId,
-        x: Math.random() * 40 + 30,
-        y: Math.random() * 20 + 40,
-      }
-      setXpToasts((prev) => [...prev, toast])
-      setTimeout(() => {
-        setXpToasts((prev) => prev.filter((t) => t.id !== toast.id))
-      }, 2500)
+      setXpToast({
+        id: taskId,
+        xp: data.xp_earned,
+        leveledUp: data.leveled_up,
+        newLevel: data.new_level,
+        dimension,
+      })
+      setTimeout(() => setXpToast(null), 3000)
     }
-
-    setActiveQuest(null)
   }
 
-  const totalXP = getTotalXP(dimensionXP)
-  const level = getLevel(totalXP)
-  const { current: xpProgress, needed: xpNeeded } = getXPToNextLevel(totalXP)
-  const allComplete = quests.length > 0 && quests.every((q) => completedIds.has(q.id))
+  async function addTask(dimension: string) {
+    if (!newTaskTitle.trim()) return
+    setSavingTask(true)
+    const uid = userId.current
 
-  if (!mounted) {
-    return (
-      <div
-        style={{
-          minHeight: '100vh',
-          background: '#0D0820',
-        }}
-      />
-    )
+    const quest = quests.find((q) => q.dimension === dimension)
+    const milestoneId = quest?.active_milestone?.id ?? null
+
+    const res = await fetch('/api/quests/tasks', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId: uid,
+        dimension,
+        title: newTaskTitle.trim(),
+        xpReward: newTaskXp,
+        milestoneId,
+      }),
+    })
+    const data = await res.json()
+
+    if (res.ok && data.task) {
+      setQuests((prev) =>
+        prev.map((q) =>
+          q.dimension === dimension
+            ? { ...q, todays_tasks: [...q.todays_tasks, data.task] }
+            : q
+        )
+      )
+    }
+
+    setNewTaskTitle('')
+    setNewTaskXp(50)
+    setAddingTask(null)
+    setSavingTask(false)
+  }
+
+  const today = new Date().toLocaleDateString('en-GB', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  })
+
+  function daysLabel(date: string | null) {
+    if (!date) return null
+    const diff = Math.ceil((new Date(date).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+    if (diff < 0) return 'overdue'
+    if (diff === 0) return 'due today'
+    return `${diff} days left`
   }
 
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        background: '#0D0820',
-        color: '#F0ECFF',
-        fontFamily: "'Space Grotesk', system-ui, sans-serif",
-        padding: '32px 24px 96px',
-        maxWidth: '680px',
-        margin: '0 auto',
-        position: 'relative',
-      }}
-    >
-      {xpToasts.map((toast) => (
+    <div className="min-h-screen pb-28 overflow-x-hidden" style={{ background: '#0D0820' }}>
+      <div className="px-4 pt-10 pb-4">
+        <p className="text-[10px] text-white/[0.28] mb-[2px] tracking-[0.14em] uppercase">
+          {today}
+        </p>
+        <h1 className="text-[26px] font-bold text-white m-0">Quests</h1>
+      </div>
+
+      {xpToast && (
         <div
-          key={toast.id}
+          className="fixed top-6 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-2xl text-center"
           style={{
-            position: 'fixed',
-            left: `${toast.x}%`,
-            top: `${toast.y}%`,
-            fontSize: '22px',
-            fontWeight: 700,
-            color: '#FFB347',
-            pointerEvents: 'none',
-            zIndex: 200,
-            animation: 'xpFloat 2.5s ease-out forwards',
-            textShadow: '0 0 20px rgba(255,179,71,0.8)',
+            background: DIM_COLORS[xpToast.dimension]?.bg ?? 'rgba(255,255,255,0.1)',
+            border: `1px solid ${DIM_COLORS[xpToast.dimension]?.border ?? 'rgba(255,255,255,0.2)'}`,
+            backdropFilter: 'blur(12px)',
           }}
         >
-          +{toast.amount} XP ✦
-        </div>
-      ))}
-
-      <div style={{ marginBottom: '28px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div>
-            <div
-              style={{
-                fontSize: '11px',
-                fontWeight: 700,
-                textTransform: 'uppercase',
-                letterSpacing: '2px',
-                color: '#9B8EC4',
-                marginBottom: '4px',
-              }}
+          <p className="text-xl font-black text-white m-0">+{xpToast.xp} XP</p>
+          {xpToast.leveledUp && (
+            <p
+              className="text-xs font-bold mt-1"
+              style={{ color: DIM_COLORS[xpToast.dimension]?.accent }}
             >
-              Protagonist
-            </div>
-            <h1 style={{ fontSize: '28px', fontWeight: 700, color: '#F0ECFF', margin: 0 }}>
-              Today&apos;s Quests
-            </h1>
-          </div>
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: '22px', fontWeight: 700, color: '#FF7A65' }}>
-              LVL {level}
-            </div>
-            <div style={{ fontSize: '11px', color: '#6B5E8C' }}>
-              {xpProgress}/{xpNeeded} XP
-            </div>
-          </div>
+              LEVEL UP → Lv.{xpToast.newLevel}
+            </p>
+          )}
         </div>
+      )}
 
-        <div
-          style={{
-            height: '4px',
-            background: 'rgba(255,255,255,0.06)',
-            borderRadius: '2px',
-            marginTop: '12px',
-            overflow: 'hidden',
-          }}
-        >
-          <div
-            style={{
-              height: '100%',
-              width: `${(xpProgress / xpNeeded) * 100}%`,
-              background: 'linear-gradient(90deg, #7B3FE4, #FF7A65)',
-              borderRadius: '2px',
-              transition: 'width 0.6s ease',
-            }}
-          />
-        </div>
-      </div>
-
-      <DimensionBars xp={dimensionXP} highlightDimension={highlightDimension} />
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 0, marginBottom: 8 }}>
-        <ErrorBoundary>
-          <OuraWidget />
-        </ErrorBoundary>
-        <ErrorBoundary>
-          <CalendarWidget />
-        </ErrorBoundary>
-        <ErrorBoundary>
-          <GmailWidget />
-        </ErrorBoundary>
-      </div>
-
-      {quests.length === 0 || showCheckin ? (
-        <div>
-          <div
-            style={{
-              fontSize: '14px',
-              color: '#9B8EC4',
-              marginBottom: '20px',
-              lineHeight: 1.6,
-            }}
-          >
-            Talk to Arc. Tell it how you&apos;re feeling — it&apos;ll generate your 3
-            missions for today.
-          </div>
-          <VoiceCheckin onQuestsGenerated={handleQuestsGenerated} />
+      {loading ? (
+        <div className="mx-4 space-y-4">
+          {[1, 2, 3].map((i) => (
+            <div
+              key={i}
+              className="rounded-2xl h-48 animate-pulse"
+              style={{ background: 'rgba(255,255,255,0.04)' }}
+            />
+          ))}
         </div>
       ) : (
-        <div>
-          {lastCheckIn && (
-            <div
-              style={{
-                background: 'rgba(123,63,228,0.1)',
-                border: '1px solid rgba(123,63,228,0.25)',
-                borderRadius: '16px',
-                padding: '20px 24px',
-                marginBottom: '24px',
-              }}
-            >
+        <div className="px-4 space-y-4">
+          {quests.map((quest) => {
+            const col = DIM_COLORS[quest.dimension] ?? DIM_COLORS.career
+            const level = getLevel(quest.xp)
+            const progress = getLevelProgress(quest.xp)
+            const toNext = getXpToNextLevel(quest.xp)
+            const tier = getTier(quest.xp)
+            const tierLabel = getTierLabel(quest.dimension, tier)
+            const milestone = quest.active_milestone
+            const completedToday = quest.todays_tasks.filter((t) => t.completed).length
+            const totalToday = quest.todays_tasks.length
+
+            return (
               <div
-                style={{
-                  fontSize: '11px',
-                  fontWeight: 700,
-                  color: '#A87EF8',
-                  letterSpacing: '1px',
-                  textTransform: 'uppercase',
-                  marginBottom: '8px',
-                }}
+                key={quest.id}
+                className="rounded-2xl overflow-hidden"
+                style={{ background: col.bg, border: `1px solid ${col.border}` }}
               >
-                Arc · Energy {lastCheckIn.energyLevel}/10 · {lastCheckIn.mood}
+                <div className="h-[3px]" style={{ background: col.accent }} />
+
+                <div className="p-4">
+                  <div className="flex items-start justify-between mb-3">
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-base font-bold text-white">
+                          {quest.character_name}
+                        </span>
+                        <span
+                          className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                          style={{ color: col.accent, background: `${col.accent}20` }}
+                        >
+                          Lv.{level}
+                        </span>
+                        <span className="text-[9px] text-white/30">{quest.character_class}</span>
+                      </div>
+                      <p className="text-[11px] text-white/50 m-0 italic leading-snug">
+                        &ldquo;{quest.vision}&rdquo;
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mb-3">
+                    <div className="flex justify-between mb-1">
+                      <span className="text-[10px] font-semibold" style={{ color: col.accent }}>
+                        {tierLabel}
+                      </span>
+                      <span className="text-[9px] text-white/30">
+                        {toNext} XP to Lv.{level + 1}
+                      </span>
+                    </div>
+                    <div
+                      className="h-[3px] rounded-full"
+                      style={{ background: 'rgba(255,255,255,0.08)' }}
+                    >
+                      <div
+                        className="h-[3px] rounded-full transition-all duration-700"
+                        style={{
+                          width: `${Math.round(progress * 100)}%`,
+                          background: col.accent,
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  {milestone ? (
+                    <div
+                      className="rounded-xl px-3 py-2.5 mb-3"
+                      style={{
+                        background: 'rgba(255,255,255,0.05)',
+                        border: '1px solid rgba(255,255,255,0.07)',
+                      }}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div
+                            className="w-1.5 h-1.5 rounded-full"
+                            style={{ background: col.accent }}
+                          />
+                          <span className="text-[11px] font-semibold text-white/80">
+                            {milestone.title}
+                          </span>
+                        </div>
+                        {milestone.target_date && (
+                          <span className="text-[9px] text-white/30">
+                            {daysLabel(milestone.target_date)}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div
+                      className="rounded-xl px-3 py-2.5 mb-3"
+                      style={{
+                        background: 'rgba(255,255,255,0.03)',
+                        border: '1px dashed rgba(255,255,255,0.1)',
+                      }}
+                    >
+                      <p className="text-[11px] text-white/30 m-0 text-center">
+                        No active milestone — tap + to add one
+                      </p>
+                    </div>
+                  )}
+
+                  {quest.todays_tasks.length > 0 && (
+                    <div className="space-y-2 mb-3">
+                      <p className="text-[9px] text-white/30 uppercase tracking-[0.1em] mb-1">
+                        Today&apos;s quests — {completedToday}/{totalToday} done
+                      </p>
+                      {quest.todays_tasks.map((task) => (
+                        <div
+                          key={task.id}
+                          className={`flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all ${task.completed ? 'opacity-40' : ''}`}
+                          style={{
+                            background: 'rgba(255,255,255,0.05)',
+                            border: '1px solid rgba(255,255,255,0.07)',
+                          }}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => !task.completed && void completeTask(task.id, quest.dimension)}
+                            disabled={task.completed}
+                            className="w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all"
+                            style={{
+                              borderColor: task.completed ? col.accent : 'rgba(255,255,255,0.25)',
+                              background: task.completed ? col.accent : 'transparent',
+                            }}
+                            aria-label={task.completed ? 'Completed' : 'Mark complete'}
+                          >
+                            {task.completed && (
+                              <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
+                                <path
+                                  d="M1 4L4 7L9 1"
+                                  stroke="#0D0820"
+                                  strokeWidth="1.5"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                />
+                              </svg>
+                            )}
+                          </button>
+                          <span
+                            className={`flex-1 text-[12px] ${task.completed ? 'line-through text-white/30' : 'text-white/80'}`}
+                          >
+                            {task.title}
+                          </span>
+                          <span
+                            className="text-[10px] font-bold flex-shrink-0"
+                            style={{
+                              color: task.completed ? 'rgba(255,255,255,0.2)' : col.accent,
+                            }}
+                          >
+                            +{task.xp_reward} XP
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {addingTask?.dimension === quest.dimension ? (
+                    <div className="space-y-2">
+                      <input
+                        type="text"
+                        placeholder="What's the quest?"
+                        value={newTaskTitle}
+                        onChange={(e) => setNewTaskTitle(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && void addTask(quest.dimension)}
+                        autoFocus
+                        className="w-full rounded-xl px-3 py-2.5 text-sm text-white bg-white/5 border border-white/10 outline-none focus:border-white/20 placeholder-white/20"
+                        style={{ fontFamily: 'inherit' }}
+                      />
+                      <div className="flex gap-2">
+                        <select
+                          value={newTaskXp}
+                          onChange={(e) => setNewTaskXp(Number(e.target.value))}
+                          className="flex-1 rounded-xl px-3 py-2 text-xs bg-white/5 border border-white/10 text-white/60 outline-none"
+                          style={{ fontFamily: 'inherit' }}
+                        >
+                          <option value={25}>+25 XP — quick task</option>
+                          <option value={50}>+50 XP — daily quest</option>
+                          <option value={100}>+100 XP — hard challenge</option>
+                          <option value={200}>+200 XP — epic quest</option>
+                        </select>
+                        <button
+                          type="button"
+                          onClick={() => void addTask(quest.dimension)}
+                          disabled={savingTask || !newTaskTitle.trim()}
+                          className="px-4 py-2 rounded-xl text-xs font-bold transition-opacity disabled:opacity-40"
+                          style={{ background: col.accent, color: '#0D0820' }}
+                        >
+                          Add
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAddingTask(null)
+                            setNewTaskTitle('')
+                          }}
+                          className="px-3 py-2 rounded-xl text-xs text-white/40 bg-white/5"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setAddingTask({ dimension: quest.dimension })}
+                      className="w-full rounded-xl py-2 text-[11px] text-center transition-all"
+                      style={{ color: col.accent, border: `1px dashed ${col.border}` }}
+                    >
+                      + Add today&apos;s quest
+                    </button>
+                  )}
+                </div>
               </div>
-              <p
-                style={{
-                  fontSize: '14px',
-                  color: '#F0ECFF',
-                  lineHeight: 1.65,
-                  fontStyle: 'italic',
-                  margin: 0,
-                }}
-              >
-                &ldquo;{lastCheckIn.arcResponse}&rdquo;
+            )
+          })}
+
+          {quests.length === 0 && !loading && (
+            <div className="text-center py-20">
+              <p className="text-4xl mb-4">⚔️</p>
+              <p className="text-white/40 text-sm">
+                No quests yet. Run <code className="text-white/50">quest-system-seed.sql</code>{' '}
+                in Supabase to get started.
               </p>
             </div>
           )}
-
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              marginBottom: '20px',
-            }}
-          >
-            <div style={{ fontSize: '13px', color: '#9B8EC4' }}>
-              {completedIds.size > 0
-                ? `${Math.min(completedIds.size, quests.length)} of ${quests.length} complete`
-                : `${quests.length} quests awaiting`}
-            </div>
-            <button
-              type="button"
-              onClick={() => setShowCheckin(true)}
-              style={{
-                background: 'transparent',
-                color: '#9B8EC4',
-                border: '1px solid rgba(255,255,255,0.08)',
-                borderRadius: '100px',
-                padding: '7px 16px',
-                fontSize: '12px',
-                cursor: 'pointer',
-                fontFamily: 'inherit',
-              }}
-            >
-              New check-in
-            </button>
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            {quests.map((quest) => (
-              <QuestCard
-                key={quest.id}
-                quest={quest}
-                isCompleted={completedIds.has(quest.id)}
-                onComplete={handleCompleteClick}
-              />
-            ))}
-          </div>
-
-          {allComplete && (
-            <div
-              style={{
-                marginTop: '32px',
-                padding: '28px',
-                background: 'rgba(110,231,164,0.06)',
-                border: '1px solid rgba(110,231,164,0.2)',
-                borderRadius: '16px',
-                textAlign: 'center',
-              }}
-            >
-              <div style={{ fontSize: '36px', marginBottom: '10px' }}>🏆</div>
-              <div
-                style={{
-                  fontSize: '18px',
-                  fontWeight: 700,
-                  color: '#6EE7A4',
-                  marginBottom: '6px',
-                }}
-              >
-                All quests complete.
-              </div>
-              <div style={{ fontSize: '14px', color: '#9B8EC4' }}>
-                Arc witnessed everything. Come back tomorrow.
-              </div>
-            </div>
-          )}
         </div>
       )}
-
-      {activeQuest && (
-        <QuestProof
-          quest={activeQuest}
-          onComplete={handleProofComplete}
-          onClose={() => setActiveQuest(null)}
-        />
-      )}
-
-      <style>{`
-        @keyframes xpFloat {
-          0% { opacity: 0; transform: translateY(0) scale(0.8); }
-          20% { opacity: 1; transform: translateY(-10px) scale(1.1); }
-          80% { opacity: 1; transform: translateY(-50px) scale(1); }
-          100% { opacity: 0; transform: translateY(-80px) scale(0.9); }
-        }
-      `}</style>
     </div>
   )
 }
