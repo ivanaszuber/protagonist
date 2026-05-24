@@ -1,5 +1,3 @@
-// Oura Ring API v2 integration
-
 const OURA_BASE = 'https://api.ouraring.com/v2'
 const OURA_AUTH = 'https://cloud.ouraring.com/oauth'
 
@@ -68,14 +66,11 @@ export function ouraRowToDailyData(row: OuraDbRow): OuraDailyData {
   }
 }
 
-export function isOuraConfigured(): boolean {
-  return Boolean(process.env.OURA_CLIENT_ID && process.env.OURA_CLIENT_SECRET)
-}
-
 export function getOuraAuthUrl(state: string, baseUrl: string): string {
+  const redirectUri = `${baseUrl}/api/oura/callback`
   const params = new URLSearchParams({
     client_id: process.env.OURA_CLIENT_ID!,
-    redirect_uri: `${baseUrl}/api/oura/callback`,
+    redirect_uri: redirectUri,
     response_type: 'code',
     scope: 'daily heartrate personal session sleep workout',
     state,
@@ -84,18 +79,25 @@ export function getOuraAuthUrl(state: string, baseUrl: string): string {
 }
 
 export async function exchangeOuraCode(code: string, baseUrl: string): Promise<OuraTokens> {
+  const redirectUri = `${baseUrl}/api/oura/callback`
+  console.log('Exchanging code with redirect_uri:', redirectUri)
+
   const res = await fetch(`${OURA_AUTH}/token`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
       grant_type: 'authorization_code',
       code,
-      redirect_uri: `${baseUrl}/api/oura/callback`,
+      redirect_uri: redirectUri,
       client_id: process.env.OURA_CLIENT_ID!,
       client_secret: process.env.OURA_CLIENT_SECRET!,
     }),
   })
-  if (!res.ok) throw new Error(`Oura token exchange failed: ${await res.text()}`)
+  if (!res.ok) {
+    const errText = await res.text()
+    console.error('Oura token exchange error:', errText)
+    throw new Error(`Oura token exchange failed: ${errText}`)
+  }
   const data = await res.json()
   return {
     access_token: data.access_token,
@@ -124,14 +126,6 @@ export async function refreshOuraTokens(refreshToken: string): Promise<OuraToken
   }
 }
 
-interface OuraSleepPeriod {
-  total_sleep_duration?: number
-  rem_sleep_duration?: number
-  deep_sleep_duration?: number
-  efficiency?: number
-  latency?: number
-}
-
 export async function fetchOuraDailyData(
   accessToken: string,
   date: string
@@ -139,11 +133,10 @@ export async function fetchOuraDailyData(
   const headers = { Authorization: `Bearer ${accessToken}` }
   const params = `?start_date=${date}&end_date=${date}`
 
-  const [sleepRes, readinessRes, activityRes, sleepDetailRes] = await Promise.allSettled([
+  const [sleepRes, readinessRes, activityRes] = await Promise.allSettled([
     fetch(`${OURA_BASE}/usercollection/daily_sleep${params}`, { headers }),
     fetch(`${OURA_BASE}/usercollection/daily_readiness${params}`, { headers }),
     fetch(`${OURA_BASE}/usercollection/daily_activity${params}`, { headers }),
-    fetch(`${OURA_BASE}/usercollection/sleep${params}`, { headers }),
   ])
 
   const result: OuraDailyData = {
@@ -170,33 +163,7 @@ export async function fetchOuraDailyData(
     const sleep = sleepData.data?.[0]
     if (sleep) {
       result.sleep_score = sleep.score ?? null
-      const contributors = sleep.contributors ?? {}
-      result.sleep_efficiency =
-        typeof contributors.efficiency === 'number' ? contributors.efficiency : null
-      result.sleep_latency_seconds =
-        typeof contributors.latency === 'number' ? contributors.latency : null
-    }
-  }
-
-  if (sleepDetailRes.status === 'fulfilled' && sleepDetailRes.value.ok) {
-    const detailData = await sleepDetailRes.value.json()
-    const periods: OuraSleepPeriod[] = detailData.data ?? []
-    const mainSleep = periods.reduce<OuraSleepPeriod | null>((best, period) => {
-      const duration = period.total_sleep_duration ?? 0
-      const bestDuration = best?.total_sleep_duration ?? 0
-      return duration > bestDuration ? period : best
-    }, null)
-
-    if (mainSleep) {
-      result.sleep_total_seconds = mainSleep.total_sleep_duration ?? null
-      result.sleep_rem_seconds = mainSleep.rem_sleep_duration ?? null
-      result.sleep_deep_seconds = mainSleep.deep_sleep_duration ?? null
-      if (result.sleep_efficiency === null && mainSleep.efficiency != null) {
-        result.sleep_efficiency = mainSleep.efficiency
-      }
-      if (result.sleep_latency_seconds === null && mainSleep.latency != null) {
-        result.sleep_latency_seconds = mainSleep.latency
-      }
+      result.sleep_efficiency = sleep.contributors?.efficiency ?? null
     }
   }
 
@@ -205,15 +172,10 @@ export async function fetchOuraDailyData(
     const readiness = readinessData.data?.[0]
     if (readiness) {
       result.readiness_score = readiness.score ?? null
-      const contributors = readiness.contributors ?? {}
-      result.hrv_balance =
-        typeof contributors.hrv_balance === 'number' ? contributors.hrv_balance : null
-      result.recovery_index =
-        typeof contributors.recovery_index === 'number' ? contributors.recovery_index : null
+      result.hrv_balance = readiness.contributors?.hrv_balance ?? null
+      result.recovery_index = readiness.contributors?.recovery_index ?? null
       result.body_temperature_deviation =
-        typeof contributors.body_temperature === 'number'
-          ? contributors.body_temperature
-          : null
+        readiness.contributors?.body_temperature ?? null
     }
   }
 
@@ -232,7 +194,6 @@ export async function fetchOuraDailyData(
 
 export function buildOuraContext(data: OuraDailyData): string {
   const parts: string[] = []
-
   if (data.readiness_score !== null) {
     const level =
       data.readiness_score >= 85
@@ -242,77 +203,32 @@ export function buildOuraContext(data: OuraDailyData): string {
           : data.readiness_score >= 55
             ? 'fair'
             : 'low'
-    parts.push(`Readiness score: ${data.readiness_score}/100 (${level})`)
+    parts.push(`Readiness: ${data.readiness_score}/100 (${level})`)
   }
-
   if (data.sleep_score !== null) {
-    const quality =
-      data.sleep_score >= 85
-        ? 'great night'
-        : data.sleep_score >= 70
-          ? 'solid sleep'
-          : data.sleep_score >= 55
-            ? 'ok sleep'
-            : 'poor night'
-    const hours =
-      data.sleep_total_seconds != null
-        ? Math.round((data.sleep_total_seconds / 3600) * 10) / 10
-        : null
-    parts.push(
-      `Sleep: ${data.sleep_score}/100 (${quality}${hours != null ? `, ${hours}h total` : ''})`
-    )
+    parts.push(`Sleep: ${data.sleep_score}/100`)
   }
-
   if (data.hrv_balance !== null) {
-    const hrvStatus =
-      data.hrv_balance >= 80
-        ? 'well above baseline'
-        : data.hrv_balance >= 60
-          ? 'above baseline'
-          : data.hrv_balance >= 40
-            ? 'near baseline'
-            : 'below baseline — recovery needed'
-    parts.push(`HRV balance: ${data.hrv_balance} (${hrvStatus})`)
+    parts.push(`HRV balance: ${data.hrv_balance}`)
   }
-
   if (data.activity_score !== null) {
-    parts.push(`Activity score: ${data.activity_score}/100`)
+    parts.push(`Activity: ${data.activity_score}/100`)
   }
-
   if (data.steps !== null) {
-    parts.push(`Steps so far: ${data.steps.toLocaleString()}`)
+    parts.push(`Steps: ${data.steps.toLocaleString()}`)
   }
-
-  if (
-    data.body_temperature_deviation !== null &&
-    Math.abs(data.body_temperature_deviation) > 0.2
-  ) {
-    const direction = data.body_temperature_deviation > 0 ? 'elevated' : 'below'
-    parts.push(
-      `Body temp: ${Math.abs(data.body_temperature_deviation).toFixed(1)}°C ${direction} baseline`
-    )
-  }
-
-  if (parts.length === 0) return 'No Oura data available for today.'
-
-  return `Today's Oura data:\n${parts.join('\n')}`
+  return parts.length === 0
+    ? 'No Oura data available.'
+    : `Today's Oura data:\n${parts.join('\n')}`
 }
 
 export function getReadinessGuidance(readinessScore: number | null): string {
   if (readinessScore === null) return ''
-  if (readinessScore >= 85) {
-    return 'Body is primed — this is a day to push boundaries if you want to.'
-  }
-  if (readinessScore >= 70) {
-    return 'Good readiness — normal intensity quests are on point.'
-  }
-  if (readinessScore >= 55) {
-    return 'Moderate readiness — mix effort with recovery. No heroics today.'
-  }
-  if (readinessScore >= 40) {
-    return 'Low readiness — body is asking for recovery. Gentle quests only. Rest IS the quest today.'
-  }
-  return 'Very low readiness — body is in recovery mode. Active rest, not performance.'
+  if (readinessScore >= 85) return 'Body is primed — push if you want to.'
+  if (readinessScore >= 70) return 'Good readiness — normal intensity.'
+  if (readinessScore >= 55) return 'Moderate readiness — mix effort with recovery.'
+  if (readinessScore >= 40) return 'Low readiness — rest IS the quest today.'
+  return 'Very low readiness — active rest only.'
 }
 
 export function ouraToArcPayload(data: OuraDailyData): {

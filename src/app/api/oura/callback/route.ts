@@ -14,13 +14,16 @@ export async function GET(request: Request) {
   }
 
   try {
-    const { userId } = JSON.parse(Buffer.from(state, 'base64url').toString()) as {
+    const parsed = JSON.parse(Buffer.from(state, 'base64url').toString()) as {
       userId: string
+      baseUrl?: string
     }
-    const tokens = await exchangeOuraCode(code, baseUrl)
+    const { userId } = parsed
+    const oauthBaseUrl = parsed.baseUrl ?? baseUrl
+    const tokens = await exchangeOuraCode(code, oauthBaseUrl)
     await saveOuraTokens(userId, tokens)
 
-    const response = NextResponse.redirect(`${baseUrl}/quests?oura=connected`)
+    const response = NextResponse.redirect(`${oauthBaseUrl}/quests?oura=connected`)
     response.cookies.set('protagonist_user_id', userId, {
       maxAge: 60 * 60 * 24 * 365,
       path: '/',
