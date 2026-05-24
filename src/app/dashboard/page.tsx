@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import { getUserId } from '@/lib/user'
-import { loadXP } from '@/lib/xp'
+import { loadXP, loadTodayQuests, loadCompletedQuests } from '@/lib/xp'
 
 interface OuraData {
   readiness_score: number | null
@@ -338,14 +338,25 @@ export default function DashboardPage() {
       setBriefing(briefRes.value.briefing)
       setBriefingLoading(false)
     }
-    if (questRes.status === 'fulfilled' && questRes.value?.quests) {
+    if (questRes.status === 'fulfilled' && questRes.value?.quests?.length) {
       setQuests(questRes.value.quests)
-    }
-    if (xpRes.status === 'fulfilled' && xpRes.value?.xp) {
-      setXp(xpRes.value.xp)
     } else {
-      setXp({ ...loadXP() })
+      const completedIds = loadCompletedQuests()
+      const localQuests = loadTodayQuests().map((q) => ({
+        id: q.id,
+        title: q.title,
+        description: q.description,
+        dimension: q.dimensionId,
+        xp_reward: q.xpReward,
+        completed: completedIds.has(q.id),
+      }))
+      if (localQuests.length > 0) setQuests(localQuests)
     }
+    const apiXp =
+      xpRes.status === 'fulfilled' && xpRes.value?.xp && Object.keys(xpRes.value.xp).length > 0
+        ? (xpRes.value.xp as Record<string, number>)
+        : null
+    setXp({ ...loadXP(), ...apiXp })
 
     setLoaded(true)
 
@@ -529,7 +540,8 @@ export default function DashboardPage() {
           )}
 
           {oura.body_temperature_deviation !== null &&
-            Math.abs(oura.body_temperature_deviation) > 0.1 && (
+            Math.abs(oura.body_temperature_deviation) > 0.05 &&
+            Math.abs(oura.body_temperature_deviation) < 5 && (
               <div className="bg-white/5 rounded-2xl border border-white/10 px-4 py-3 mb-3 flex items-center justify-between backdrop-blur-sm">
                 <div className="flex items-center gap-2">
                   <span>🌡️</span>
@@ -660,7 +672,7 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {Object.keys(xp).length > 0 && (
+      {loaded && (
         <div className="mx-4 mb-6">
           <div className="flex items-center gap-2 mb-3 px-1">
             <span>🏆</span>

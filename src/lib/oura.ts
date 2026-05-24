@@ -18,6 +18,7 @@ export interface OuraDailyData {
   readiness_score: number | null
   hrv_balance: number | null
   recovery_index: number | null
+  /** Celsius deviation from baseline, e.g. +0.12 or -0.08. Roughly ±3°C — NOT the 0–100 contributor score. */
   body_temperature_deviation: number | null
   activity_score: number | null
   steps: number | null
@@ -60,6 +61,7 @@ export interface OuraDbRow {
 }
 
 interface OuraSleepPeriod {
+  type?: string
   total_sleep_duration?: number
   rem_sleep_duration?: number
   deep_sleep_duration?: number
@@ -67,6 +69,13 @@ interface OuraSleepPeriod {
   efficiency?: number
   latency?: number
   average_breath?: number
+}
+
+/** Reject contributor scores (0–100) mistakenly stored as °C deviation. */
+function sanitizeTemperatureDeviation(value: number | null | undefined): number | null {
+  if (value == null || Number.isNaN(value)) return null
+  if (Math.abs(value) > 5) return null
+  return value
 }
 
 export function ouraRowToDailyData(row: OuraDbRow): OuraDailyData {
@@ -85,7 +94,9 @@ export function ouraRowToDailyData(row: OuraDbRow): OuraDailyData {
     readiness_score: row.readiness_score ?? null,
     hrv_balance: row.hrv_balance ?? null,
     recovery_index: row.recovery_index ?? null,
-    body_temperature_deviation: row.body_temperature_deviation ?? null,
+    body_temperature_deviation: sanitizeTemperatureDeviation(
+      row.body_temperature_deviation
+    ),
     activity_score: row.activity_score ?? null,
     steps: row.steps ?? null,
     active_calories: row.active_calories ?? null,
@@ -219,8 +230,9 @@ export async function fetchOuraDailyData(
       result.readiness_score = readiness.score ?? null
       result.hrv_balance = readiness.contributors?.hrv_balance ?? null
       result.recovery_index = readiness.contributors?.recovery_index ?? null
-      result.body_temperature_deviation =
-        readiness.contributors?.body_temperature ?? null
+      result.body_temperature_deviation = sanitizeTemperatureDeviation(
+        readiness.temperature_deviation ?? null
+      )
     }
   }
 
@@ -237,14 +249,19 @@ export async function fetchOuraDailyData(
   if (detailedSleepRes.status === 'fulfilled' && detailedSleepRes.value.ok) {
     const sleepDetail = await detailedSleepRes.value.json()
     const periods: OuraSleepPeriod[] = sleepDetail.data ?? []
-    const mainSleep = periods.reduce<OuraSleepPeriod | null>((best, period) => {
-      const duration = period.total_sleep_duration ?? 0
-      const bestDuration = best?.total_sleep_duration ?? 0
-      return duration > bestDuration ? period : best
-    }, null)
+    const longSleep = periods.find((period) => period.type === 'long_sleep')
+    const mainSleep =
+      longSleep ??
+      periods.reduce<OuraSleepPeriod | null>((best, period) => {
+        const duration = period.total_sleep_duration ?? 0
+        const bestDuration = best?.total_sleep_duration ?? 0
+        return duration > bestDuration ? period : best
+      }, null)
 
     if (mainSleep) {
-      result.sleep_total_seconds = mainSleep.total_sleep_duration ?? null
+      if (!result.sleep_total_seconds) {
+        result.sleep_total_seconds = mainSleep.total_sleep_duration ?? null
+      }
       result.deep_sleep_seconds = mainSleep.deep_sleep_duration ?? null
       result.rem_sleep_seconds = mainSleep.rem_sleep_duration ?? null
       result.light_sleep_seconds = mainSleep.light_sleep_duration ?? null
