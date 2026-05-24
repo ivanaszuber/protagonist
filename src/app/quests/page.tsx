@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Component, type ReactNode } from 'react'
 import {
   Quest,
   DimensionXPState,
@@ -46,6 +46,25 @@ interface XPToast {
   dimensionId: string
   x: number
   y: number
+}
+
+class ErrorBoundary extends Component<
+  { children: ReactNode },
+  { hasError: boolean }
+> {
+  constructor(props: { children: ReactNode }) {
+    super(props)
+    this.state = { hasError: false }
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true }
+  }
+
+  render() {
+    if (this.state.hasError) return null
+    return this.props.children
+  }
 }
 
 export default function QuestsPage() {
@@ -276,8 +295,9 @@ export default function QuestsPage() {
       </div>
 
       <DimensionBars xp={dimensionXP} highlightDimension={highlightDimension} />
-
-      <OuraWidget />
+      <ErrorBoundary>
+        <OuraWidget />
+      </ErrorBoundary>
 
       {quests.length === 0 || showCheckin ? (
         <div>
