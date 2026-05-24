@@ -59,7 +59,7 @@ export default function BottomNav() {
         <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
           <path
             d="M3 9L10 3L17 9V17H13V13H7V17H3V9Z"
-            stroke={active ? '#C084FC' : '#3D3358'}
+            stroke={active ? '#C084FC' : '#6A5A8A'}
             strokeWidth="1.5"
             strokeLinejoin="round"
             fill="none"
@@ -74,17 +74,17 @@ export default function BottomNav() {
       level: levels.career,
       icon: (active) => (
         <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-          <circle cx="10" cy="7" r="4" stroke={active ? '#EF9F27' : '#3D3358'} strokeWidth="1.5" />
+          <circle cx="10" cy="7" r="4" stroke={active ? '#EF9F27' : '#6A5A8A'} strokeWidth="1.5" />
           <path
             d="M6 12Q10 10 14 12L15 19H5Z"
-            stroke={active ? '#EF9F27' : '#3D3358'}
+            stroke={active ? '#EF9F27' : '#6A5A8A'}
             strokeWidth="1.5"
             strokeLinejoin="round"
             fill="none"
           />
           <path
             d="M13 15L15 13L17 15"
-            stroke={active ? '#EF9F27' : '#3D3358'}
+            stroke={active ? '#EF9F27' : '#6A5A8A'}
             strokeWidth="1.2"
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -100,10 +100,10 @@ export default function BottomNav() {
       level: levels.social,
       icon: (active) => (
         <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-          <circle cx="10" cy="7" r="4" stroke={active ? '#F0997B' : '#3D3358'} strokeWidth="1.5" />
+          <circle cx="10" cy="7" r="4" stroke={active ? '#F0997B' : '#6A5A8A'} strokeWidth="1.5" />
           <path
             d="M6 12Q10 10 14 12L15 19H5Z"
-            stroke={active ? '#F0997B' : '#3D3358'}
+            stroke={active ? '#F0997B' : '#6A5A8A'}
             strokeWidth="1.5"
             strokeLinejoin="round"
             fill="none"
@@ -111,7 +111,7 @@ export default function BottomNav() {
           <path
             d="M15 8Q17 10 15 13"
             fill="none"
-            stroke={active ? '#F0997B' : '#3D3358'}
+            stroke={active ? '#F0997B' : '#6A5A8A'}
             strokeWidth="1.2"
             strokeLinecap="round"
           />
@@ -125,10 +125,10 @@ export default function BottomNav() {
       level: levels.wealth,
       icon: (active) => (
         <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-          <circle cx="10" cy="7" r="4" stroke={active ? '#1D9E75' : '#3D3358'} strokeWidth="1.5" />
+          <circle cx="10" cy="7" r="4" stroke={active ? '#1D9E75' : '#6A5A8A'} strokeWidth="1.5" />
           <path
             d="M6 12Q10 10 14 12L15 19H5Z"
-            stroke={active ? '#1D9E75' : '#3D3358'}
+            stroke={active ? '#1D9E75' : '#6A5A8A'}
             strokeWidth="1.5"
             strokeLinejoin="round"
             fill="none"
@@ -138,28 +138,9 @@ export default function BottomNav() {
             cy="3"
             r="2"
             fill={active ? '#FAC775' : 'none'}
-            stroke={active ? '#FAC775' : '#3D3358'}
+            stroke={active ? '#FAC775' : '#6A5A8A'}
             strokeWidth="1"
           />
-        </svg>
-      ),
-    },
-    {
-      href: '/arc',
-      label: 'Oracle',
-      icon: (active) => (
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-          <circle cx="10" cy="10" r="8" stroke={active ? '#9333EA' : '#3D3358'} strokeWidth="1.5" />
-          <ellipse
-            cx="10"
-            cy="10"
-            rx="4"
-            ry="3"
-            stroke={active ? '#9333EA' : '#3D3358'}
-            strokeWidth="1"
-            fill="none"
-          />
-          <circle cx="10" cy="10" r="1.5" fill={active ? '#E879F9' : '#3D3358'} />
         </svg>
       ),
     },
@@ -206,7 +187,7 @@ export default function BottomNav() {
               <span
                 style={{
                   fontSize: 10,
-                  color: isActive ? accent : '#3D3358',
+                  color: isActive ? accent : '#6A5A8A',
                 }}
               >
                 {item.label}
@@ -215,7 +196,7 @@ export default function BottomNav() {
                 <span
                   style={{
                     fontSize: 8,
-                    color: isActive ? accent : '#3D3358',
+                    color: isActive ? accent : '#6A5A8A',
                     opacity: 0.7,
                   }}
                 >

@@ -2,14 +2,10 @@
 
 import { useEffect, useState, useRef, useCallback } from 'react'
 import Link from 'next/link'
-import { motion, AnimatePresence } from 'framer-motion'
-import ScoreRing from '@/components/ScoreRing'
-import ForgeCharacter from '@/components/characters/ForgeCharacter'
-import EchoCharacter from '@/components/characters/EchoCharacter'
-import VaultCharacter from '@/components/characters/VaultCharacter'
-import ProtagonistCharacter from '@/components/characters/ProtagonistCharacter'
+import { useRouter } from 'next/navigation'
+import { motion } from 'framer-motion'
 import OracleButton from '@/components/characters/OracleButton'
-import { getLevel, getLevelProgress, getTier } from '@/lib/xp'
+import { getLevel, getTier } from '@/lib/xp'
 import { CHARACTERS, type Dimension } from '@/lib/character'
 import { getUserId } from '@/lib/user'
 import MoodTracker from '@/components/MoodTracker'
@@ -38,6 +34,7 @@ interface MainQuest {
     completed: boolean
     xp_reward: number
   } | null
+  todays_tasks?: { completed: boolean }[]
   xp: number
 }
 
@@ -46,7 +43,7 @@ interface CalendarEvent {
   start: string
 }
 
-function getArcVerdict(
+function getOracleVerdict(
   oura: OuraData,
   moodScore: number | null
 ): { text: string; color: string } {
@@ -128,12 +125,6 @@ function formatCyclePhase(phase: string | null, day: number | null): string {
   return day ? `${label} · Day ${day}` : label
 }
 
-function daysUntil(dateStr: string): number {
-  const target = new Date(dateStr)
-  const now = new Date()
-  return Math.ceil((target.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
-}
-
 function formatNextEvent(event: CalendarEvent): { title: string; time: string } {
   const d = new Date(event.start)
   const now = new Date()
@@ -164,305 +155,270 @@ function PulsingDot({ color }: { color: string }) {
   )
 }
 
-function XPToast({ xp, show }: { xp: number; show: boolean }) {
+function StatBar({
+  label,
+  value,
+  color,
+}: {
+  label: string
+  value: number | null
+  color: string
+}) {
+  const pct = value ?? 0
   return (
-    <AnimatePresence>
-      {show && (
-        <motion.div
-          initial={{ opacity: 0, y: 10, scale: 0.8 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: -20, scale: 0.9 }}
+    <div style={{ marginBottom: 8 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
+        <span style={{ fontSize: 10, color: '#5A4A7A' }}>{label}</span>
+        <span style={{ fontSize: 10, color: '#7A5FA0' }}>{value ?? '—'}</span>
+      </div>
+      <div style={{ height: 6, background: '#1E0D40', borderRadius: 3, overflow: 'hidden' }}>
+        <div
           style={{
-            position: 'fixed',
-            bottom: 100,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            background: '#FAC775',
-            color: '#412402',
-            padding: '8px 18px',
-            borderRadius: 20,
-            fontSize: 14,
-            fontWeight: 500,
-            zIndex: 50,
+            height: '100%',
+            width: `${pct}%`,
+            background: color,
+            borderRadius: 3,
+            transition: 'width 1s ease',
           }}
-        >
-          +{xp} XP
-        </motion.div>
-      )}
-    </AnimatePresence>
-  )
-}
-
-const CHARACTER_COMPONENTS = {
-  career: ForgeCharacter,
-  social: EchoCharacter,
-  wealth: VaultCharacter,
-} as const
-
-const FLOAT_DELAYS = { career: 0, social: 1.2, wealth: 0.6 }
-
-function WealthProgress({ userId }: { userId: string }) {
-  const [wealth, setWealth] = useState<{
-    net_worth: number | null
-    fire_goal: number
-    fire_year: number
-  } | null>(null)
-
-  useEffect(() => {
-    fetch(`/api/wealth?userId=${encodeURIComponent(userId)}`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then(setWealth)
-      .catch(() => {})
-  }, [userId])
-
-  if (!wealth?.net_worth) {
-    return (
-      <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px' }}>
-        <span style={{ fontSize: 12, color: '#3D3358', fontStyle: 'italic' }}>
-          Add your net worth to track progress
-        </span>
-      </div>
-    )
-  }
-
-  const pct = Math.min((wealth.net_worth / wealth.fire_goal) * 100, 100)
-  return (
-    <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 8, padding: '7px 8px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
-        <span style={{ fontSize: 12, fontWeight: 500, color: '#C8C0D8' }}>
-          €{wealth.net_worth.toLocaleString()}
-        </span>
-        <span style={{ fontSize: 11, color: '#4A4060' }}>
-          €{(wealth.fire_goal / 1000).toFixed(0)}k goal
-        </span>
-      </div>
-      <div
-        style={{
-          background: 'rgba(255,255,255,0.07)',
-          height: 4,
-          borderRadius: 2,
-          overflow: 'hidden',
-        }}
-      >
-        <motion.div
-          initial={{ width: 0 }}
-          animate={{ width: `${pct}%` }}
-          transition={{ duration: 1, ease: 'easeOut', delay: 1 }}
-          style={{ height: '100%', background: '#1D9E75', borderRadius: 2 }}
         />
       </div>
     </div>
   )
 }
 
-interface MissionCardProps {
-  quest: MainQuest
-  userId: string
-  onCompleteTask: (taskId: string, xpReward: number, dimension: string) => void
-  completingTaskId: string | null
+function ForgeCharacter() {
+  return (
+    <svg width="44" height="54" viewBox="0 0 44 54" fill="none">
+      <circle cx="39" cy="10" r="3.5" fill="#FAC775" opacity={0.85} />
+      <circle cx="35" cy="5" r="1.8" fill="#FAC775" opacity={0.55} />
+      <rect x="3" y="8" width="30" height="24" rx="9" fill="#EF9F27" />
+      <circle cx="13" cy="20" r="6" fill="#1A0800" />
+      <circle cx="26" cy="20" r="6" fill="#1A0800" />
+      <circle cx="11" cy="18" r="2" fill="white" opacity={0.6} />
+      <circle cx="24" cy="18" r="2" fill="white" opacity={0.6} />
+      <rect x="7" y="34" width="22" height="16" rx="5" fill="#BA7517" />
+      <line x1="11" y1="41" x2="25" y2="41" stroke="#EF9F27" strokeWidth="1.5" opacity={0.45} />
+      <line x1="11" y1="46" x2="25" y2="46" stroke="#EF9F27" strokeWidth="1" opacity={0.25} />
+    </svg>
+  )
 }
 
-function MissionCard({ quest, userId, onCompleteTask, completingTaskId }: MissionCardProps) {
-  const dim = quest.dimension as Dimension
-  const char = CHARACTERS[dim] ?? CHARACTERS.career
-  const CharSVG = CHARACTER_COMPONENTS[dim] ?? ForgeCharacter
-  const tier = getTier(quest.xp)
-  const level = getLevel(quest.xp)
-  const progressPct = Math.round(getLevelProgress(quest.xp) * 100)
-  const tierLabel = char.tierLabels[tier - 1]
-  const milestone = quest.active_milestone
-  const days =
-    milestone?.target_date ? daysUntil(milestone.target_date) : null
-  const isWealth = dim === 'wealth'
+function EchoCharacter() {
+  return (
+    <svg width="46" height="54" viewBox="0 0 46 54" fill="none">
+      <circle cx="38" cy="10" r="3" fill="#FFCAB6" opacity={0.8} />
+      <rect x="3" y="8" width="30" height="24" rx="9" fill="#F0997B" />
+      <circle cx="13" cy="20" r="6" fill="#1A0800" />
+      <circle cx="26" cy="20" r="6" fill="#1A0800" />
+      <circle cx="11" cy="18" r="2" fill="white" opacity={0.6} />
+      <circle cx="24" cy="18" r="2" fill="white" opacity={0.6} />
+      <rect x="7" y="34" width="22" height="16" rx="5" fill="#D85A30" />
+      <path
+        d="M33 30Q37 35 33 40"
+        stroke="#F0997B"
+        strokeWidth="2"
+        strokeLinecap="round"
+        fill="none"
+        opacity={0.85}
+      />
+      <path
+        d="M36 27Q42 35 36 43"
+        stroke="#F0997B"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        fill="none"
+        opacity={0.4}
+      />
+    </svg>
+  )
+}
+
+function VaultCharacter() {
+  return (
+    <svg width="42" height="56" viewBox="0 0 42 56" fill="none">
+      <circle cx="18" cy="7" r="5.5" fill="#FAC775" opacity={0.95} />
+      <circle cx="18" cy="7" r="3.5" fill="#EF9F27" />
+      <path d="M17.5 4.5V9.5M15.5 7H21" stroke="#FAC775" strokeWidth="1.2" strokeLinecap="round" />
+      <rect x="3" y="12" width="30" height="24" rx="9" fill="#1D9E75" />
+      <circle cx="13" cy="24" r="6" fill="#012A1E" />
+      <circle cx="26" cy="24" r="6" fill="#012A1E" />
+      <circle cx="11" cy="22" r="2" fill="white" opacity={0.6} />
+      <circle cx="24" cy="22" r="2" fill="white" opacity={0.6} />
+      <rect x="7" y="38" width="22" height="16" rx="5" fill="#0F6E56" />
+      <path
+        d="M11 51L16 47L20 49L26 44"
+        stroke="#1D9E75"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+        opacity={0.75}
+      />
+    </svg>
+  )
+}
+
+const CHARACTER_COMPONENTS: Record<string, React.FC> = {
+  career: ForgeCharacter,
+  social: EchoCharacter,
+  wealth: VaultCharacter,
+}
+
+const AREA_LABELS: Record<string, string> = {
+  career: 'Career',
+  social: 'Social',
+  wealth: 'Finances',
+}
+
+const CHARACTER_COLORS: Record<string, string> = {
+  career: '#EF9F27',
+  social: '#F0997B',
+  wealth: '#1D9E75',
+}
+
+const LEFT_BORDER_COLORS: Record<string, string> = {
+  career: '#EF9F27',
+  social: '#F0997B',
+  wealth: '#1D9E75',
+}
+
+function MissionCard({
+  quest,
+  dimension,
+  xp,
+  level,
+  tierLabel,
+  todayTasks,
+}: {
+  quest: { title: string }
+  dimension: string
+  xp: number
+  level: number
+  tierLabel: string
+  todayTasks: { completed: boolean }[]
+}) {
+  const CharSvg = CHARACTER_COMPONENTS[dimension] ?? ForgeCharacter
+  const areaLabel = AREA_LABELS[dimension] ?? dimension
+  const color = CHARACTER_COLORS[dimension] ?? '#9333EA'
+  const charName =
+    dimension === 'career' ? 'Forge' : dimension === 'social' ? 'Echo' : 'Vault'
+
+  const xpInLevel = xp % 500
+  const xpNeeded = 500
+  const pct = Math.round((xpInLevel / xpNeeded) * 100)
+
+  const doneTasks = todayTasks.filter((t) => t.completed).length
+  const totalTasks = todayTasks.length
+
+  const router = useRouter()
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 14 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ ease: 'easeOut', duration: 0.45 }}
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={() =>
+        router.push(
+          dimension === 'career' ? '/forge' : dimension === 'social' ? '/echo' : '/vault'
+        )
+      }
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          router.push(
+            dimension === 'career' ? '/forge' : dimension === 'social' ? '/echo' : '/vault'
+          )
+        }
+      }}
       style={{
         background: '#140C28',
-        border: `1.5px solid ${char.color}`,
-        borderRadius: 16,
-        padding: '12px 14px',
-        marginBottom: 10,
+        borderRadius: 14,
+        border: '0.5px solid #2D1B55',
+        padding: '12px 12px 12px 14px',
+        marginBottom: 8,
+        position: 'relative',
+        overflow: 'hidden',
         display: 'flex',
-        gap: 12,
+        alignItems: 'center',
+        gap: 10,
+        cursor: 'pointer',
       }}
     >
       <div
         style={{
-          flexShrink: 0,
-          width: 54,
+          position: 'absolute',
+          left: 0,
+          top: 0,
+          bottom: 0,
+          width: 3,
+          background: LEFT_BORDER_COLORS[dimension] ?? '#9333EA',
+        }}
+      />
+
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 5 }}>
+        <span style={{ fontSize: 16, fontWeight: 500, color: '#E8E0F0', lineHeight: 1 }}>
+          {areaLabel}
+        </span>
+        <span style={{ fontSize: 10, color: '#5A4A7A', lineHeight: 1.3 }}>{quest.title}</span>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+          <span style={{ fontSize: 9, color: '#5A4A7A', whiteSpace: 'nowrap' }}>
+            {xpInLevel}/{xpNeeded} XP
+          </span>
+          <div
+            style={{
+              flex: 1,
+              height: 4,
+              background: '#1E0D40',
+              borderRadius: 2,
+              overflow: 'hidden',
+            }}
+          >
+            <div
+              style={{
+                width: `${pct}%`,
+                height: '100%',
+                background: color,
+                borderRadius: 2,
+                transition: 'width 1s ease',
+              }}
+            />
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+          {todayTasks.map((t, i) => (
+            <div
+              key={i}
+              style={{
+                width: 6,
+                height: 6,
+                borderRadius: '50%',
+                background: t.completed ? '#34d399' : '#1E0D40',
+                border: t.completed ? 'none' : '0.5px solid #3D2878',
+              }}
+            />
+          ))}
+          <span style={{ fontSize: 9, color: '#5A4A7A', marginLeft: 3 }}>
+            {doneTasks} of {totalTasks} today
+          </span>
+        </div>
+      </div>
+
+      <div
+        style={{
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
-          gap: 6,
+          gap: 2,
+          flexShrink: 0,
         }}
       >
-        <CharSVG tier={tier} delay={FLOAT_DELAYS[dim] ?? 0} />
-        <span
-          style={{
-            fontSize: 10,
-            fontWeight: 500,
-            color: char.color,
-            background: char.badgeBg,
-            border: `0.5px solid ${char.badgeBorder}`,
-            padding: '2px 7px',
-            borderRadius: 3,
-          }}
-        >
-          Lv.{level}
+        <CharSvg />
+        <span style={{ fontSize: 9, fontWeight: 500, color }}>{charName}</span>
+        <span style={{ fontSize: 8, color: '#5A4A7A' }}>
+          Lv {level} · {tierLabel}
         </span>
       </div>
-
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'baseline',
-            justifyContent: 'space-between',
-            marginBottom: 2,
-          }}
-        >
-          <span style={{ fontSize: 15, fontWeight: 500, color: '#E8E0F0' }}>{char.name}</span>
-          <span style={{ fontSize: 10, color: char.color, opacity: 0.8 }}>{tierLabel}</span>
-        </div>
-
-        <div
-          style={{
-            background: 'rgba(255,255,255,0.07)',
-            height: 3,
-            borderRadius: 2,
-            overflow: 'hidden',
-            marginBottom: 8,
-          }}
-        >
-          <motion.div
-            initial={{ width: 0 }}
-            animate={{ width: `${progressPct}%` }}
-            transition={{ duration: 1, ease: 'easeOut', delay: 0.8 }}
-            style={{ height: '100%', background: char.color, borderRadius: 2 }}
-          />
-        </div>
-
-        <p
-          style={{
-            fontSize: 11,
-            color: '#4A4060',
-            margin: '0 0 6px',
-            fontStyle: 'italic',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          {quest.vision}
-        </p>
-
-        {milestone && (
-          <p
-            style={{
-              fontSize: 11,
-              color: '#6A6080',
-              margin: '0 0 6px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 4,
-            }}
-          >
-            <svg width="11" height="11" viewBox="0 0 11 11" style={{ flexShrink: 0 }}>
-              <path d="M2 1 L9 1 L9 7 L2 7 L5.5 10 Z" fill={char.color} opacity="0.7" />
-            </svg>
-            {milestone.title}
-            {days !== null && <span style={{ color: '#4A4060' }}> · {days}d left</span>}
-          </p>
-        )}
-
-        {isWealth ? (
-          <WealthProgress userId={userId} />
-        ) : quest.today_task ? (
-          <button
-            type="button"
-            onClick={() =>
-              !quest.today_task!.completed &&
-              onCompleteTask(quest.today_task!.id, quest.today_task!.xp_reward, dim)
-            }
-            style={{
-              width: '100%',
-              textAlign: 'left',
-              background: 'rgba(255,255,255,0.04)',
-              border: 'none',
-              borderRadius: 8,
-              padding: '6px 8px',
-              cursor: quest.today_task.completed ? 'default' : 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-            }}
-          >
-            <motion.div
-              animate={quest.today_task.completed ? { scale: [1, 1.3, 1] } : {}}
-              style={{
-                width: 15,
-                height: 15,
-                borderRadius: '50%',
-                border: `1.5px solid ${char.color}`,
-                background: quest.today_task.completed ? char.color : 'transparent',
-                flexShrink: 0,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              {quest.today_task.completed && (
-                <svg width="8" height="8" viewBox="0 0 8 8">
-                  <path
-                    d="M1.5 4 L3.5 6 L6.5 2"
-                    stroke="#0D0820"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    fill="none"
-                  />
-                </svg>
-              )}
-            </motion.div>
-            <span
-              style={{
-                fontSize: 12,
-                color: quest.today_task.completed ? '#4A4060' : '#B8B0C8',
-                textDecoration: quest.today_task.completed ? 'line-through' : 'none',
-              }}
-            >
-              {completingTaskId === quest.today_task.id
-                ? 'Completing...'
-                : quest.today_task.title}
-            </span>
-            {!quest.today_task.completed && (
-              <span style={{ marginLeft: 'auto', fontSize: 10, color: '#4A4060' }}>
-                +{quest.today_task.xp_reward} XP
-              </span>
-            )}
-          </button>
-        ) : (
-          <div
-            style={{
-              background: 'rgba(255,255,255,0.03)',
-              borderRadius: 8,
-              padding: '6px 8px',
-            }}
-          >
-            <span style={{ fontSize: 12, color: '#3D3358', fontStyle: 'italic' }}>
-              No quest today —{' '}
-              <Link href="/quests" style={{ color: char.color, textDecoration: 'none' }}>
-                add one
-              </Link>
-            </span>
-          </div>
-        )}
-      </div>
-    </motion.div>
+    </div>
   )
 }
 
@@ -472,12 +428,7 @@ export default function DashboardPage() {
   const [quests, setQuests] = useState<MainQuest[]>([])
   const [nextEvent, setNextEvent] = useState<CalendarEvent | null>(null)
   const [loading, setLoading] = useState(true)
-  const [completingTaskId, setCompletingTaskId] = useState<string | null>(null)
   const [todayMood, setTodayMood] = useState<number | null>(null)
-  const [xpToast, setXpToast] = useState<{ xp: number; visible: boolean }>({
-    xp: 0,
-    visible: false,
-  })
 
   const loadDashboard = useCallback(async () => {
     const uid = userId.current
@@ -520,35 +471,6 @@ export default function DashboardPage() {
     void loadDashboard()
   }, [loadDashboard])
 
-  async function handleCompleteTask(taskId: string, xpReward: number, dimension: string) {
-    setCompletingTaskId(taskId)
-    try {
-      const res = await fetch(`/api/quests/tasks/${taskId}/complete`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: userId.current }),
-      })
-      const data = await res.json()
-      if (res.ok) {
-        setQuests((prev) =>
-          prev.map((q) =>
-            q.today_task?.id === taskId
-              ? {
-                  ...q,
-                  xp: q.xp + (data.xp_earned ?? xpReward),
-                  today_task: { ...q.today_task!, completed: true },
-                }
-              : q
-          )
-        )
-        setXpToast({ xp: data.xp_earned ?? xpReward, visible: true })
-        setTimeout(() => setXpToast((t) => ({ ...t, visible: false })), 2000)
-      }
-    } finally {
-      setCompletingTaskId(null)
-    }
-  }
-
   async function handleSyncOura() {
     try {
       const ouraSync = await fetch('/api/oura/sync', {
@@ -573,7 +495,7 @@ export default function DashboardPage() {
         ? protagonistTiers[1]
         : protagonistTiers[2]
 
-  const arc = oura ? getArcVerdict(oura, todayMood) : null
+  const oracle = oura ? getOracleVerdict(oura, todayMood) : null
   const cycleLabel = oura ? formatCyclePhase(oura.cycle_phase, oura.cycle_day) : ''
 
   const ORDER: Dimension[] = ['career', 'social', 'wealth']
@@ -584,11 +506,15 @@ export default function DashboardPage() {
 
   return (
     <main
+      className="dashboard-scroll"
       style={{
         background: '#0D0820',
         minHeight: '100vh',
         padding: '0 0 100px 0',
         fontFamily: 'var(--font-space-grotesk), system-ui, sans-serif',
+        overflowY: 'auto',
+        scrollbarWidth: 'none',
+        msOverflowStyle: 'none',
       }}
     >
       <div style={{ maxWidth: 430, margin: '0 auto', padding: '0 16px' }}>
@@ -641,7 +567,37 @@ export default function DashboardPage() {
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 14 }}>
-            <ProtagonistCharacter size={50} />
+            <div
+              style={{
+                width: 50,
+                height: 50,
+                borderRadius: 14,
+                background: '#1E0840',
+                border: '1.5px solid #9333EA',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+              }}
+            >
+              <svg width="34" height="42" viewBox="0 0 34 42" fill="none">
+                <path d="M4 14 L8 6 L17 11 L26 6 L30 14Z" fill="#FAC775" />
+                <circle cx="4" cy="14" r="2.5" fill="#ef4444" />
+                <circle cx="17" cy="10" r="2.5" fill="#22c55e" />
+                <circle cx="30" cy="14" r="2.5" fill="#60a5fa" />
+                <rect x="4" y="12" width="26" height="20" rx="8" fill="#9333EA" />
+                <circle cx="12" cy="22" r="5.5" fill="#1A003A" />
+                <circle cx="22" cy="22" r="5.5" fill="#1A003A" />
+                <circle cx="10.2" cy="20.2" r="1.8" fill="white" opacity={0.6} />
+                <circle cx="20.2" cy="20.2" r="1.8" fill="white" opacity={0.6} />
+                <rect x="7" y="34" width="20" height="9" rx="4" fill="#7C3AED" />
+                <path
+                  d="M17 35.5L18.2 38.8L21.8 38.8L19 40.8L20 44L17 42L14 44L15 40.8L12.2 38.8L15.8 38.8Z"
+                  fill="#FAC775"
+                  transform="scale(0.52) translate(12,27)"
+                />
+              </svg>
+            </div>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                 <span style={{ fontSize: 18, fontWeight: 500, color: '#E8E0F0' }}>Ivana</span>
@@ -667,30 +623,24 @@ export default function DashboardPage() {
             style={{ borderTop: '0.5px solid rgba(255,255,255,0.06)', marginBottom: 14 }}
           />
 
-          <div style={{ display: 'flex', justifyContent: 'space-around', marginBottom: 14 }}>
-            <ScoreRing
-              value={oura?.readiness_score ?? null}
-              color="#34d399"
-              label="Stamina"
-            />
-            <ScoreRing value={oura?.sleep_score ?? null} color="#60a5fa" label="Mana" />
-            <ScoreRing value={oura?.activity_score ?? null} color="#fb923c" label="Power" />
-          </div>
+          <StatBar
+            label="Resilience"
+            value={oura?.readiness_score ?? null}
+            color="#34d399"
+          />
+          <StatBar label="Sleep" value={oura?.sleep_score ?? null} color="#60a5fa" />
+          <StatBar
+            label="Activity"
+            value={oura?.activity_score ?? null}
+            color="#EF9F27"
+          />
 
-          {arc && (
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 10 }}>
-              <PulsingDot color={arc.color} />
-              <p
-                style={{
-                  fontSize: 13,
-                  color: '#C8C0E0',
-                  margin: 0,
-                  lineHeight: 1.5,
-                  fontStyle: 'italic',
-                }}
-              >
-                {arc.text}
-              </p>
+          {oracle && (
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginTop: 10 }}>
+              <PulsingDot color={oracle.color} />
+              <span style={{ fontSize: 11, color: '#A090C0', fontStyle: 'italic' }}>
+                {oracle.text}
+              </span>
             </div>
           )}
 
@@ -765,15 +715,29 @@ export default function DashboardPage() {
             No quests yet — tap to begin your journey
           </Link>
         ) : (
-          sortedQuests.map((q) => (
-            <MissionCard
-              key={q.id}
-              quest={q}
-              userId={userId.current}
-              onCompleteTask={handleCompleteTask}
-              completingTaskId={completingTaskId}
-            />
-          ))
+          sortedQuests.map((q) => {
+            const dim = q.dimension as Dimension
+            const char = CHARACTERS[dim] ?? CHARACTERS.career
+            const tier = getTier(q.xp)
+            const level = getLevel(q.xp)
+            const tierLabel = char.tierLabels[tier - 1]
+            const todayTasks = (q.todays_tasks ?? []).map((t) => ({
+              completed: Boolean(t.completed),
+            }))
+            const subtitle = q.active_milestone?.title ?? q.vision
+
+            return (
+              <MissionCard
+                key={q.id}
+                quest={{ title: subtitle }}
+                dimension={q.dimension}
+                xp={q.xp}
+                level={level}
+                tierLabel={tierLabel}
+                todayTasks={todayTasks}
+              />
+            )
+          })
         )}
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
@@ -820,7 +784,6 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <XPToast xp={xpToast.xp} show={xpToast.visible} />
     </main>
   )
 }

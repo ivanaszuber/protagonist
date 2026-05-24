@@ -3,7 +3,7 @@
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 
-export default function ArcPage() {
+export default function OraclePage() {
   const router = useRouter()
 
   useEffect(() => {
@@ -21,7 +21,7 @@ export default function ArcPage() {
         justifyContent: 'center',
       }}
     >
-      <span style={{ color: '#3D3358', fontSize: 13 }}>Opening Oracle…</span>
+      <span style={{ color: '#6A5A8A', fontSize: 13 }}>Opening Oracle…</span>
     </main>
   )
 }
