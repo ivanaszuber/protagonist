@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import { Space_Grotesk } from 'next/font/google'
 import { ArcChat } from '@/components/arc/ArcChat'
-import { BottomNav } from '@/components/nav/BottomNav'
+import BottomNav from '@/components/BottomNav'
 import './globals.css'
 
 const spaceGrotesk = Space_Grotesk({

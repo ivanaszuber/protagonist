@@ -13,7 +13,7 @@ interface Message {
 
 export function ArcChat() {
   const pathname = usePathname()
-  const hideDefaultFab = pathname === '/dashboard'
+  const hideDefaultFab = pathname === '/dashboard' || pathname === '/arc'
   const [chatState, setChatState] = useState<ChatState>('closed')
   const [messages, setMessages] = useState<Message[]>([])
   const [inputText, setInputText] = useState('')
