@@ -176,7 +176,7 @@ export default function OuraWidget() {
           <span style={{ fontSize: 13, fontWeight: 600, color: '#9B8EC4' }}>Oura Ring</span>
         </div>
         <p style={{ fontSize: 12, color: '#6B5E8C', marginBottom: 12, lineHeight: 1.5 }}>
-          Connect your ring to power Arc with real energy data.
+          Connect your ring to power the Oracle with real energy data.
         </p>
         <button
           type="button"

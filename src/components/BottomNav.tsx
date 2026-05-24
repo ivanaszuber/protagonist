@@ -56,9 +56,9 @@ export default function BottomNav() {
       href: '/dashboard',
       label: 'Home',
       icon: (active) => (
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+        <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
           <path
-            d="M3 9L10 3L17 9V17H13V13H7V17H3V9Z"
+            d="M2.5 10.5L11 3L19.5 10.5V20H14.5V14.5H7.5V20H2.5V10.5Z"
             stroke={active ? '#C084FC' : '#6A5A8A'}
             strokeWidth="1.5"
             strokeLinejoin="round"
@@ -73,23 +73,26 @@ export default function BottomNav() {
       color: '#EF9F27',
       level: levels.career,
       icon: (active) => (
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-          <circle cx="10" cy="7" r="4" stroke={active ? '#EF9F27' : '#6A5A8A'} strokeWidth="1.5" />
-          <path
-            d="M6 12Q10 10 14 12L15 19H5Z"
-            stroke={active ? '#EF9F27' : '#6A5A8A'}
-            strokeWidth="1.5"
-            strokeLinejoin="round"
-            fill="none"
+        <svg width="24" height="22" viewBox="0 0 28 26" fill="none">
+          <circle
+            cx="24"
+            cy="5"
+            r="2.8"
+            fill={active ? '#EF9F27' : '#6A5A8A'}
+            opacity={active ? 0.7 : 0.4}
           />
-          <path
-            d="M13 15L15 13L17 15"
-            stroke={active ? '#EF9F27' : '#6A5A8A'}
-            strokeWidth="1.2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            fill="none"
+          <circle
+            cx="21"
+            cy="2"
+            r="1.4"
+            fill={active ? '#EF9F27' : '#6A5A8A'}
+            opacity={active ? 0.45 : 0.25}
           />
+          <rect x="2" y="5" width="20" height="16" rx="6" fill={active ? '#EF9F27' : '#2D1B55'} />
+          <circle cx="8.5" cy="13" r="4" fill={active ? '#1A0800' : '#1A0D30'} />
+          <circle cx="15.5" cy="13" r="4" fill={active ? '#1A0800' : '#1A0D30'} />
+          <circle cx="7.2" cy="11.8" r="1.3" fill="white" opacity={active ? 0.6 : 0.2} />
+          <circle cx="14.2" cy="11.8" r="1.3" fill="white" opacity={active ? 0.6 : 0.2} />
         </svg>
       ),
     },
@@ -99,21 +102,25 @@ export default function BottomNav() {
       color: '#F0997B',
       level: levels.social,
       icon: (active) => (
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-          <circle cx="10" cy="7" r="4" stroke={active ? '#F0997B' : '#6A5A8A'} strokeWidth="1.5" />
-          <path
-            d="M6 12Q10 10 14 12L15 19H5Z"
-            stroke={active ? '#F0997B' : '#6A5A8A'}
-            strokeWidth="1.5"
-            strokeLinejoin="round"
-            fill="none"
+        <svg width="26" height="22" viewBox="0 0 30 26" fill="none">
+          <circle
+            cx="25"
+            cy="8"
+            r="2.2"
+            fill={active ? '#F0997B' : '#6A5A8A'}
+            opacity={active ? 0.7 : 0.4}
           />
+          <rect x="2" y="5" width="20" height="16" rx="6" fill={active ? '#F0997B' : '#2D1B55'} />
+          <circle cx="8.5" cy="13" r="4" fill={active ? '#1A0800' : '#1A0D30'} />
+          <circle cx="15.5" cy="13" r="4" fill={active ? '#1A0800' : '#1A0D30'} />
+          <circle cx="7.2" cy="11.8" r="1.3" fill="white" opacity={active ? 0.6 : 0.2} />
+          <circle cx="14.2" cy="11.8" r="1.3" fill="white" opacity={active ? 0.6 : 0.2} />
           <path
-            d="M15 8Q17 10 15 13"
-            fill="none"
+            d="M24 9Q28 13 24 17"
             stroke={active ? '#F0997B' : '#6A5A8A'}
-            strokeWidth="1.2"
+            strokeWidth="1.8"
             strokeLinecap="round"
+            fill="none"
           />
         </svg>
       ),
@@ -124,23 +131,26 @@ export default function BottomNav() {
       color: '#1D9E75',
       level: levels.wealth,
       icon: (active) => (
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-          <circle cx="10" cy="7" r="4" stroke={active ? '#1D9E75' : '#6A5A8A'} strokeWidth="1.5" />
-          <path
-            d="M6 12Q10 10 14 12L15 19H5Z"
-            stroke={active ? '#1D9E75' : '#6A5A8A'}
-            strokeWidth="1.5"
-            strokeLinejoin="round"
-            fill="none"
-          />
+        <svg width="24" height="24" viewBox="0 0 28 28" fill="none">
           <circle
-            cx="10"
-            cy="3"
-            r="2"
-            fill={active ? '#FAC775' : 'none'}
+            cx="12"
+            cy="4"
+            r="4"
+            fill={active ? '#FAC775' : '#6A5A8A'}
+            opacity={active ? 0.95 : 0.4}
+          />
+          <circle cx="12" cy="4" r="2.5" fill={active ? '#EF9F27' : '#3D2878'} />
+          <path
+            d="M11.5 2V6M10 4H14.5"
             stroke={active ? '#FAC775' : '#6A5A8A'}
             strokeWidth="1"
+            strokeLinecap="round"
           />
+          <rect x="2" y="8" width="20" height="16" rx="6" fill={active ? '#1D9E75' : '#2D1B55'} />
+          <circle cx="8.5" cy="16" r="4" fill={active ? '#012A1E' : '#1A0D30'} />
+          <circle cx="15.5" cy="16" r="4" fill={active ? '#012A1E' : '#1A0D30'} />
+          <circle cx="7.2" cy="14.8" r="1.3" fill="white" opacity={active ? 0.6 : 0.2} />
+          <circle cx="14.2" cy="14.8" r="1.3" fill="white" opacity={active ? 0.6 : 0.2} />
         </svg>
       ),
     },

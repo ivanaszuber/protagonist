@@ -147,7 +147,7 @@ export default function CalendarWidget() {
           </span>
         </div>
         <p style={{ fontSize: 12, color: '#6B5E8C', marginBottom: 12, lineHeight: 1.5 }}>
-          Let Arc see your day so it can fit quests around your schedule.
+          Let the Oracle see your day so it can fit quests around your schedule.
         </p>
         <button
           type="button"

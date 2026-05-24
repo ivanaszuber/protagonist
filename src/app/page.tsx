@@ -53,7 +53,7 @@ export default function Home() {
           marginBottom: '40px',
         }}
       >
-        Your life, as an RPG. Talk to Arc, get your quests, live your day.
+        Your life, as an RPG. Talk to the Oracle, get your quests, live your day.
       </p>
 
       <Link

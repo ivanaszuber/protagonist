@@ -4,7 +4,6 @@ import { useEffect, useState, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
-import OracleButton from '@/components/characters/OracleButton'
 import { getLevel, getTier } from '@/lib/xp'
 import { CHARACTERS, type Dimension } from '@/lib/character'
 import { getUserId } from '@/lib/user'
@@ -136,10 +135,6 @@ function formatNextEvent(event: CalendarEvent): { title: string; time: string } 
       ? time
       : `${d.toLocaleDateString([], { weekday: 'short' })} ${time}`,
   }
-}
-
-function openOracle() {
-  window.dispatchEvent(new CustomEvent('protagonist:open-oracle'))
 }
 
 function PulsingDot({ color }: { color: string }) {
@@ -412,7 +407,15 @@ function MissionCard({
           flexShrink: 0,
         }}
       >
-        <CharSvg />
+        <div
+          style={{
+            animation: 'protagonist-float 3.2s ease-in-out infinite',
+            animationDelay:
+              dimension === 'career' ? '0s' : dimension === 'social' ? '0.5s' : '1s',
+          }}
+        >
+          <CharSvg />
+        </div>
         <span style={{ fontSize: 9, fontWeight: 500, color }}>{charName}</span>
         <span style={{ fontSize: 8, color: '#5A4A7A' }}>
           Lv {level} · {tierLabel}
@@ -423,6 +426,7 @@ function MissionCard({
 }
 
 export default function DashboardPage() {
+  const router = useRouter()
   const userId = useRef(getUserId())
   const [oura, setOura] = useState<OuraData | null>(null)
   const [quests, setQuests] = useState<MainQuest[]>([])
@@ -740,48 +744,101 @@ export default function DashboardPage() {
           })
         )}
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-          {nextEvent ? (
-            <div
+        {nextEvent && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              background: '#140C28',
+              border: '0.5px solid rgba(255,255,255,0.07)',
+              borderRadius: 20,
+              padding: '9px 14px',
+              marginBottom: 4,
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ flexShrink: 0 }}>
+              <rect x="1" y="2" width="12" height="11" rx="2" stroke="#5A5070" strokeWidth="1.2" />
+              <line x1="1" y1="5.5" x2="13" y2="5.5" stroke="#5A5070" strokeWidth="1" />
+              <line x1="4" y1="1" x2="4" y2="3.5" stroke="#5A5070" strokeWidth="1.2" strokeLinecap="round" />
+              <line x1="10" y1="1" x2="10" y2="3.5" stroke="#5A5070" strokeWidth="1.2" strokeLinecap="round" />
+            </svg>
+            <span
               style={{
+                fontSize: 13,
+                color: '#C8C0D8',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
                 flex: 1,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                background: '#140C28',
-                border: '0.5px solid rgba(255,255,255,0.07)',
-                borderRadius: 20,
-                padding: '9px 14px',
               }}
             >
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ flexShrink: 0 }}>
-                <rect x="1" y="2" width="12" height="11" rx="2" stroke="#5A5070" strokeWidth="1.2" />
-                <line x1="1" y1="5.5" x2="13" y2="5.5" stroke="#5A5070" strokeWidth="1" />
-                <line x1="4" y1="1" x2="4" y2="3.5" stroke="#5A5070" strokeWidth="1.2" strokeLinecap="round" />
-                <line x1="10" y1="1" x2="10" y2="3.5" stroke="#5A5070" strokeWidth="1.2" strokeLinecap="round" />
-              </svg>
-              <span
-                style={{
-                  fontSize: 13,
-                  color: '#C8C0D8',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {formatNextEvent(nextEvent).title}
-              </span>
-              <span
-                style={{ marginLeft: 'auto', fontSize: 12, color: '#3D3358', flexShrink: 0 }}
-              >
-                {formatNextEvent(nextEvent).time}
-              </span>
-            </div>
-          ) : (
-            <div style={{ flex: 1 }} />
-          )}
-          <OracleButton onClick={openOracle} />
-        </div>
+              {formatNextEvent(nextEvent).title}
+            </span>
+            <span style={{ fontSize: 12, color: '#6A5A8A', flexShrink: 0 }}>
+              {formatNextEvent(nextEvent).time}
+            </span>
+          </div>
+        )}
+      </div>
+
+      <div
+        style={{
+          position: 'fixed',
+          bottom: 88,
+          right: 20,
+          width: 54,
+          height: 54,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 40,
+        }}
+      >
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            borderRadius: '50%',
+            border: '1.5px solid #9333EA',
+            animation: 'oracle-ring 2.2s ease-out infinite',
+          }}
+        />
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            borderRadius: '50%',
+            border: '1.5px solid #9333EA',
+            animation: 'oracle-ring 2.2s ease-out infinite',
+            animationDelay: '1.1s',
+          }}
+        />
+        <button
+          type="button"
+          onClick={() => router.push('/oracle')}
+          aria-label="Oracle"
+          style={{
+            width: 54,
+            height: 54,
+            borderRadius: '50%',
+            background: '#200A45',
+            border: '2px solid #9333EA',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            position: 'relative',
+            animation: 'oracle-breathe 3s ease-in-out infinite',
+          }}
+        >
+          <svg width="26" height="26" viewBox="0 0 26 26" fill="none">
+            <ellipse cx="13" cy="13" rx="11" ry="7.5" stroke="#9333EA" strokeWidth="1.5" />
+            <ellipse cx="13" cy="13" rx="4.5" ry="4.5" stroke="#C084FC" strokeWidth="1.2" />
+            <circle cx="13" cy="13" r="2.5" fill="#E879F9" />
+            <circle cx="11.5" cy="11.5" r="1" fill="white" opacity={0.55} />
+          </svg>
+        </button>
       </div>
 
     </main>

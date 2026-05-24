@@ -38,7 +38,7 @@ export function VoiceCheckin({ onQuestsGenerated }: VoiceCheckinProps) {
 
   const processCheckIn = useCallback(async (finalTranscript: string) => {
     if (finalTranscript.trim().length < 3) {
-      setError('Say a bit more — Arc needs at least a few words to work with.')
+      setError('Say a bit more — the Oracle needs at least a few words to work with.')
       setFlowState('error')
       return
     }
@@ -167,7 +167,7 @@ export function VoiceCheckin({ onQuestsGenerated }: VoiceCheckinProps) {
         // Fall back to text input gracefully
         recognition.stop()
         setFlowState('idle')
-        const text = window.prompt('Arc is listening (text mode) — how are you feeling today?')
+        const text = window.prompt('Oracle is listening (text mode) — how are you feeling today?')
         if (text?.trim()) {
           processCheckIn(text)
         }
@@ -256,7 +256,7 @@ export function VoiceCheckin({ onQuestsGenerated }: VoiceCheckinProps) {
                   textTransform: 'uppercase',
                 }}
               >
-                Arc · The Oracle
+                Oracle
               </div>
               <div style={{ fontSize: '11px', color: '#6B5E8C' }}>
                 Energy {checkIn.energyLevel}/10 · {checkIn.mood}
@@ -338,7 +338,7 @@ export function VoiceCheckin({ onQuestsGenerated }: VoiceCheckinProps) {
         </div>
         <p style={{ fontSize: '16px', color: '#9B8EC4', fontWeight: 500 }}>
           {flowState === 'processing-checkin'
-            ? 'Arc is listening…'
+            ? 'Oracle is listening…'
             : 'Generating your quests…'}
         </p>
         <style>{`
@@ -419,7 +419,7 @@ export function VoiceCheckin({ onQuestsGenerated }: VoiceCheckinProps) {
           lineHeight: 1.2,
         }}
       >
-        {flowState === 'recording' ? 'Arc is listening…' : 'Good morning.'}
+        {flowState === 'recording' ? 'Oracle is listening…' : 'Good morning.'}
       </h2>
 
       <p
@@ -431,7 +431,7 @@ export function VoiceCheckin({ onQuestsGenerated }: VoiceCheckinProps) {
         }}
       >
         {flowState === 'recording'
-          ? "Tell Arc how you're feeling. What's on your mind? Tap the mic when you're done."
+          ? "Tell the Oracle how you're feeling. What's on your mind? Tap the mic when you're done."
           : "How are you feeling today? What's on your mind? Tap the mic and just talk."}
       </p>
 

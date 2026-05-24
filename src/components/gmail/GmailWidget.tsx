@@ -138,7 +138,7 @@ export default function GmailWidget() {
         <p style={{ fontSize: 12, color: '#6B5E8C', marginBottom: 12, lineHeight: 1.5 }}>
           {needsReauth
             ? 'Gmail needs re-authorization — click to reconnect Google.'
-            : 'Connect Google to let Arc see your inbox and surface what needs attention.'}
+            : 'Connect Google to let the Oracle see your inbox and surface what needs attention.'}
         </p>
         <button
           type="button"

@@ -135,8 +135,8 @@ export function ArcChat() {
           fontSize: '22px',
           zIndex: 50,
         }}
-        title="Talk to Arc"
-        aria-label="Talk to Arc"
+        title="Talk to the Oracle"
+        aria-label="Talk to the Oracle"
       >
         🔮
       </button>
@@ -171,7 +171,7 @@ export function ArcChat() {
           pointerEvents: 'auto',
           background: 'transparent',
         }}
-        aria-label="Close Arc chat"
+        aria-label="Close Oracle chat"
       />
 
       <div
@@ -215,7 +215,7 @@ export function ArcChat() {
               }}
             />
             <div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: '#F0ECFF' }}>Arc</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#F0ECFF' }}>Oracle</div>
               <div style={{ fontSize: 10, color: '#6B5E8C' }}>
                 {chatState === 'recording'
                   ? '🎙 Listening — tap Send when done'
@@ -363,7 +363,7 @@ export function ArcChat() {
             placeholder={
               chatState === 'recording'
                 ? 'Transcript will appear here...'
-                : 'Talk to Arc...'
+                : 'Talk to the Oracle...'
             }
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}

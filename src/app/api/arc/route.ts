@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error('Arc route error:', error)
     return NextResponse.json(
-      { error: 'Arc is having a moment. Try again.' },
+      { error: 'The Oracle is having a moment. Try again.' },
       { status: 500 }
     )
   }

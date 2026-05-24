@@ -43,7 +43,7 @@ export function QuestProof({ quest, onComplete, onClose }: QuestProofProps) {
         setResult(data)
         setProofState('result')
       } catch {
-        setError('Arc had trouble connecting. Try again?')
+        setError('The Oracle had trouble connecting. Try again?')
         setProofState('error')
       }
     },
@@ -56,7 +56,7 @@ export function QuestProof({ quest, onComplete, onClose }: QuestProofProps) {
 
     if (!SpeechRecognitionCtor) {
       const text = window.prompt(
-        `Did you complete "${quest.title}"? Tell Arc what happened — be specific.`
+        `Did you complete "${quest.title}"? Tell the Oracle what happened — be specific.`
       )
       if (text?.trim()) processProof(text.trim())
       return
@@ -79,7 +79,7 @@ export function QuestProof({ quest, onComplete, onClose }: QuestProofProps) {
         recognition.stop()
         setProofState('prompt')
         const text = window.prompt(
-          `Did you complete "${quest.title}"? Tell Arc what happened — be specific.`
+          `Did you complete "${quest.title}"? Tell the Oracle what happened — be specific.`
         )
         if (text?.trim()) processProof(text.trim())
       } else {
@@ -175,7 +175,7 @@ export function QuestProof({ quest, onComplete, onClose }: QuestProofProps) {
                 lineHeight: 1.65,
               }}
             >
-              Tell Arc what happened. 30 seconds.
+              Tell the Oracle what happened. 30 seconds.
               <br />
               How did it feel? What surprised you?
             </div>
@@ -203,7 +203,7 @@ export function QuestProof({ quest, onComplete, onClose }: QuestProofProps) {
               type="button"
               onClick={() => {
                 const text = window.prompt(
-                  `Did you complete "${quest.title}"? Tell Arc what happened — be specific.`
+                  `Did you complete "${quest.title}"? Tell the Oracle what happened — be specific.`
                 )
                 if (text?.trim()) processProof(text.trim())
               }}
@@ -269,7 +269,7 @@ export function QuestProof({ quest, onComplete, onClose }: QuestProofProps) {
                 marginBottom: '6px',
               }}
             >
-              Arc is listening...
+              Oracle is listening...
             </div>
             <div style={{ fontSize: '13px', color: '#9B8EC4' }}>
               Tell it what happened. Be real.
@@ -288,7 +288,7 @@ export function QuestProof({ quest, onComplete, onClose }: QuestProofProps) {
                 marginBottom: '6px',
               }}
             >
-              Arc is evaluating...
+              Oracle is evaluating...
             </div>
             {transcript && (
               <div
