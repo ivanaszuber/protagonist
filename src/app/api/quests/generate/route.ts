@@ -15,7 +15,9 @@ export interface Quest {
 
 export async function POST(request: Request) {
   try {
-    const checkIn: CheckInData = await request.json()
+    const body = await request.json()
+    const checkIn: CheckInData = body
+    const ouraContext: string | undefined = body.ouraContext
 
     if (!process.env.ANTHROPIC_API_KEY) {
       return NextResponse.json(
@@ -49,6 +51,7 @@ CHECK-IN DATA:
 - What they said: "${checkIn.transcript}"
 
 ENERGY GUIDANCE: ${energyContext}
+${ouraContext ? `\nOURA RING DATA:\n${ouraContext}\nCalibrate vitality quests to readiness/sleep. Low readiness (<60) = gentle recovery only.` : ''}
 
 RULES:
 - Generate EXACTLY 3 quests

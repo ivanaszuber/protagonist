@@ -1,5 +1,11 @@
 import { anthropic, parseJsonFromClaude } from '@/lib/anthropic'
-import { getDimensionMemories, saveDimensionMemory } from '@/lib/db'
+import { getDimensionMemories, saveDimensionMemory, getOuraDaily } from '@/lib/db'
+import {
+  buildOuraContext,
+  getReadinessGuidance,
+  ouraRowToDailyData,
+  ouraToArcPayload,
+} from '@/lib/oura'
 import { DimensionId } from '@/types'
 import { SPECIALISTS, SpecialistResponse } from './specialists'
 import { detectDimensions, isCheckIn } from './router'
@@ -42,7 +48,7 @@ async function callSpecialist(
   userMessage: string,
   memories: string[],
   userId: string,
-  ouraData?: ArcInput['ouraData']
+  ouraContextBlock?: string
 ): Promise<SpecialistResponse & { dimensionId: DimensionId }> {
   const specialist = SPECIALISTS[dimensionId]
   if (!specialist) {
@@ -55,9 +61,7 @@ async function callSpecialist(
       : `\nNo memories yet for ${dimensionId}.`
 
   const ouraContext =
-    ouraData && dimensionId === 'vitality'
-      ? `\nOura data: sleep ${ouraData.sleepScore ?? 'unknown'}, readiness ${ouraData.readiness ?? 'unknown'}, HRV ${ouraData.hrv ?? 'unknown'}`
-      : ''
+    ouraContextBlock && dimensionId === 'vitality' ? `\n\n${ouraContextBlock}` : ''
 
   const zaraBootstrap =
     dimensionId === 'family' && memories.length === 0
@@ -86,8 +90,57 @@ What is your specialist insight on the ${dimensionId} angle of this message?`
   }
 }
 
+async function loadOuraContextForUser(userId: string): Promise<{
+  payload?: ArcInput['ouraData']
+  contextBlock: string
+}> {
+  try {
+    const today = new Date().toISOString().split('T')[0]
+    const row = await getOuraDaily(userId, today)
+    if (!row) return { contextBlock: '' }
+
+    const data = ouraRowToDailyData({
+      date: row.date,
+      sleep_score: row.sleep_score,
+      sleep_total_seconds: row.sleep_total_seconds,
+      sleep_rem_seconds: row.sleep_rem_seconds,
+      sleep_deep_seconds: row.sleep_deep_seconds,
+      sleep_efficiency: row.sleep_efficiency,
+      sleep_latency_seconds: row.sleep_latency_seconds,
+      readiness_score: row.readiness_score,
+      hrv_balance: row.hrv_balance,
+      recovery_index: row.recovery_index,
+      body_temperature_deviation: row.body_temperature_deviation,
+      activity_score: row.activity_score,
+      steps: row.steps,
+      active_calories: row.active_calories,
+      resilience_level: row.resilience_level,
+      hrv_average: row.hrv_average,
+    })
+
+    const context = buildOuraContext(data)
+    const guidance = getReadinessGuidance(data.readiness_score)
+    return {
+      payload: ouraToArcPayload(data),
+      contextBlock: guidance ? `${context}\n${guidance}` : context,
+    }
+  } catch {
+    return { contextBlock: '' }
+  }
+}
+
 export async function consultArc(input: ArcInput): Promise<ArcOutput> {
-  const { userMessage, userId, ouraData, checkInData } = input
+  const { userMessage, userId, checkInData } = input
+
+  const loadedOura =
+    input.ouraData !== undefined
+      ? {
+          payload: input.ouraData,
+          contextBlock: '',
+        }
+      : await loadOuraContextForUser(userId)
+
+  const ouraContextBlock = loadedOura.contextBlock
 
   const allDimensions: DimensionId[] = isCheckIn(userMessage)
     ? ['vitality', 'mind', 'create', 'social', 'love', 'family', 'wealth']
@@ -105,7 +158,7 @@ export async function consultArc(input: ArcInput): Promise<ArcOutput> {
 
   const specialistResults = await Promise.all(
     allDimensions.map((dim) =>
-      callSpecialist(dim, userMessage, memoryMap[dim] || [], userId, ouraData)
+      callSpecialist(dim, userMessage, memoryMap[dim] || [], userId, ouraContextBlock)
     )
   )
 
@@ -120,6 +173,10 @@ export async function consultArc(input: ArcInput): Promise<ArcOutput> {
 
   const checkInContext = checkInData
     ? `\nUser's current state: energy ${checkInData.energyLevel}/10, mood: ${checkInData.mood}`
+    : ''
+
+  const ouraSection = ouraContextBlock
+    ? `\n\nBIODATA FOR TODAY (from Oura Ring — use for energy/recovery calibration):\n${ouraContextBlock}`
     : ''
 
   const synthesisPrompt =
@@ -138,7 +195,7 @@ No specialist insights were available. Respond as Arc with warmth and specificit
   const arcMessage = await anthropic.messages.create({
     model: ARC_MODEL,
     max_tokens: 400,
-    system: ARC_SYNTHESIS_PROMPT,
+    system: `${ARC_SYNTHESIS_PROMPT}${ouraSection}`,
     messages: [{ role: 'user', content: synthesisPrompt }],
   })
 

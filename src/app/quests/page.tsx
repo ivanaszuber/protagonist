@@ -9,6 +9,7 @@ import {
   CheckInData,
 } from '@/types'
 import { VoiceCheckin } from '@/components/checkin/VoiceCheckin'
+import OuraWidget from '@/components/oura/OuraWidget'
 import { QuestCard } from '@/components/quests/QuestCard'
 import { QuestProof } from '@/components/quests/QuestProof'
 import { DimensionBars } from '@/components/xp/DimensionBars'
@@ -57,6 +58,14 @@ export default function QuestsPage() {
   const [showCheckin, setShowCheckin] = useState(false)
   const [lastCheckIn, setLastCheckIn] = useState<CheckInData | null>(null)
   const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const ouraStatus = params.get('oura')
+    if (ouraStatus === 'connected' || ouraStatus === 'error') {
+      window.history.replaceState({}, '', '/quests')
+    }
+  }, [])
 
   useEffect(() => {
     async function loadFromDatabase() {
@@ -267,6 +276,8 @@ export default function QuestsPage() {
       </div>
 
       <DimensionBars xp={dimensionXP} highlightDimension={highlightDimension} />
+
+      <OuraWidget />
 
       {quests.length === 0 || showCheckin ? (
         <div>

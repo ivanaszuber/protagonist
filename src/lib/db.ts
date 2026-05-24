@@ -259,3 +259,88 @@ export async function getDimensionMemories(
   if (error || !data) return []
   return data.map((row) => `[${row.created_at.split('T')[0]}] ${row.content}`)
 }
+
+// ── OURA ───────────────────────────────────────────────
+
+export async function saveOuraTokens(
+  userId: string,
+  tokens: { access_token: string; refresh_token: string; expires_at: Date }
+) {
+  if (!isSupabaseConfigured()) return
+
+  const { error } = await supabase.from('oura_tokens').upsert(
+    {
+      user_id: userId,
+      access_token: tokens.access_token,
+      refresh_token: tokens.refresh_token,
+      expires_at: tokens.expires_at.toISOString(),
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: 'user_id' }
+  )
+  if (error) throw error
+}
+
+export async function getOuraTokens(userId: string) {
+  if (!isSupabaseConfigured()) return null
+
+  const { data, error } = await supabase
+    .from('oura_tokens')
+    .select('*')
+    .eq('user_id', userId)
+    .maybeSingle()
+
+  if (error) {
+    console.error('getOuraTokens error:', error)
+    return null
+  }
+  return data
+}
+
+export async function deleteOuraTokens(userId: string) {
+  if (!isSupabaseConfigured()) return
+  await supabase.from('oura_tokens').delete().eq('user_id', userId)
+}
+
+export async function saveOuraDaily(
+  userId: string,
+  data: Record<string, unknown>
+) {
+  if (!isSupabaseConfigured()) return
+
+  const { error } = await supabase
+    .from('oura_daily')
+    .upsert({ user_id: userId, ...data }, { onConflict: 'user_id,date' })
+  if (error) throw error
+}
+
+export async function getOuraDaily(userId: string, date: string) {
+  if (!isSupabaseConfigured()) return null
+
+  const { data, error } = await supabase
+    .from('oura_daily')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('date', date)
+    .maybeSingle()
+
+  if (error) {
+    console.error('getOuraDaily error:', error)
+    return null
+  }
+  return data
+}
+
+export async function getOuraRecentDays(userId: string, days = 7) {
+  if (!isSupabaseConfigured()) return []
+
+  const { data, error } = await supabase
+    .from('oura_daily')
+    .select('*')
+    .eq('user_id', userId)
+    .order('date', { ascending: false })
+    .limit(days)
+
+  if (error) return []
+  return data ?? []
+}

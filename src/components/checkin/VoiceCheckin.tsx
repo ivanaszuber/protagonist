@@ -6,6 +6,8 @@ import type { Quest as ApiQuest } from '@/app/api/quests/generate/route'
 import type { Quest, CheckInData } from '@/types'
 import { QuestCard } from '@/components/quests/QuestCard'
 import { mapApiQuestsToAppQuests } from '@/lib/questMapper'
+import { getUserId } from '@/lib/user'
+import { buildOuraContext } from '@/lib/oura'
 
 type FlowState =
   | 'idle'
@@ -60,10 +62,27 @@ export function VoiceCheckin({ onQuestsGenerated }: VoiceCheckinProps) {
       setCheckIn(checkInData)
 
       setFlowState('processing-quests')
+
+      let ouraContext: string | undefined
+      try {
+        const userId = getUserId()
+        const syncRes = await fetch('/api/oura/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId }),
+        })
+        const syncData = await syncRes.json()
+        if (syncData.connected && syncData.data) {
+          ouraContext = buildOuraContext(syncData.data)
+        }
+      } catch {
+        // Oura optional — continue without
+      }
+
       const questsRes = await fetch('/api/quests/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(checkInData),
+        body: JSON.stringify({ ...checkInData, ouraContext }),
       })
 
       if (!questsRes.ok) {
