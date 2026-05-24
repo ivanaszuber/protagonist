@@ -53,18 +53,14 @@ export function calendarRowToEvent(row: CalendarEventRow): CalendarEvent {
   }
 }
 
-function appUrl(): string {
-  return process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
-}
-
 export function isGoogleConfigured(): boolean {
   return Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET)
 }
 
-export function getGoogleAuthUrl(state: string): string {
+export function getGoogleAuthUrl(state: string, baseUrl: string): string {
   const params = new URLSearchParams({
     client_id: process.env.GOOGLE_CLIENT_ID!,
-    redirect_uri: `${appUrl()}/api/calendar/callback`,
+    redirect_uri: `${baseUrl}/api/calendar/callback`,
     response_type: 'code',
     scope: SCOPES,
     access_type: 'offline',
@@ -74,14 +70,14 @@ export function getGoogleAuthUrl(state: string): string {
   return `${GOOGLE_AUTH}/auth?${params}`
 }
 
-export async function exchangeGoogleCode(code: string): Promise<GoogleTokens> {
+export async function exchangeGoogleCode(code: string, baseUrl: string): Promise<GoogleTokens> {
   const res = await fetch(`${GOOGLE_AUTH}/token`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
       grant_type: 'authorization_code',
       code,
-      redirect_uri: `${appUrl()}/api/calendar/callback`,
+      redirect_uri: `${baseUrl}/api/calendar/callback`,
       client_id: process.env.GOOGLE_CLIENT_ID!,
       client_secret: process.env.GOOGLE_CLIENT_SECRET!,
     }),

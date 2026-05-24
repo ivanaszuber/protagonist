@@ -19,7 +19,15 @@ export async function GET(request: Request) {
     }
     const tokens = await exchangeOuraCode(code, baseUrl)
     await saveOuraTokens(userId, tokens)
-    return NextResponse.redirect(`${baseUrl}/quests?oura=connected`)
+
+    const response = NextResponse.redirect(`${baseUrl}/quests?oura=connected`)
+    response.cookies.set('protagonist_user_id', userId, {
+      maxAge: 60 * 60 * 24 * 365,
+      path: '/',
+      sameSite: 'lax',
+      httpOnly: false,
+    })
+    return response
   } catch (err) {
     console.error('Oura callback error:', err)
     return NextResponse.redirect(`${baseUrl}/quests?oura=error`)

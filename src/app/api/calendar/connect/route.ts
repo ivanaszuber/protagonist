@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
-import { getGoogleAuthUrl, isGoogleConfigured } from '@/lib/google'
+import { getGoogleAuthUrl } from '@/lib/google'
 
 export async function GET(request: Request) {
+  const baseUrl = new URL(request.url).origin
   const { searchParams } = new URL(request.url)
   const userId = searchParams.get('userId')
 
@@ -9,13 +10,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'userId required' }, { status: 400 })
   }
 
-  if (!isGoogleConfigured()) {
-    return NextResponse.redirect(
-      `${process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'}/quests?calendar=error`
-    )
-  }
-
-  const state = Buffer.from(JSON.stringify({ userId })).toString('base64url')
-  const authUrl = getGoogleAuthUrl(state)
+  const state = Buffer.from(JSON.stringify({ userId, baseUrl })).toString('base64url')
+  const authUrl = getGoogleAuthUrl(state, baseUrl)
   return NextResponse.redirect(authUrl)
 }
