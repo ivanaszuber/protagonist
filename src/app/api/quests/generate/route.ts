@@ -18,6 +18,7 @@ export async function POST(request: Request) {
     const body = await request.json()
     const checkIn: CheckInData = body
     const ouraContext: string | undefined = body.ouraContext
+    const calendarContext: string | undefined = body.calendarContext
 
     if (!process.env.ANTHROPIC_API_KEY) {
       return NextResponse.json(
@@ -52,6 +53,7 @@ CHECK-IN DATA:
 
 ENERGY GUIDANCE: ${energyContext}
 ${ouraContext ? `\nOURA RING DATA:\n${ouraContext}\nCalibrate vitality quests to readiness/sleep. Low readiness (<60) = gentle recovery only.` : ''}
+${calendarContext ? `\nCALENDAR / SCHEDULE:\n${calendarContext}\nFit create/social quests around meetings. On heavy meeting days, keep Forge (create) quests short.` : ''}
 
 RULES:
 - Generate EXACTLY 3 quests

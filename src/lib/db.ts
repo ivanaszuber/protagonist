@@ -344,3 +344,87 @@ export async function getOuraRecentDays(userId: string, days = 7) {
   if (error) return []
   return data ?? []
 }
+
+// ── GOOGLE CALENDAR ────────────────────────────────────
+
+export async function saveGoogleTokens(
+  userId: string,
+  tokens: {
+    access_token: string
+    refresh_token: string | null
+    expires_at: Date
+    scope: string
+  }
+) {
+  if (!isSupabaseConfigured()) return
+
+  const { error } = await supabase.from('google_tokens').upsert(
+    {
+      user_id: userId,
+      access_token: tokens.access_token,
+      refresh_token: tokens.refresh_token,
+      expires_at: tokens.expires_at.toISOString(),
+      scope: tokens.scope,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: 'user_id' }
+  )
+  if (error) throw error
+}
+
+export async function getGoogleTokens(userId: string) {
+  if (!isSupabaseConfigured()) return null
+
+  const { data, error } = await supabase
+    .from('google_tokens')
+    .select('*')
+    .eq('user_id', userId)
+    .maybeSingle()
+
+  if (error) {
+    console.error('getGoogleTokens error:', error)
+    return null
+  }
+  return data
+}
+
+export async function deleteGoogleTokens(userId: string) {
+  if (!isSupabaseConfigured()) return
+  await supabase.from('google_tokens').delete().eq('user_id', userId)
+}
+
+export async function saveCalendarEvents(
+  userId: string,
+  events: Array<Record<string, unknown>>
+) {
+  if (!isSupabaseConfigured() || events.length === 0) return
+
+  const rows = events.map((e) => ({ user_id: userId, ...e }))
+  const { error } = await supabase
+    .from('calendar_events')
+    .upsert(rows, { onConflict: 'user_id,google_event_id' })
+  if (error) throw error
+}
+
+export async function getCalendarEvents(userId: string, date: string) {
+  if (!isSupabaseConfigured()) return []
+
+  const { data, error } = await supabase
+    .from('calendar_events')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('event_date', date)
+    .order('start_time', { ascending: true })
+
+  if (error) return []
+  return data ?? []
+}
+
+export async function deleteCalendarEventsForDate(userId: string, date: string) {
+  if (!isSupabaseConfigured()) return
+  await supabase
+    .from('calendar_events')
+    .delete()
+    .eq('user_id', userId)
+    .eq('event_date', date)
+}

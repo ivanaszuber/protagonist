@@ -1,5 +1,16 @@
 import { anthropic, parseJsonFromClaude } from '@/lib/anthropic'
-import { getDimensionMemories, saveDimensionMemory, getOuraDaily } from '@/lib/db'
+import {
+  getDimensionMemories,
+  saveDimensionMemory,
+  getOuraDaily,
+  getCalendarEvents,
+} from '@/lib/db'
+import {
+  buildCalendarContext,
+  calendarRowToEvent,
+  detectFreeBlocks,
+  type CalendarEventRow,
+} from '@/lib/google'
 import {
   buildOuraContext,
   getReadinessGuidance,
@@ -48,7 +59,8 @@ async function callSpecialist(
   userMessage: string,
   memories: string[],
   userId: string,
-  ouraContextBlock?: string
+  ouraContextBlock?: string,
+  specialistExtra?: string
 ): Promise<SpecialistResponse & { dimensionId: DimensionId }> {
   const specialist = SPECIALISTS[dimensionId]
   if (!specialist) {
@@ -69,7 +81,9 @@ async function callSpecialist(
 This is established fact — treat it as memory, not assumption.`
       : ''
 
-  const contextMessage = `User message: "${userMessage}"${memoryContext}${zaraBootstrap}${ouraContext}
+  const specialistExtraBlock = specialistExtra ? `\n\n${specialistExtra}` : ''
+
+  const contextMessage = `User message: "${userMessage}"${memoryContext}${zaraBootstrap}${ouraContext}${specialistExtraBlock}
 
 What is your specialist insight on the ${dimensionId} angle of this message?`
 
@@ -129,6 +143,38 @@ async function loadOuraContextForUser(userId: string): Promise<{
   }
 }
 
+async function loadCalendarContextForUser(userId: string): Promise<{
+  calendarContext: string
+  freeBlocks: string[]
+}> {
+  try {
+    const today = new Date().toISOString().split('T')[0]
+    const rows = await getCalendarEvents(userId, today)
+    if (!rows.length) return { calendarContext: '', freeBlocks: [] }
+
+    const events = rows.map((row) =>
+      calendarRowToEvent({
+        google_event_id: row.google_event_id as string,
+        title: row.title as string,
+        start_time: (row.start_time as string | null) ?? null,
+        end_time: (row.end_time as string | null) ?? null,
+        all_day: Boolean(row.all_day),
+        location: (row.location as string | null) ?? null,
+        description: (row.description as string | null) ?? null,
+        calendar_name: (row.calendar_name as string) ?? 'Calendar',
+        event_date: row.event_date as string,
+      } satisfies CalendarEventRow)
+    )
+
+    return {
+      calendarContext: buildCalendarContext(events, today),
+      freeBlocks: detectFreeBlocks(events, today),
+    }
+  } catch {
+    return { calendarContext: '', freeBlocks: [] }
+  }
+}
+
 export async function consultArc(input: ArcInput): Promise<ArcOutput> {
   const { userMessage, userId, checkInData } = input
 
@@ -141,6 +187,8 @@ export async function consultArc(input: ArcInput): Promise<ArcOutput> {
       : await loadOuraContextForUser(userId)
 
   const ouraContextBlock = loadedOura.contextBlock
+
+  const { calendarContext, freeBlocks } = await loadCalendarContextForUser(userId)
 
   const allDimensions: DimensionId[] = isCheckIn(userMessage)
     ? ['vitality', 'mind', 'create', 'social', 'love', 'family', 'wealth']
@@ -157,9 +205,23 @@ export async function consultArc(input: ArcInput): Promise<ArcOutput> {
   ) as Record<DimensionId, string[]>
 
   const specialistResults = await Promise.all(
-    allDimensions.map((dim) =>
-      callSpecialist(dim, userMessage, memoryMap[dim] || [], userId, ouraContextBlock)
-    )
+    allDimensions.map((dim) => {
+      const specialistExtra =
+        dim === 'create' && calendarContext
+          ? `TODAY'S SCHEDULE CONTEXT:\n${calendarContext}\nFree blocks for deep work: ${freeBlocks.join(', ') || 'Check calendar'}`
+          : dim === 'love' && calendarContext
+            ? `Schedule note: ${calendarContext.split('\n')[0]}`
+            : undefined
+
+      return callSpecialist(
+        dim,
+        userMessage,
+        memoryMap[dim] || [],
+        userId,
+        ouraContextBlock,
+        specialistExtra
+      )
+    })
   )
 
   const activeResults = specialistResults.filter((r) => r.insight.trim().length > 0)
@@ -175,9 +237,17 @@ export async function consultArc(input: ArcInput): Promise<ArcOutput> {
     ? `\nUser's current state: energy ${checkInData.energyLevel}/10, mood: ${checkInData.mood}`
     : ''
 
-  const ouraSection = ouraContextBlock
-    ? `\n\nBIODATA FOR TODAY (from Oura Ring — use for energy/recovery calibration):\n${ouraContextBlock}`
-    : ''
+  const contextSection = [
+    ouraContextBlock
+      ? `BIODATA FOR TODAY (from Oura Ring — use for energy/recovery calibration):\n${ouraContextBlock}`
+      : '',
+    calendarContext ? `SCHEDULE FOR TODAY:\n${calendarContext}` : '',
+    freeBlocks.length > 0 ? `FREE BLOCKS FOR DEEP WORK:\n${freeBlocks.join('\n')}` : '',
+  ]
+    .filter(Boolean)
+    .join('\n\n')
+
+  const contextSectionBlock = contextSection ? `\n\n${contextSection}` : ''
 
   const synthesisPrompt =
     activeResults.length > 0
@@ -195,7 +265,7 @@ No specialist insights were available. Respond as Arc with warmth and specificit
   const arcMessage = await anthropic.messages.create({
     model: ARC_MODEL,
     max_tokens: 400,
-    system: `${ARC_SYNTHESIS_PROMPT}${ouraSection}`,
+    system: `${ARC_SYNTHESIS_PROMPT}${contextSectionBlock}`,
     messages: [{ role: 'user', content: synthesisPrompt }],
   })
 

@@ -8,6 +8,7 @@ import { QuestCard } from '@/components/quests/QuestCard'
 import { mapApiQuestsToAppQuests } from '@/lib/questMapper'
 import { getUserId } from '@/lib/user'
 import { buildOuraContext } from '@/lib/oura'
+import { buildCalendarContext } from '@/lib/google'
 
 type FlowState =
   | 'idle'
@@ -64,8 +65,11 @@ export function VoiceCheckin({ onQuestsGenerated }: VoiceCheckinProps) {
       setFlowState('processing-quests')
 
       let ouraContext: string | undefined
+      let calendarContext: string | undefined
+      const userId = getUserId()
+      const today = new Date().toISOString().split('T')[0]
+
       try {
-        const userId = getUserId()
         const syncRes = await fetch('/api/oura/sync', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -79,10 +83,24 @@ export function VoiceCheckin({ onQuestsGenerated }: VoiceCheckinProps) {
         // Oura optional — continue without
       }
 
+      try {
+        const calSyncRes = await fetch('/api/calendar/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId }),
+        })
+        const calSyncData = await calSyncRes.json()
+        if (calSyncData.connected && calSyncData.events?.length) {
+          calendarContext = buildCalendarContext(calSyncData.events, today)
+        }
+      } catch {
+        // Calendar optional — continue without
+      }
+
       const questsRes = await fetch('/api/quests/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...checkInData, ouraContext }),
+        body: JSON.stringify({ ...checkInData, ouraContext, calendarContext }),
       })
 
       if (!questsRes.ok) {

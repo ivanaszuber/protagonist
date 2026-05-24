@@ -10,6 +10,7 @@ import {
 } from '@/types'
 import { VoiceCheckin } from '@/components/checkin/VoiceCheckin'
 import OuraWidget from '@/components/oura/OuraWidget'
+import CalendarWidget from '@/components/calendar/CalendarWidget'
 import { QuestCard } from '@/components/quests/QuestCard'
 import { QuestProof } from '@/components/quests/QuestProof'
 import { DimensionBars } from '@/components/xp/DimensionBars'
@@ -81,7 +82,13 @@ export default function QuestsPage() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const ouraStatus = params.get('oura')
-    if (ouraStatus === 'connected' || ouraStatus === 'error') {
+    const calendarStatus = params.get('calendar')
+    if (
+      ouraStatus === 'connected' ||
+      ouraStatus === 'error' ||
+      calendarStatus === 'connected' ||
+      calendarStatus === 'error'
+    ) {
       window.history.replaceState({}, '', '/quests')
     }
   }, [])
@@ -295,9 +302,14 @@ export default function QuestsPage() {
       </div>
 
       <DimensionBars xp={dimensionXP} highlightDimension={highlightDimension} />
-      <ErrorBoundary>
-        <OuraWidget />
-      </ErrorBoundary>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 0, marginBottom: 8 }}>
+        <ErrorBoundary>
+          <OuraWidget />
+        </ErrorBoundary>
+        <ErrorBoundary>
+          <CalendarWidget />
+        </ErrorBoundary>
+      </div>
 
       {quests.length === 0 || showCheckin ? (
         <div>
