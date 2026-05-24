@@ -8,6 +8,7 @@ import { getLevel } from '@/lib/xp'
 import type { Dimension } from '@/lib/character'
 import { getUserId } from '@/lib/user'
 import MoodTracker from '@/components/MoodTracker'
+import { StatBar } from '@/components/StatBar'
 
 interface OuraData {
   readiness_score: number | null
@@ -153,37 +154,6 @@ function PulsingDot({ color }: { color: string }) {
         transition={{ duration: 2.2, repeat: Infinity, ease: 'easeOut' }}
       />
       <div style={{ position: 'absolute', inset: 1, borderRadius: '50%', background: color }} />
-    </div>
-  )
-}
-
-function StatBar({
-  label,
-  value,
-  color,
-}: {
-  label: string
-  value: number | null
-  color: string
-}) {
-  const pct = value ?? 0
-  return (
-    <div style={{ marginBottom: 8 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
-        <span style={{ fontSize: 10, color: '#5A4A7A' }}>{label}</span>
-        <span style={{ fontSize: 10, color: '#7A5FA0' }}>{value ?? '—'}</span>
-      </div>
-      <div style={{ height: 6, background: '#1E0D40', borderRadius: 3, overflow: 'hidden' }}>
-        <div
-          style={{
-            height: '100%',
-            width: `${pct}%`,
-            background: color,
-            borderRadius: 3,
-            transition: 'width 1s ease',
-          }}
-        />
-      </div>
     </div>
   )
 }

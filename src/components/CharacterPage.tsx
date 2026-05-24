@@ -1,13 +1,16 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { motion } from 'framer-motion'
+import { useEffect, useState, type CSSProperties, type ReactNode } from 'react'
 import Link from 'next/link'
-import ForgeCharacter from '@/components/characters/ForgeCharacter'
-import EchoCharacter from '@/components/characters/EchoCharacter'
-import VaultCharacter from '@/components/characters/VaultCharacter'
-import { getLevel, getLevelProgress, getXpToNextLevel, getTier } from '@/lib/xp'
+import { StatBar } from '@/components/StatBar'
+import {
+  EchoCharacterLarge,
+  ForgeCharacterLarge,
+  VaultCharacterLarge,
+} from '@/components/characters/CharacterHeroArt'
+import { getLevel } from '@/lib/xp'
 import { CHARACTERS, type Dimension } from '@/lib/character'
+import { DIMENSION_TO_SLUG, getTierName } from '@/lib/tierName'
 import { getUserId } from '@/lib/user'
 
 interface Milestone {
@@ -36,10 +39,16 @@ interface QuestData {
   xp: number
 }
 
-const CHARACTER_COMPONENTS = {
-  career: ForgeCharacter,
-  social: EchoCharacter,
-  wealth: VaultCharacter,
+interface OuraData {
+  readiness_score: number | null
+  sleep_score: number | null
+  activity_score: number | null
+}
+
+const HERO_ART = {
+  career: ForgeCharacterLarge,
+  social: EchoCharacterLarge,
+  wealth: VaultCharacterLarge,
 } as const
 
 function daysUntil(dateStr: string | null): number {
@@ -47,13 +56,41 @@ function daysUntil(dateStr: string | null): number {
   return Math.ceil((new Date(dateStr).getTime() - Date.now()) / 86400000)
 }
 
-function formatDate(dateStr: string | null): string {
-  if (!dateStr) return '—'
-  return new Date(dateStr).toLocaleDateString('en-GB', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  })
+function LeftBorderCard({
+  accentColor,
+  children,
+  style,
+}: {
+  accentColor: string
+  children: ReactNode
+  style?: CSSProperties
+}) {
+  return (
+    <div
+      style={{
+        background: '#140C28',
+        borderRadius: 14,
+        border: '0.5px solid #2D1B55',
+        padding: '14px 14px 14px 17px',
+        marginBottom: 8,
+        position: 'relative',
+        overflow: 'hidden',
+        ...style,
+      }}
+    >
+      <div
+        style={{
+          position: 'absolute',
+          left: 0,
+          top: 0,
+          bottom: 0,
+          width: 3,
+          background: accentColor,
+        }}
+      />
+      {children}
+    </div>
+  )
 }
 
 interface CharacterPageProps {
@@ -62,8 +99,14 @@ interface CharacterPageProps {
 
 export function CharacterPage({ dimension }: CharacterPageProps) {
   const char = CHARACTERS[dimension]
-  const CharSVG = CHARACTER_COMPONENTS[dimension]
+  const characterSlug = DIMENSION_TO_SLUG[dimension]
+  const accentColor = char.color
+  const HeroArt = HERO_ART[dimension]
+  const floatDelay =
+    dimension === 'career' ? '0s' : dimension === 'social' ? '0.5s' : '1s'
+
   const [quest, setQuest] = useState<QuestData | null>(null)
+  const [oura, setOura] = useState<OuraData | null>(null)
   const [loading, setLoading] = useState(true)
   const [addingTask, setAddingTask] = useState(false)
   const [newTaskTitle, setNewTaskTitle] = useState('')
@@ -72,16 +115,26 @@ export function CharacterPage({ dimension }: CharacterPageProps) {
 
   useEffect(() => {
     const uid = getUserId()
-    fetch(`/api/quests/character/${dimension}?userId=${encodeURIComponent(uid)}`)
-      .then((r) => r.json())
-      .then((data) => {
-        setQuest(data.quest ?? null)
-        setLoading(false)
-      })
-      .catch(() => setLoading(false))
+    Promise.allSettled([
+      fetch(`/api/quests/character/${dimension}?userId=${encodeURIComponent(uid)}`).then(
+        (r) => r.json()
+      ),
+      fetch(`/api/oura/sync?userId=${encodeURIComponent(uid)}`).then((r) => r.json()),
+    ]).then(([questRes, ouraRes]) => {
+      if (questRes.status === 'fulfilled') {
+        setQuest(questRes.value.quest ?? null)
+      }
+      if (ouraRes.status === 'fulfilled' && ouraRes.value?.data) {
+        setOura(ouraRes.value.data)
+      }
+      setLoading(false)
+    })
   }, [dimension])
 
-  async function completeTask(taskId: string, xpReward: number) {
+  async function handleTaskToggle(taskId: string, xpReward: number) {
+    const task = quest?.recent_tasks.find((t) => t.id === taskId)
+    if (!task || task.completed) return
+
     setCompletingId(taskId)
     const uid = getUserId()
     try {
@@ -141,569 +194,511 @@ export function CharacterPage({ dimension }: CharacterPageProps) {
     }
   }
 
-  if (loading) {
-    return (
-      <main
-        style={{
-          background: '#0D0820',
-          minHeight: '100vh',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          paddingBottom: 100,
-        }}
-      >
-        <span style={{ color: '#3D3358', fontSize: 13 }}>Loading...</span>
-      </main>
-    )
+  const xp = quest?.xp ?? 0
+  const level = getLevel(xp)
+  const xpInLevel = xp % 500
+  const tierLabel = getTierName(level, characterSlug)
+  const activeMilestone = quest?.milestones.find((m) => !m.completed) ?? null
+  const completedMilestones = quest?.milestones.filter((m) => m.completed) ?? []
+  const todayStr = new Date().toISOString().split('T')[0]
+  const todayTasks =
+    quest?.recent_tasks.filter((t) => t.task_date === todayStr) ?? []
+  const focusTask =
+    todayTasks.find((t) => !t.completed) ?? todayTasks[0] ?? null
+
+  const pageShellStyle: CSSProperties = {
+    minHeight: '100dvh',
+    background: '#0D0820',
+    overflowY: 'auto',
+    scrollbarWidth: 'none',
+    msOverflowStyle: 'none',
+    paddingBottom: 100,
+    fontFamily: 'var(--font-space-grotesk), system-ui, sans-serif',
   }
 
-  if (!quest) {
+  if (loading) {
     return (
-      <main style={{ background: '#0D0820', minHeight: '100vh', padding: '80px 16px 100px' }}>
-        <div style={{ textAlign: 'center', color: '#3D3358' }}>
-          <p>No quest for {char.name} yet.</p>
-          <Link href="/quests" style={{ color: char.color, fontSize: 13 }}>
-            Set up your quest →
-          </Link>
+      <main className="dashboard-scroll" style={pageShellStyle}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            minHeight: '60vh',
+          }}
+        >
+          <span style={{ color: '#3D3358', fontSize: 13 }}>Loading...</span>
         </div>
       </main>
     )
   }
 
-  const level = getLevel(quest.xp)
-  const tier = getTier(quest.xp)
-  const progress = getLevelProgress(quest.xp)
-  const progressPct = Math.round(progress * 100)
-  const xpToNext = getXpToNextLevel(quest.xp)
-  const tierLabel = char.tierLabels[tier - 1]
-  const activeMilestone = quest.milestones.find((m) => !m.completed)
-  const todayStr = new Date().toISOString().split('T')[0]
-  const todayTasks = quest.recent_tasks.filter((t) => t.task_date === todayStr)
-  const pastTasks = quest.recent_tasks.filter((t) => t.task_date < todayStr).slice(0, 10)
+  const questTitle = quest
+    ? `${quest.character_name} · ${quest.character_class}`
+    : ''
 
   return (
-    <main
-      style={{
-        background: '#0D0820',
-        minHeight: '100vh',
-        paddingBottom: 100,
-        fontFamily: 'var(--font-space-grotesk), system-ui, sans-serif',
-      }}
-    >
+    <main className="dashboard-scroll" style={pageShellStyle}>
       <div style={{ maxWidth: 430, margin: '0 auto', padding: '0 16px' }}>
+        {/* Hero */}
         <div
           style={{
-            background: '#140C28',
-            borderBottom: `2px solid ${char.color}22`,
-            padding: '32px 20px 24px',
-            margin: '0 -16px 16px',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            gap: 12,
+            paddingTop: 32,
+            paddingBottom: 24,
+            gap: 8,
           }}
         >
-          <CharSVG tier={tier} size={100} delay={0} />
-
-          <div style={{ textAlign: 'center' }}>
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 10,
-                justifyContent: 'center',
-                marginBottom: 4,
-              }}
-            >
-              <span style={{ fontSize: 24, fontWeight: 500, color: '#E8E0F0' }}>
-                {char.name}
-              </span>
-              <span
-                style={{
-                  fontSize: 11,
-                  fontWeight: 500,
-                  color: char.color,
-                  background: char.badgeBg,
-                  border: `0.5px solid ${char.badgeBorder}`,
-                  padding: '3px 10px',
-                  borderRadius: 4,
-                }}
-              >
-                Lv.{level}
-              </span>
-            </div>
-            <span style={{ fontSize: 13, color: char.color, opacity: 0.8 }}>{tierLabel}</span>
+          <div
+            style={{
+              animation: 'protagonist-float 3.2s ease-in-out infinite',
+              animationDelay: floatDelay,
+              transformOrigin: 'center bottom',
+            }}
+          >
+            <HeroArt />
           </div>
 
-          <div style={{ width: '100%', maxWidth: 260 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-              <span style={{ fontSize: 11, color: '#5A5070' }}>{quest.xp % 500} / 500 XP</span>
-              <span style={{ fontSize: 11, color: '#5A5070' }}>
-                {xpToNext} XP to Lv.{level + 1}
-              </span>
+          <span style={{ fontSize: 22, fontWeight: 500, color: '#E8E0F0', marginTop: 4 }}>
+            {char.name}
+          </span>
+
+          <span
+            style={{
+              fontSize: 11,
+              color: accentColor,
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+            }}
+          >
+            {tierLabel}
+          </span>
+
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              background: '#1E0D40',
+              borderRadius: 20,
+              padding: '4px 12px',
+              border: '0.5px solid #3D2070',
+            }}
+          >
+            <span style={{ fontSize: 11, color: '#7A5FA0' }}>Level</span>
+            <span style={{ fontSize: 13, fontWeight: 500, color: accentColor }}>
+              {level}
+            </span>
+          </div>
+
+          <div style={{ width: '60%', marginTop: 4 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
+              <span style={{ fontSize: 9, color: '#5A4A7A' }}>{xpInLevel} XP</span>
+              <span style={{ fontSize: 9, color: '#5A4A7A' }}>500</span>
             </div>
             <div
               style={{
-                background: 'rgba(255,255,255,0.07)',
-                height: 6,
-                borderRadius: 3,
+                height: 4,
+                background: '#1E0D40',
+                borderRadius: 2,
                 overflow: 'hidden',
               }}
             >
-              <motion.div
-                initial={{ width: 0 }}
-                animate={{ width: `${progressPct}%` }}
-                transition={{ duration: 1.2, ease: 'easeOut', delay: 0.3 }}
-                style={{ height: '100%', background: char.color, borderRadius: 3 }}
+              <div
+                style={{
+                  height: '100%',
+                  width: `${Math.round((xpInLevel / 500) * 100)}%`,
+                  background: accentColor,
+                  borderRadius: 2,
+                  transition: 'width 1s ease',
+                }}
               />
             </div>
           </div>
-
-          <p
-            style={{
-              fontSize: 13,
-              color: '#9B8FB0',
-              fontStyle: 'italic',
-              textAlign: 'center',
-              margin: 0,
-              lineHeight: 1.5,
-              maxWidth: 280,
-            }}
-          >
-            &ldquo;{quest.vision}&rdquo;
-          </p>
-
-          {tier < 3 && (
-            <span style={{ fontSize: 10, color: '#3D3358' }}>
-              {tier === 1
-                ? `Reach Lv.4 to unlock ${char.tierLabels[1]}`
-                : `Reach Lv.8 to unlock ${char.tierLabels[2]}`}
-            </span>
-          )}
         </div>
 
-        {activeMilestone && (
-          <div
-            style={{
-              background: '#140C28',
-              border: `0.5px solid ${char.color}44`,
-              borderRadius: 14,
-              padding: '12px 14px',
-              marginBottom: 12,
-            }}
-          >
-            <p
+        {/* Today's stats */}
+        <LeftBorderCard accentColor={accentColor}>
+          <span style={{ fontSize: 11, color: '#5A4A7A', display: 'block', marginBottom: 10 }}>
+            Today&apos;s stats
+          </span>
+          <StatBar
+            label="Resilience"
+            value={oura?.readiness_score ?? null}
+            color="#34d399"
+          />
+          <StatBar label="Sleep" value={oura?.sleep_score ?? null} color="#60a5fa" />
+          <StatBar
+            label="Activity"
+            value={oura?.activity_score ?? null}
+            color="#EF9F27"
+          />
+        </LeftBorderCard>
+
+        {/* Active quest */}
+        {quest ? (
+          <LeftBorderCard accentColor={accentColor}>
+            <span
               style={{
-                fontSize: 10,
-                color: char.color,
-                margin: '0 0 6px',
-                letterSpacing: '0.06em',
-                opacity: 0.7,
+                fontSize: 13,
+                fontWeight: 500,
+                color: '#E8E0F0',
+                display: 'block',
+                marginBottom: 4,
               }}
             >
-              CURRENT CHAPTER
-            </p>
+              {questTitle}
+            </span>
+
+            {quest.vision && (
+              <span
+                style={{
+                  fontSize: 10,
+                  color: '#5A4A7A',
+                  fontStyle: 'italic',
+                  display: 'block',
+                  marginBottom: 8,
+                }}
+              >
+                {quest.vision}
+              </span>
+            )}
+
+            {activeMilestone && (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 5,
+                  marginBottom: 8,
+                }}
+              >
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                  <path
+                    d="M2 1V9M2 1L8 4L2 7"
+                    stroke="#7A5FA0"
+                    strokeWidth="1.2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                <span style={{ fontSize: 10, color: '#7A5FA0' }}>{activeMilestone.title}</span>
+                <span style={{ fontSize: 10, color: '#3D3358', marginLeft: 'auto' }}>
+                  {daysUntil(activeMilestone.target_date)}d left
+                </span>
+              </div>
+            )}
+
+            {focusTask && (
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={() => void handleTaskToggle(focusTask.id, focusTask.xp_reward)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    void handleTaskToggle(focusTask.id, focusTask.xp_reward)
+                  }
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 7,
+                  background: '#1A0D35',
+                  borderRadius: 8,
+                  padding: '7px 10px',
+                  cursor: focusTask.completed ? 'default' : 'pointer',
+                  border: '0.5px solid #2D1B55',
+                }}
+              >
+                <div
+                  style={{
+                    width: 16,
+                    height: 16,
+                    borderRadius: '50%',
+                    flexShrink: 0,
+                    border: `1.5px solid ${focusTask.completed ? '#34d399' : accentColor}`,
+                    background: focusTask.completed ? '#34d399' : 'transparent',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  {completingId === focusTask.id && (
+                    <div
+                      style={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: '50%',
+                        border: `1.5px solid ${accentColor}`,
+                        borderTopColor: 'transparent',
+                        animation: 'spin 0.6s linear infinite',
+                      }}
+                    />
+                  )}
+                </div>
+                <span
+                  style={{
+                    fontSize: 10,
+                    color: focusTask.completed ? '#5A4A7A' : '#C0B0E0',
+                    textDecoration: focusTask.completed ? 'line-through' : 'none',
+                    lineHeight: 1.4,
+                  }}
+                >
+                  {focusTask.title}
+                </span>
+              </div>
+            )}
+          </LeftBorderCard>
+        ) : (
+          <LeftBorderCard accentColor={accentColor}>
+            <span style={{ fontSize: 13, color: '#3D3358', display: 'block', marginBottom: 8 }}>
+              No active quest yet
+            </span>
+            <Link
+              href="/quests"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
+                background: '#1E0D40',
+                border: '0.5px solid #3D2070',
+                borderRadius: 8,
+                padding: '6px 14px',
+                fontSize: 11,
+                color: '#7A5FA0',
+                textDecoration: 'none',
+              }}
+            >
+              + Add quest
+            </Link>
+          </LeftBorderCard>
+        )}
+
+        {/* Completed milestones */}
+        {completedMilestones.length > 0 && (
+          <div style={{ marginBottom: 8 }}>
+            <span
+              style={{
+                fontSize: 10,
+                color: '#3D3358',
+                display: 'block',
+                marginBottom: 6,
+                paddingLeft: 2,
+              }}
+            >
+              Completed milestones
+            </span>
+            {completedMilestones.map((m) => (
+              <div
+                key={m.id}
+                style={{
+                  background: '#140C28',
+                  borderRadius: 12,
+                  border: '0.5px solid #1E1040',
+                  padding: '10px 12px 10px 15px',
+                  marginBottom: 6,
+                  position: 'relative',
+                  overflow: 'hidden',
+                  opacity: 0.6,
+                }}
+              >
+                <div
+                  style={{
+                    position: 'absolute',
+                    left: 0,
+                    top: 0,
+                    bottom: 0,
+                    width: 3,
+                    background: '#2D1B55',
+                  }}
+                />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                    <circle cx="5" cy="5" r="4" stroke="#34d399" strokeWidth="1.2" />
+                    <path
+                      d="M3 5L4.5 6.5L7 3.5"
+                      stroke="#34d399"
+                      strokeWidth="1.2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                  <span style={{ fontSize: 10, color: '#7A5FA0' }}>{m.title}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Additional today's quests */}
+        {quest && (
+          <LeftBorderCard accentColor={accentColor}>
             <div
               style={{
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
+                marginBottom: 10,
               }}
             >
-              <span style={{ fontSize: 14, fontWeight: 500, color: '#E8E0F0' }}>
-                {activeMilestone.title}
-              </span>
-              {activeMilestone.target_date && (
-                <span
-                  style={{
-                    fontSize: 11,
-                    color: '#5A5070',
-                    flexShrink: 0,
-                    marginLeft: 8,
-                  }}
-                >
-                  {daysUntil(activeMilestone.target_date)}d left
-                </span>
-              )}
-            </div>
-            <span style={{ fontSize: 11, color: '#4A4060' }}>
-              {formatDate(activeMilestone.target_date)}
-            </span>
-          </div>
-        )}
-
-        <div style={{ marginBottom: 12 }}>
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              marginBottom: 8,
-            }}
-          >
-            <span
-              style={{
-                fontSize: 11,
-                fontWeight: 500,
-                letterSpacing: '0.06em',
-                color: '#3D3358',
-              }}
-            >
-              Today&apos;s quests
-            </span>
-            <button
-              type="button"
-              onClick={() => setAddingTask(!addingTask)}
-              style={{
-                background: `${char.color}22`,
-                border: `0.5px solid ${char.color}44`,
-                borderRadius: 6,
-                padding: '3px 10px',
-                fontSize: 11,
-                color: char.color,
-                cursor: 'pointer',
-              }}
-            >
-              + Add
-            </button>
-          </div>
-
-          {addingTask && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              style={{
-                background: '#140C28',
-                border: '0.5px solid rgba(255,255,255,0.07)',
-                borderRadius: 12,
-                padding: 12,
-                marginBottom: 8,
-              }}
-            >
-              <input
-                value={newTaskTitle}
-                onChange={(e) => setNewTaskTitle(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && void addTask()}
-                placeholder="What's the quest?"
-                autoFocus
+              <span style={{ fontSize: 11, color: '#5A4A7A' }}>Today&apos;s quests</span>
+              <button
+                type="button"
+                onClick={() => setAddingTask(!addingTask)}
                 style={{
-                  width: '100%',
-                  background: 'rgba(255,255,255,0.05)',
-                  border: '0.5px solid rgba(255,255,255,0.1)',
-                  borderRadius: 8,
-                  padding: '8px 10px',
-                  color: '#E8E0F0',
-                  fontSize: 13,
-                  outline: 'none',
-                  marginBottom: 8,
-                  boxSizing: 'border-box',
-                }}
-              />
-              <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
-                {[25, 50, 100, 200].map((xp) => (
-                  <button
-                    key={xp}
-                    type="button"
-                    onClick={() => setNewTaskXp(xp)}
-                    style={{
-                      flex: 1,
-                      background: newTaskXp === xp ? char.color : 'rgba(255,255,255,0.05)',
-                      border: 'none',
-                      borderRadius: 6,
-                      padding: '5px 0',
-                      fontSize: 11,
-                      color: newTaskXp === xp ? '#0D0820' : '#5A5070',
-                      cursor: 'pointer',
-                      fontWeight: newTaskXp === xp ? 500 : 400,
-                    }}
-                  >
-                    {xp} XP
-                  </button>
-                ))}
-              </div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button
-                  type="button"
-                  onClick={() => void addTask()}
-                  style={{
-                    flex: 1,
-                    background: char.color,
-                    border: 'none',
-                    borderRadius: 8,
-                    padding: '8px 0',
-                    fontSize: 13,
-                    color: '#0D0820',
-                    fontWeight: 500,
-                    cursor: 'pointer',
-                  }}
-                >
-                  Add quest
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setAddingTask(false)}
-                  style={{
-                    background: 'rgba(255,255,255,0.05)',
-                    border: 'none',
-                    borderRadius: 8,
-                    padding: '8px 14px',
-                    fontSize: 13,
-                    color: '#5A5070',
-                    cursor: 'pointer',
-                  }}
-                >
-                  Cancel
-                </button>
-              </div>
-            </motion.div>
-          )}
-
-          {todayTasks.length === 0 && !addingTask && (
-            <div
-              style={{
-                background: '#140C28',
-                borderRadius: 12,
-                border: '0.5px solid rgba(255,255,255,0.05)',
-                padding: '14px',
-                textAlign: 'center',
-              }}
-            >
-              <span style={{ fontSize: 13, color: '#3D3358', fontStyle: 'italic' }}>
-                No quests today yet
-              </span>
-            </div>
-          )}
-
-          {todayTasks.map((task) => (
-            <TaskRow
-              key={task.id}
-              task={task}
-              accentColor={char.color}
-              onComplete={() => void completeTask(task.id, task.xp_reward)}
-              isCompleting={completingId === task.id}
-            />
-          ))}
-        </div>
-
-        <div style={{ marginBottom: 12 }}>
-          <span
-            style={{
-              fontSize: 11,
-              fontWeight: 500,
-              letterSpacing: '0.06em',
-              color: '#3D3358',
-              display: 'block',
-              marginBottom: 8,
-            }}
-          >
-            Chapters
-          </span>
-          {quest.milestones.map((ms) => (
-            <div
-              key={ms.id}
-              style={{
-                background: '#140C28',
-                border: `0.5px solid ${ms.completed ? `${char.color}44` : 'rgba(255,255,255,0.05)'}`,
-                borderRadius: 12,
-                padding: '10px 14px',
-                marginBottom: 6,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 10,
-                opacity: ms.completed ? 0.6 : 1,
-              }}
-            >
-              <div
-                style={{
-                  width: 20,
-                  height: 20,
-                  borderRadius: '50%',
-                  border: `1.5px solid ${ms.completed ? char.color : '#3D3358'}`,
-                  background: ms.completed ? char.color : 'transparent',
-                  flexShrink: 0,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
+                  background: '#1E0D40',
+                  border: '0.5px solid #3D2070',
+                  borderRadius: 6,
+                  padding: '3px 10px',
+                  fontSize: 10,
+                  color: '#7A5FA0',
+                  cursor: 'pointer',
                 }}
               >
-                {ms.completed && (
-                  <svg width="10" height="10" viewBox="0 0 10 10">
-                    <path
-                      d="M2 5 L4 7.5 L8 2.5"
-                      stroke="#0D0820"
-                      strokeWidth="1.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      fill="none"
-                    />
-                  </svg>
-                )}
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <span
-                  style={{
-                    fontSize: 13,
-                    color: ms.completed ? '#4A4060' : '#E8E0F0',
-                    display: 'block',
-                  }}
-                >
-                  {ms.title}
-                </span>
-                <span style={{ fontSize: 11, color: '#3D3358' }}>
-                  {ms.completed ? 'Completed' : formatDate(ms.target_date)}
-                </span>
-              </div>
+                + Add
+              </button>
             </div>
-          ))}
-        </div>
 
-        {pastTasks.length > 0 && (
-          <div>
-            <span
-              style={{
-                fontSize: 11,
-                fontWeight: 500,
-                letterSpacing: '0.06em',
-                color: '#3D3358',
-                display: 'block',
-                marginBottom: 8,
-              }}
-            >
-              Quest log
-            </span>
-            {pastTasks.map((task) => (
-              <div
-                key={task.id}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 10,
-                  padding: '8px 0',
-                  borderBottom: '0.5px solid rgba(255,255,255,0.04)',
-                  opacity: 0.5,
-                }}
-              >
-                <div
+            {addingTask && (
+              <div style={{ marginBottom: 10 }}>
+                <input
+                  value={newTaskTitle}
+                  onChange={(e) => setNewTaskTitle(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && void addTask()}
+                  placeholder="What's the quest?"
+                  autoFocus
                   style={{
-                    width: 14,
-                    height: 14,
-                    borderRadius: '50%',
-                    background: task.completed ? char.color : 'rgba(255,255,255,0.1)',
-                    flexShrink: 0,
+                    width: '100%',
+                    background: '#1A0D35',
+                    border: '0.5px solid #2D1B55',
+                    borderRadius: 8,
+                    padding: '8px 10px',
+                    color: '#E8E0F0',
+                    fontSize: 12,
+                    outline: 'none',
+                    marginBottom: 8,
+                    boxSizing: 'border-box',
                   }}
                 />
-                <span
+                <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+                  {[25, 50, 100, 200].map((xpVal) => (
+                    <button
+                      key={xpVal}
+                      type="button"
+                      onClick={() => setNewTaskXp(xpVal)}
+                      style={{
+                        flex: 1,
+                        background: newTaskXp === xpVal ? accentColor : '#1A0D35',
+                        border: '0.5px solid #2D1B55',
+                        borderRadius: 6,
+                        padding: '5px 0',
+                        fontSize: 10,
+                        color: newTaskXp === xpVal ? '#0D0820' : '#5A5070',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {xpVal} XP
+                    </button>
+                  ))}
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    type="button"
+                    onClick={() => void addTask()}
+                    style={{
+                      flex: 1,
+                      background: accentColor,
+                      border: 'none',
+                      borderRadius: 8,
+                      padding: '8px 0',
+                      fontSize: 12,
+                      color: '#0D0820',
+                      fontWeight: 500,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Add quest
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAddingTask(false)}
+                    style={{
+                      background: '#1A0D35',
+                      border: '0.5px solid #2D1B55',
+                      borderRadius: 8,
+                      padding: '8px 14px',
+                      fontSize: 12,
+                      color: '#5A5070',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {todayTasks.length === 0 && !addingTask && (
+              <span style={{ fontSize: 11, color: '#3D3358', fontStyle: 'italic' }}>
+                No quests today yet
+              </span>
+            )}
+
+            {todayTasks
+              .filter((t) => t.id !== focusTask?.id)
+              .map((task) => (
+                <div
+                  key={task.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => void handleTaskToggle(task.id, task.xp_reward)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      void handleTaskToggle(task.id, task.xp_reward)
+                    }
+                  }}
                   style={{
-                    fontSize: 12,
-                    color: '#5A5070',
-                    flex: 1,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    background: '#1A0D35',
+                    borderRadius: 8,
+                    padding: '7px 10px',
+                    marginBottom: 6,
+                    cursor: task.completed ? 'default' : 'pointer',
+                    border: '0.5px solid #2D1B55',
                   }}
                 >
-                  {task.title}
-                </span>
-                <span style={{ fontSize: 10, color: '#3D3358', flexShrink: 0 }}>
-                  +{task.xp_reward} XP
-                </span>
-              </div>
-            ))}
-          </div>
+                  <div
+                    style={{
+                      width: 14,
+                      height: 14,
+                      borderRadius: '50%',
+                      flexShrink: 0,
+                      border: `1.5px solid ${task.completed ? '#34d399' : accentColor}`,
+                      background: task.completed ? '#34d399' : 'transparent',
+                    }}
+                  />
+                  <span
+                    style={{
+                      fontSize: 10,
+                      color: task.completed ? '#5A4A7A' : '#C0B0E0',
+                      textDecoration: task.completed ? 'line-through' : 'none',
+                      flex: 1,
+                    }}
+                  >
+                    {task.title}
+                  </span>
+                  {!task.completed && (
+                    <span style={{ fontSize: 9, color: '#3D3358' }}>+{task.xp_reward} XP</span>
+                  )}
+                </div>
+              ))}
+          </LeftBorderCard>
         )}
       </div>
     </main>
-  )
-}
-
-function TaskRow({
-  task,
-  accentColor,
-  onComplete,
-  isCompleting,
-}: {
-  task: Task
-  accentColor: string
-  onComplete: () => void
-  isCompleting: boolean
-}) {
-  return (
-    <motion.div
-      layout
-      style={{
-        background: '#140C28',
-        border: '0.5px solid rgba(255,255,255,0.05)',
-        borderRadius: 12,
-        padding: '10px 12px',
-        marginBottom: 6,
-        display: 'flex',
-        alignItems: 'center',
-        gap: 10,
-      }}
-    >
-      <button
-        type="button"
-        onClick={() => !task.completed && onComplete()}
-        style={{
-          width: 20,
-          height: 20,
-          borderRadius: '50%',
-          border: `1.5px solid ${accentColor}`,
-          background: task.completed ? accentColor : 'transparent',
-          cursor: task.completed ? 'default' : 'pointer',
-          flexShrink: 0,
-          padding: 0,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        {task.completed && !isCompleting && (
-          <svg width="10" height="10" viewBox="0 0 10 10">
-            <path
-              d="M2 5 L4 7.5 L8 2.5"
-              stroke="#0D0820"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              fill="none"
-            />
-          </svg>
-        )}
-        {isCompleting && (
-          <div
-            style={{
-              width: 8,
-              height: 8,
-              borderRadius: '50%',
-              border: `1.5px solid ${accentColor}`,
-              borderTopColor: 'transparent',
-              animation: 'spin 0.6s linear infinite',
-            }}
-          />
-        )}
-      </button>
-
-      <span
-        style={{
-          flex: 1,
-          fontSize: 13,
-          color: task.completed ? '#3D3358' : '#C8C0D8',
-          textDecoration: task.completed ? 'line-through' : 'none',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
-        }}
-      >
-        {task.title}
-      </span>
-
-      {!task.completed && (
-        <span style={{ fontSize: 11, color: '#3D3358', flexShrink: 0 }}>
-          +{task.xp_reward} XP
-        </span>
-      )}
-    </motion.div>
   )
 }
