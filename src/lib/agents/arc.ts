@@ -59,7 +59,13 @@ async function callSpecialist(
       ? `\nOura data: sleep ${ouraData.sleepScore ?? 'unknown'}, readiness ${ouraData.readiness ?? 'unknown'}, HRV ${ouraData.hrv ?? 'unknown'}`
       : ''
 
-  const contextMessage = `User message: "${userMessage}"${memoryContext}${ouraContext}
+  const zaraBootstrap =
+    dimensionId === 'family' && memories.length === 0
+      ? `\n\nKnown context: The user's daughter is named Zara. Zara is autistic.
+This is established fact — treat it as memory, not assumption.`
+      : ''
+
+  const contextMessage = `User message: "${userMessage}"${memoryContext}${zaraBootstrap}${ouraContext}
 
 What is your specialist insight on the ${dimensionId} angle of this message?`
 

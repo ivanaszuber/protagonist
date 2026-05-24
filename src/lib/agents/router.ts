@@ -96,7 +96,6 @@ const DIMENSION_KEYWORDS: Record<DimensionId, string[]> = {
   love: [
     'partner',
     'relationship',
-    'love',
     'romance',
     'date',
     'intimacy',
@@ -114,6 +113,7 @@ const DIMENSION_KEYWORDS: Record<DimensionId, string[]> = {
   ],
   family: [
     'zara',
+    "zara's",
     'daughter',
     'school',
     'autism',
@@ -131,6 +131,7 @@ const DIMENSION_KEYWORDS: Record<DimensionId, string[]> = {
     'homework',
     'teacher',
     'weekend with',
+    'after school',
   ],
   wealth: [
     'money',
@@ -161,21 +162,32 @@ const DIMENSION_KEYWORDS: Record<DimensionId, string[]> = {
   ],
 }
 
+const HARD_OVERRIDES: Partial<Record<DimensionId, string[]>> = {
+  family: ['zara', "zara's", 'my daughter'],
+  wealth: ['fire', 'my fire number', 'financial independence'],
+}
+
 export function detectDimensions(message: string): DimensionId[] {
   const lower = message.toLowerCase()
-  const detected: DimensionId[] = []
+  const detected = new Set<DimensionId>()
 
-  for (const [dimension, keywords] of Object.entries(DIMENSION_KEYWORDS)) {
-    if (keywords.some((keyword) => lower.includes(keyword))) {
-      detected.push(dimension as DimensionId)
+  for (const [dimension, keywords] of Object.entries(HARD_OVERRIDES)) {
+    if (keywords!.some((kw) => lower.includes(kw))) {
+      detected.add(dimension as DimensionId)
     }
   }
 
-  if (detected.length === 0) {
-    detected.push('mind')
+  for (const [dimension, keywords] of Object.entries(DIMENSION_KEYWORDS)) {
+    if (keywords.some((keyword) => lower.includes(keyword))) {
+      detected.add(dimension as DimensionId)
+    }
   }
 
-  return detected
+  if (detected.size === 0) {
+    detected.add('mind')
+  }
+
+  return Array.from(detected)
 }
 
 export function isCheckIn(message: string): boolean {

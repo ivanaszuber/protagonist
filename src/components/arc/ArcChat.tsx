@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useCallback, useRef, useEffect } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import { getUserId } from '@/lib/user'
 
-type ChatState = 'closed' | 'open' | 'recording' | 'thinking' | 'responding'
+type ChatState = 'closed' | 'open' | 'recording' | 'thinking'
 
 interface Message {
   role: 'user' | 'arc'
@@ -16,44 +16,36 @@ export function ArcChat() {
   const [inputText, setInputText] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
-  useEffect(() => {
+  const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, chatState])
+  }
 
   const sendToArc = useCallback(async (message: string) => {
-    if (!message.trim()) return
+    const text = message.trim()
+    if (!text) return
 
-    setMessages((prev) => [...prev, { role: 'user', text: message }])
+    setMessages((prev) => [...prev, { role: 'user', text }])
     setInputText('')
     setChatState('thinking')
+    setTimeout(scrollToBottom, 50)
 
     try {
       const res = await fetch('/api/arc', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message,
-          userId: getUserId(),
-        }),
+        body: JSON.stringify({ message: text, userId: getUserId() }),
       })
 
-      if (!res.ok) {
-        throw new Error('Arc request failed')
-      }
-
       const data = await res.json()
-      setMessages((prev) => [
-        ...prev,
-        { role: 'arc', text: data.response ?? "I'm here. Tell me more." },
-      ])
-      setChatState('responding')
-      setTimeout(() => setChatState('open'), 100)
+      setMessages((prev) => [...prev, { role: 'arc', text: data.response }])
     } catch {
       setMessages((prev) => [
         ...prev,
-        { role: 'arc', text: "Something went wrong. I'm still here though." },
+        { role: 'arc', text: "Something went wrong on my end. Still here though." },
       ])
+    } finally {
       setChatState('open')
+      setTimeout(scrollToBottom, 50)
     }
   }, [])
 
@@ -62,34 +54,53 @@ export function ArcChat() {
       window.SpeechRecognition || window.webkitSpeechRecognition
 
     if (!SpeechRecognitionCtor) {
-      const text = window.prompt('Talk to Arc:')
-      if (text?.trim()) void sendToArc(text.trim())
       return
     }
 
     const recognition = new SpeechRecognitionCtor()
     recognition.continuous = false
+    recognition.interimResults = false
     recognition.lang = 'en-US'
+    recognition.maxAlternatives = 1
 
     setChatState('recording')
 
+    let gotResult = false
+
     recognition.onresult = (event: SpeechRecognitionEvent) => {
-      const text = event.results[0]?.[0]?.transcript
-      if (text?.trim()) void sendToArc(text.trim())
+      gotResult = true
+      const transcript = event.results[0]?.[0]?.transcript
+      if (transcript) {
+        setInputText(transcript)
+      }
+      setChatState('open')
     }
 
-    recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-      if (event.error === 'network' || event.error === 'not-allowed') {
-        setChatState('open')
-        const text = window.prompt('Talk to Arc:')
-        if (text?.trim()) void sendToArc(text.trim())
-      } else {
+    recognition.onend = () => {
+      if (!gotResult) {
         setChatState('open')
       }
     }
 
-    recognition.start()
-  }, [sendToArc])
+    recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+      console.error('Voice error:', event.error)
+      setChatState('open')
+    }
+
+    try {
+      recognition.start()
+    } catch (e) {
+      console.error('Could not start recognition:', e)
+      setChatState('open')
+    }
+  }, [])
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      void sendToArc(inputText)
+    }
+  }
 
   if (chatState === 'closed') {
     return (
@@ -112,13 +123,6 @@ export function ArcChat() {
           justifyContent: 'center',
           fontSize: '22px',
           zIndex: 50,
-          transition: 'transform 0.2s ease',
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.transform = 'scale(1.1)'
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.transform = 'scale(1)'
         }}
         title="Talk to Arc"
         aria-label="Talk to Arc"
@@ -132,196 +136,267 @@ export function ArcChat() {
     <div
       style={{
         position: 'fixed',
-        bottom: 24,
-        right: 24,
-        width: 340,
-        maxHeight: '70vh',
-        background: '#130E2A',
-        border: '1px solid rgba(255,122,101,0.25)',
-        borderRadius: 20,
-        boxShadow: '0 8px 40px rgba(0,0,0,0.5)',
-        display: 'flex',
-        flexDirection: 'column',
+        bottom: 0,
+        right: 0,
+        left: 0,
+        top: 0,
         zIndex: 50,
-        overflow: 'hidden',
+        display: 'flex',
+        alignItems: 'flex-end',
+        justifyContent: 'flex-end',
+        pointerEvents: 'none',
       }}
     >
       <div
-        style={{
-          padding: '14px 18px',
-          borderBottom: '1px solid rgba(255,255,255,0.07)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          background: '#1A1238',
+        role="button"
+        tabIndex={0}
+        onClick={() => setChatState('closed')}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') setChatState('closed')
         }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div
-            style={{
-              width: 28,
-              height: 28,
-              borderRadius: '50%',
-              background: 'radial-gradient(circle at 35% 35%, #FFB0A3, #FF7A65)',
-              boxShadow: '0 0 12px rgba(255,122,101,0.4)',
-            }}
-          />
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#F0ECFF' }}>Arc</div>
-            <div style={{ fontSize: 10, color: '#6B5E8C' }}>
-              {chatState === 'recording'
-                ? 'Listening...'
-                : chatState === 'thinking'
-                  ? 'Thinking...'
-                  : 'Your Oracle'}
-            </div>
-          </div>
-        </div>
-        <button
-          type="button"
-          onClick={() => setChatState('closed')}
-          style={{
-            background: 'transparent',
-            border: 'none',
-            color: '#6B5E8C',
-            cursor: 'pointer',
-            fontSize: 18,
-            padding: 4,
-          }}
-          aria-label="Close Arc chat"
-        >
-          ×
-        </button>
-      </div>
+        style={{
+          position: 'absolute',
+          inset: 0,
+          pointerEvents: 'auto',
+          background: 'transparent',
+        }}
+        aria-label="Close Arc chat"
+      />
 
       <div
+        onClick={(e) => e.stopPropagation()}
         style={{
-          flex: 1,
-          overflowY: 'auto',
-          padding: '16px 18px',
+          position: 'relative',
+          width: '100%',
+          maxWidth: 380,
+          maxHeight: '80vh',
+          margin: '0 0 0 auto',
+          background: '#130E2A',
+          border: '1px solid rgba(255,122,101,0.25)',
+          borderRadius: '20px 20px 0 0',
+          boxShadow: '0 -4px 40px rgba(0,0,0,0.5)',
           display: 'flex',
           flexDirection: 'column',
-          gap: 12,
-          minHeight: 200,
-          maxHeight: 320,
+          pointerEvents: 'auto',
         }}
       >
-        {messages.length === 0 && (
-          <div
-            style={{
-              fontSize: 13,
-              color: '#9B8EC4',
-              fontStyle: 'italic',
-              textAlign: 'center',
-              marginTop: 16,
-            }}
-          >
-            &ldquo;What&apos;s on your mind?&rdquo;
-          </div>
-        )}
-        {messages.map((msg, i) => (
-          <div
-            key={`${msg.role}-${i}-${msg.text.slice(0, 20)}`}
-            style={{
-              maxWidth: '85%',
-              alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
-            }}
-          >
+        <div
+          style={{
+            padding: '14px 18px',
+            borderBottom: '1px solid rgba(255,255,255,0.07)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            background: '#1A1238',
+            borderRadius: '20px 20px 0 0',
+            flexShrink: 0,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div
               style={{
-                background:
-                  msg.role === 'user'
-                    ? 'rgba(123,63,228,0.2)'
-                    : 'rgba(255,122,101,0.08)',
-                border: `1px solid ${
-                  msg.role === 'user'
-                    ? 'rgba(123,63,228,0.3)'
-                    : 'rgba(255,122,101,0.15)'
-                }`,
-                borderRadius:
-                  msg.role === 'user' ? '14px 14px 4px 14px' : '14px 14px 14px 4px',
-                padding: '10px 14px',
+                width: 28,
+                height: 28,
+                borderRadius: '50%',
+                background: 'radial-gradient(circle at 35% 35%, #FFB0A3, #FF7A65)',
+                boxShadow: '0 0 12px rgba(255,122,101,0.4)',
+                flexShrink: 0,
+              }}
+            />
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#F0ECFF' }}>Arc</div>
+              <div style={{ fontSize: 10, color: '#6B5E8C' }}>
+                {chatState === 'recording'
+                  ? '🎙 Listening — tap Send when done'
+                  : chatState === 'thinking'
+                    ? '⚡ Thinking...'
+                    : 'Your Oracle · always on'}
+              </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setChatState('closed')}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: '#6B5E8C',
+              cursor: 'pointer',
+              fontSize: 22,
+              padding: '0 4px',
+              lineHeight: 1,
+            }}
+            aria-label="Close"
+          >
+            ×
+          </button>
+        </div>
+
+        <div
+          style={{
+            flex: 1,
+            overflowY: 'auto',
+            padding: '16px 16px 8px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 10,
+          }}
+        >
+          {messages.length === 0 && (
+            <div
+              style={{
                 fontSize: 13,
-                color: '#F0ECFF',
+                color: '#9B8EC4',
+                fontStyle: 'italic',
+                textAlign: 'center',
+                paddingTop: 24,
                 lineHeight: 1.6,
               }}
             >
-              {msg.text}
+              &ldquo;Talk to me. Check in, process something,
+              <br />
+              ask a question — I&apos;m always here.&rdquo;
             </div>
-          </div>
-        ))}
-        {chatState === 'thinking' && (
-          <div style={{ alignSelf: 'flex-start' }}>
+          )}
+
+          {messages.map((msg, i) => (
             <div
+              key={`${msg.role}-${i}`}
               style={{
-                background: 'rgba(255,122,101,0.08)',
-                border: '1px solid rgba(255,122,101,0.15)',
-                borderRadius: '14px 14px 14px 4px',
-                padding: '10px 16px',
-                fontSize: 18,
-                letterSpacing: 4,
-                color: '#FF7A65',
+                maxWidth: '85%',
+                alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
               }}
             >
-              ···
+              <div
+                style={{
+                  background:
+                    msg.role === 'user'
+                      ? 'rgba(123,63,228,0.2)'
+                      : 'rgba(255,122,101,0.08)',
+                  border: `1px solid ${
+                    msg.role === 'user'
+                      ? 'rgba(123,63,228,0.3)'
+                      : 'rgba(255,122,101,0.15)'
+                  }`,
+                  borderRadius:
+                    msg.role === 'user' ? '14px 14px 4px 14px' : '14px 14px 14px 4px',
+                  padding: '10px 14px',
+                  fontSize: 14,
+                  color: '#F0ECFF',
+                  lineHeight: 1.65,
+                }}
+              >
+                {msg.text}
+              </div>
             </div>
-          </div>
-        )}
-        <div ref={messagesEndRef} />
-      </div>
+          ))}
 
-      <div
-        style={{
-          padding: '12px 14px',
-          borderTop: '1px solid rgba(255,255,255,0.07)',
-          display: 'flex',
-          gap: 8,
-          alignItems: 'center',
-        }}
-      >
-        <input
-          type="text"
-          placeholder="Tell Arc anything..."
-          value={inputText}
-          onChange={(e) => setInputText(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') void sendToArc(inputText)
-          }}
-          disabled={chatState === 'thinking' || chatState === 'recording'}
+          {chatState === 'thinking' && (
+            <div style={{ alignSelf: 'flex-start' }}>
+              <div
+                style={{
+                  background: 'rgba(255,122,101,0.08)',
+                  border: '1px solid rgba(255,122,101,0.15)',
+                  borderRadius: '14px 14px 14px 4px',
+                  padding: '10px 18px',
+                  fontSize: 20,
+                  letterSpacing: 5,
+                  color: '#FF7A65',
+                }}
+              >
+                ···
+              </div>
+            </div>
+          )}
+          <div ref={messagesEndRef} />
+        </div>
+
+        <div
           style={{
-            flex: 1,
-            background: 'rgba(255,255,255,0.05)',
-            border: '1px solid rgba(255,255,255,0.1)',
-            borderRadius: 100,
-            padding: '9px 16px',
-            fontSize: 13,
-            color: '#F0ECFF',
-            outline: 'none',
-            fontFamily: 'inherit',
-          }}
-        />
-        <button
-          type="button"
-          onClick={startVoice}
-          disabled={chatState === 'thinking'}
-          style={{
-            width: 36,
-            height: 36,
-            borderRadius: '50%',
-            background:
-              chatState === 'recording' ? '#FF7A65' : 'rgba(255,122,101,0.15)',
-            border: '1px solid rgba(255,122,101,0.3)',
-            cursor: chatState === 'thinking' ? 'not-allowed' : 'pointer',
-            fontSize: 15,
+            padding: '10px 12px 16px',
+            borderTop: '1px solid rgba(255,255,255,0.07)',
             display: 'flex',
+            gap: 8,
             alignItems: 'center',
-            justifyContent: 'center',
             flexShrink: 0,
           }}
-          aria-label="Voice message to Arc"
         >
-          🎙
-        </button>
+          <button
+            type="button"
+            onClick={startVoice}
+            disabled={chatState === 'thinking'}
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: '50%',
+              background:
+                chatState === 'recording' ? '#FF7A65' : 'rgba(255,122,101,0.12)',
+              border: `1px solid ${
+                chatState === 'recording' ? '#FF7A65' : 'rgba(255,122,101,0.25)'
+              }`,
+              cursor: 'pointer',
+              fontSize: 16,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+              opacity: chatState === 'thinking' ? 0.4 : 1,
+            }}
+            aria-label="Record voice message"
+          >
+            🎙
+          </button>
+
+          <input
+            type="text"
+            placeholder={
+              chatState === 'recording'
+                ? 'Transcript will appear here...'
+                : 'Talk to Arc...'
+            }
+            value={inputText}
+            onChange={(e) => setInputText(e.target.value)}
+            onKeyDown={handleKeyDown}
+            disabled={chatState === 'thinking'}
+            style={{
+              flex: 1,
+              background: 'rgba(255,255,255,0.05)',
+              border: '1px solid rgba(255,255,255,0.1)',
+              borderRadius: 100,
+              padding: '10px 16px',
+              fontSize: 14,
+              color: '#F0ECFF',
+              outline: 'none',
+              fontFamily: 'inherit',
+              opacity: chatState === 'thinking' ? 0.5 : 1,
+            }}
+          />
+
+          {inputText.trim().length > 0 && (
+            <button
+              type="button"
+              onClick={() => void sendToArc(inputText)}
+              disabled={chatState === 'thinking'}
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: '50%',
+                background: '#7B3FE4',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: 16,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+                boxShadow: '0 4px 12px rgba(123,63,228,0.4)',
+              }}
+              aria-label="Send message"
+            >
+              ↑
+            </button>
+          )}
+        </div>
       </div>
     </div>
   )
