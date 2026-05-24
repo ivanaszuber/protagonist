@@ -57,7 +57,7 @@ export default function Home() {
       </p>
 
       <Link
-        href="/quests"
+        href="/dashboard"
         style={{
           display: 'inline-block',
           background: '#FF7A65',
@@ -70,7 +70,7 @@ export default function Home() {
           boxShadow: '0 0 24px rgba(255,122,101,0.35)',
         }}
       >
-        Start Daily Check-In →
+        Open Your Day →
       </Link>
     </main>
   )

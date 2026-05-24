@@ -464,3 +464,94 @@ export async function getGmailDigest(userId: string) {
   }
   return data
 }
+
+// ── Daily briefings ────────────────────────────────────
+
+export async function getDailyBriefing(userId: string, date?: string) {
+  if (!isSupabaseConfigured()) return null
+
+  const day = date ?? todayDate()
+  const { data, error } = await supabase
+    .from('daily_briefings')
+    .select('briefing')
+    .eq('user_id', userId)
+    .eq('date', day)
+    .maybeSingle()
+
+  if (error) {
+    console.error('getDailyBriefing error:', error)
+    return null
+  }
+  return data?.briefing ?? null
+}
+
+export async function saveDailyBriefing(
+  userId: string,
+  briefing: string,
+  dataSnapshot: unknown
+) {
+  if (!isSupabaseConfigured()) return
+
+  const day = todayDate()
+  const { error } = await supabase.from('daily_briefings').upsert(
+    {
+      user_id: userId,
+      date: day,
+      briefing,
+      data_snapshot: dataSnapshot,
+    },
+    { onConflict: 'user_id,date' }
+  )
+  if (error) throw error
+}
+
+export async function getDimensionXP(userId: string): Promise<Record<string, number> | null> {
+  if (!isSupabaseConfigured()) return null
+
+  const { data, error } = await supabase
+    .from('dimension_xp')
+    .select('dimension_id, total_xp')
+    .eq('user_id', userId)
+
+  if (error) {
+    console.error('getDimensionXP error:', error)
+    return null
+  }
+
+  const xpMap: Record<string, number> = {}
+  for (const row of data ?? []) {
+    xpMap[row.dimension_id] = row.total_xp ?? 0
+  }
+  return xpMap
+}
+
+export async function getTodayQuestsForUser(userId: string): Promise<
+  Array<{
+    id: string
+    title: string
+    description: string
+    dimension: string
+    xp_reward: number
+    completed: boolean
+  }>
+> {
+  if (!isSupabaseConfigured()) return []
+
+  const { data, error } = await supabase
+    .from('quests')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('date', todayDate())
+    .order('created_at', { ascending: true })
+
+  if (error || !data) return []
+
+  return data.map((row) => ({
+    id: row.id,
+    title: row.title,
+    description: row.description ?? '',
+    dimension: row.dimension_id,
+    xp_reward: row.xp_reward ?? 100,
+    completed: row.status === 'completed',
+  }))
+}

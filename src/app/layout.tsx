@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import { Space_Grotesk } from 'next/font/google'
 import { ArcChat } from '@/components/arc/ArcChat'
+import { BottomNav } from '@/components/nav/BottomNav'
 import './globals.css'
 
 const spaceGrotesk = Space_Grotesk({
@@ -43,6 +44,7 @@ export default function RootLayout({
         style={{ fontFamily: 'var(--font-space-grotesk), system-ui, sans-serif' }}
       >
         {children}
+        <BottomNav />
         <ArcChat />
       </body>
     </html>

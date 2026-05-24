@@ -226,7 +226,7 @@ export default function QuestsPage() {
         background: '#0D0820',
         color: '#F0ECFF',
         fontFamily: "'Space Grotesk', system-ui, sans-serif",
-        padding: '32px 24px',
+        padding: '32px 24px 96px',
         maxWidth: '680px',
         margin: '0 auto',
         position: 'relative',
