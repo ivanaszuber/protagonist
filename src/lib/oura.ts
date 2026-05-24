@@ -78,6 +78,24 @@ function sanitizeTemperatureDeviation(value: number | null | undefined): number 
   return value
 }
 
+export interface OuraDashboardData {
+  readiness_score: number | null
+  sleep_score: number | null
+  activity_score: number | null
+  cycle_day: number | null
+  cycle_phase: string | null
+}
+
+export function ouraToDashboardPayload(data: OuraDailyData): OuraDashboardData {
+  return {
+    readiness_score: data.readiness_score,
+    sleep_score: data.sleep_score,
+    activity_score: data.activity_score,
+    cycle_day: data.cycle_day,
+    cycle_phase: data.cycle_phase,
+  }
+}
+
 export function ouraRowToDailyData(row: OuraDbRow): OuraDailyData {
   const deep =
     row.deep_sleep_seconds ?? row.sleep_deep_seconds ?? null

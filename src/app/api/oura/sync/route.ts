@@ -1,5 +1,10 @@
 import { NextResponse } from 'next/server'
-import { fetchOuraDailyData, ouraRowToDailyData, refreshOuraTokens } from '@/lib/oura'
+import {
+  fetchOuraDailyData,
+  ouraRowToDailyData,
+  ouraToDashboardPayload,
+  refreshOuraTokens,
+} from '@/lib/oura'
 import { getOuraTokens, saveOuraTokens, saveOuraDaily, getOuraDaily } from '@/lib/db'
 
 export async function POST(request: Request) {
@@ -60,7 +65,11 @@ export async function POST(request: Request) {
       cycle_phase: data.cycle_phase,
     })
 
-    return NextResponse.json({ success: true, connected: true, data })
+    return NextResponse.json({
+      success: true,
+      connected: true,
+      data: ouraToDashboardPayload(data),
+    })
   } catch (err) {
     console.error('Oura sync error:', err)
     return NextResponse.json({ error: 'sync_failed', connected: true }, { status: 500 })
@@ -79,7 +88,7 @@ export async function GET(request: Request) {
 
   const today = new Date().toISOString().split('T')[0]
   const row = await getOuraDaily(userId, today)
-  const data = row ? ouraRowToDailyData(row) : null
+  const data = row ? ouraToDashboardPayload(ouraRowToDailyData(row)) : null
 
   return NextResponse.json({ connected: true, data })
 }

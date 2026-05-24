@@ -1,26 +1,17 @@
 'use client'
 
-import { useEffect, useState, useRef, useCallback } from 'react'
-import Link from 'next/link'
+import { useEffect, useState, useRef, type ReactNode } from 'react'
 import { getUserId } from '@/lib/user'
-import { loadXP, loadTodayQuests, loadCompletedQuests } from '@/lib/xp'
+import { loadTodayQuests, loadCompletedQuests } from '@/lib/xp'
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface OuraData {
   readiness_score: number | null
   sleep_score: number | null
   activity_score: number | null
-  hrv_balance: number | null
-  steps: number | null
-  sleep_total_seconds: number | null
-  deep_sleep_seconds: number | null
-  rem_sleep_seconds: number | null
-  light_sleep_seconds: number | null
-  respiratory_rate: number | null
-  body_temperature_deviation: number | null
-  skin_temperature_deviation: number | null
   cycle_day: number | null
   cycle_phase: string | null
-  recovery_index: number | null
 }
 
 interface CalendarEvent {
@@ -29,237 +20,426 @@ interface CalendarEvent {
   start_time: string | null
   end_time: string | null
   all_day: boolean
-  location: string | null
   event_date: string
-}
-
-interface ActionItem {
-  subject: string
-  from: string
-  urgency: 'high' | 'medium' | 'low'
-  snippet: string
 }
 
 interface Quest {
   id: string
   title: string
-  description: string
   dimension: string
   xp_reward: number
   completed: boolean
 }
 
-const DIMENSIONS = [
-  { key: 'vitality', label: 'Vitality', emoji: '💪', color: '#34d399' },
-  { key: 'mind', label: 'Mind', emoji: '🧠', color: '#818cf8' },
-  { key: 'create', label: 'Create', emoji: '✨', color: '#f59e0b' },
-  { key: 'social', label: 'Social', emoji: '🤝', color: '#38bdf8' },
-  { key: 'love', label: 'Love', emoji: '💕', color: '#f472b6' },
-  { key: 'family', label: 'Family', emoji: '👧', color: '#a78bfa' },
-  { key: 'wealth', label: 'Wealth', emoji: '💰', color: '#fbbf24' },
-]
-
-const XP_PER_LEVEL = 500
-
-const CYCLE_PHASES: Record<
-  string,
-  { label: string; color: string; emoji: string; note: string }
-> = {
-  menstrual: {
-    label: 'Menstrual',
-    color: '#f87171',
-    emoji: '🌑',
-    note: 'Rest & restore. Iron-rich foods. Gentle movement.',
-  },
-  follicular: {
-    label: 'Follicular',
-    color: '#fb923c',
-    emoji: '🌒',
-    note: 'Energy rising. Great time for new projects & hard workouts.',
-  },
-  ovulatory: {
-    label: 'Ovulatory',
-    color: '#fbbf24',
-    emoji: '🌕',
-    note: 'Peak energy & confidence. Your highest performance window.',
-  },
-  luteal: {
-    label: 'Luteal',
-    color: '#a78bfa',
-    emoji: '🌖',
-    note: 'Focus inward. Finish things. Prioritize sleep & recovery.',
-  },
+interface WealthData {
+  net_worth: number | null
+  fire_goal: number
+  fire_year: number
+  total_resisted: number
+  last_resist_item: string | null
+  last_resist_amount: number | null
 }
 
-function formatTime(seconds: number): string {
-  const h = Math.floor(seconds / 3600)
-  const m = Math.round((seconds % 3600) / 60)
-  return `${h}h ${m}m`
+// ─── Cycle phase config ───────────────────────────────────────────────────────
+
+const CYCLE_PHASES: Record<string, { emoji: string; label: string }> = {
+  menstrual: { emoji: '🌑', label: 'Menstrual' },
+  follicular: { emoji: '🌒', label: 'Follicular' },
+  ovulatory: { emoji: '🌕', label: 'Ovulatory' },
+  luteal: { emoji: '🌖', label: 'Luteal' },
 }
 
-function formatEventTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString('en-GB', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  })
-}
+// ─── Arc verdict logic ────────────────────────────────────────────────────────
 
-function isHappening(event: CalendarEvent): boolean {
-  if (!event.start_time || !event.end_time) return false
-  const now = Date.now()
-  return (
-    now >= new Date(event.start_time).getTime() &&
-    now <= new Date(event.end_time).getTime()
-  )
-}
+function getArcVerdict(oura: OuraData): { text: string; color: string } {
+  const r = oura.readiness_score ?? 0
+  const s = oura.sleep_score ?? 0
+  const phase = oura.cycle_phase?.toLowerCase() ?? null
 
-function isNext(events: CalendarEvent[], event: CalendarEvent): boolean {
-  const upcoming = events.filter(
-    (e) => e.start_time && new Date(e.start_time).getTime() > Date.now()
-  )
-  return upcoming[0]?.id === event.id
-}
+  if (phase === 'menstrual') {
+    if (r < 70 || s < 70) {
+      return {
+        color: '#f472b6',
+        text: 'Menstrual phase + lower scores. Rest is the mission today — gentle movement, iron-rich food, early bed.',
+      }
+    }
+    return {
+      color: '#f472b6',
+      text: 'Menstrual phase. Even with decent numbers, your body is doing inner work. Choose depth over intensity.',
+    }
+  }
 
-function scoreColor(score: number | null): string {
-  if (!score) return '#ffffff40'
-  if (score >= 85) return '#34d399'
-  if (score >= 70) return '#60a5fa'
-  if (score >= 55) return '#fbbf24'
-  return '#f87171'
-}
+  if (phase === 'ovulatory') {
+    if (r >= 85 && s >= 75) {
+      return {
+        color: '#34d399',
+        text: 'Peak phase + optimal body. Your highest performance window — attack the hardest thing before noon.',
+      }
+    }
+    return {
+      color: '#6ee7a4',
+      text: 'Ovulatory phase. Good energy window — lead with your best work despite slightly lower recovery.',
+    }
+  }
 
-function scoreLabel(score: number | null): string {
-  if (!score) return '—'
-  if (score >= 85) return 'Optimal'
-  if (score >= 70) return 'Good'
-  if (score >= 55) return 'Fair'
-  return 'Low'
-}
+  if (phase === 'luteal') {
+    if (r >= 80) {
+      return {
+        color: '#a78bfa',
+        text: 'Luteal phase. Good body baseline. Finish things, go deep on existing work — new starts can wait.',
+      }
+    }
+    return {
+      color: '#a78bfa',
+      text: 'Luteal phase + lower recovery. Protect your energy. Batch tasks, skip draining interactions.',
+    }
+  }
 
-function mapCalendarEvent(row: Record<string, unknown>): CalendarEvent {
+  if (phase === 'follicular') {
+    if (r >= 80) {
+      return {
+        color: '#34d399',
+        text: 'Follicular phase + great readiness. Energy rising — excellent time to start something new or push harder.',
+      }
+    }
+    return {
+      color: '#60a5fa',
+      text: 'Follicular phase. Energy building. Steady effort today, bigger push coming as the week progresses.',
+    }
+  }
+
+  if (r >= 85 && s >= 75) {
+    return {
+      color: '#34d399',
+      text: 'Optimal body. No excuses. Attack your hardest challenge before noon.',
+    }
+  }
+  if (r >= 70 && s >= 65) {
+    return {
+      color: '#60a5fa',
+      text: 'Solid baseline today. Steady, focused work — you have good fuel in the tank.',
+    }
+  }
+  if (r < 60 || s < 60) {
+    return {
+      color: '#f87171',
+      text: 'Body asking for recovery. Protect your energy — short deep work sessions, then rest.',
+    }
+  }
   return {
-    id: (row.id as string) ?? (row.google_event_id as string),
-    title: row.title as string,
-    start_time: (row.start_time as string | null) ?? null,
-    end_time: (row.end_time as string | null) ?? null,
-    all_day: Boolean(row.all_day),
-    location: (row.location as string | null) ?? null,
-    event_date: row.event_date as string,
+    color: '#fbbf24',
+    text: 'Moderate recovery. Prioritize the one thing that matters most today, then be gentle with the rest.',
   }
 }
+
+// ─── Score Ring ───────────────────────────────────────────────────────────────
 
 function ScoreRing({
   score,
   label,
-  size = 72,
-  strokeWidth = 5,
+  color,
+  size = 58,
+  stroke = 4.5,
 }: {
   score: number | null
   label: string
+  color: string
   size?: number
-  strokeWidth?: number
+  stroke?: number
 }) {
-  const r = (size - strokeWidth * 2) / 2
+  const r = (size - stroke * 2) / 2
   const circ = 2 * Math.PI * r
   const filled = score ? (score / 100) * circ : 0
-  const color = scoreColor(score)
+
+  const statusLabel = !score
+    ? '—'
+    : score >= 85
+      ? 'Optimal'
+      : score >= 70
+        ? 'Good'
+        : score >= 55
+          ? 'Fair'
+          : 'Low'
 
   return (
-    <div className="flex flex-col items-center gap-1.5">
+    <div className="flex flex-col items-center gap-[3px]">
       <div className="relative" style={{ width: size, height: size }}>
-        <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
+        <svg
+          width={size}
+          height={size}
+          style={{ transform: 'rotate(-90deg)', display: 'block' }}
+        >
           <circle
             cx={size / 2}
             cy={size / 2}
             r={r}
             fill="none"
             stroke="rgba(255,255,255,0.07)"
-            strokeWidth={strokeWidth}
+            strokeWidth={stroke}
           />
-          <circle
-            cx={size / 2}
-            cy={size / 2}
-            r={r}
-            fill="none"
-            stroke={color}
-            strokeWidth={strokeWidth}
-            strokeDasharray={circ}
-            strokeDashoffset={circ - filled}
-            strokeLinecap="round"
-            style={{
-              filter: `drop-shadow(0 0 6px ${color}60)`,
-              transition: 'stroke-dashoffset 1s ease',
-            }}
-          />
+          {score !== null && (
+            <circle
+              cx={size / 2}
+              cy={size / 2}
+              r={r}
+              fill="none"
+              stroke={color}
+              strokeWidth={stroke}
+              strokeDasharray={circ}
+              strokeDashoffset={circ - filled}
+              strokeLinecap="round"
+              style={{ transition: 'stroke-dashoffset 1s ease' }}
+            />
+          )}
         </svg>
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-base font-bold text-white">{score ?? '—'}</span>
+        <div className="absolute inset-0 flex items-center justify-center">
+          <span className="text-sm font-bold text-white">{score ?? '—'}</span>
         </div>
       </div>
-      <div className="text-center">
-        <p className="text-xs text-white/50">{label}</p>
-        <p className="text-xs font-semibold" style={{ color }}>
-          {scoreLabel(score)}
-        </p>
+      <p className="text-[9px] text-white/35 m-0">{label}</p>
+      <p
+        className="text-[9px] font-semibold m-0"
+        style={{ color: score !== null ? color : 'rgba(255,255,255,0.3)' }}
+      >
+        {statusLabel}
+      </p>
+    </div>
+  )
+}
+
+// ─── Character SVG avatars ────────────────────────────────────────────────────
+
+function ForgeAvatar() {
+  return (
+    <div
+      className="w-[42px] h-[42px] rounded-[13px] overflow-hidden flex items-end justify-center flex-shrink-0"
+      style={{ background: 'rgba(232,148,26,0.2)' }}
+    >
+      <svg width="42" height="42" viewBox="0 0 42 42">
+        <rect x="13" y="25" width="16" height="13" rx="3" fill="#8B5000" />
+        <rect x="14" y="12" width="14" height="14" rx="4" fill="#E8941A" />
+        <rect x="13" y="19" width="16" height="3" rx="1" fill="#CC7A10" />
+        <ellipse
+          cx="18"
+          cy="17"
+          rx="3"
+          ry="2.5"
+          fill="#FFD47A"
+          stroke="#5A2800"
+          strokeWidth="1"
+        />
+        <ellipse
+          cx="24"
+          cy="17"
+          rx="3"
+          ry="2.5"
+          fill="#FFD47A"
+          stroke="#5A2800"
+          strokeWidth="1"
+        />
+        <rect x="20.5" y="16" width="1" height="3" fill="#8B5000" />
+        <circle cx="33" cy="9" r="2.5" fill="#FFD47A" />
+        <circle cx="30" cy="13" r="1.5" fill="#FFA030" />
+      </svg>
+    </div>
+  )
+}
+
+function EchoAvatar() {
+  return (
+    <div
+      className="w-[42px] h-[42px] rounded-[13px] overflow-hidden flex items-end justify-center flex-shrink-0"
+      style={{ background: 'rgba(46,204,113,0.2)' }}
+    >
+      <svg width="42" height="42" viewBox="0 0 42 42">
+        <rect x="13" y="25" width="16" height="13" rx="3" fill="#1A8F50" />
+        <rect
+          x="11"
+          y="24"
+          width="6"
+          height="10"
+          rx="3"
+          fill="rgba(110,231,164,0.25)"
+          transform="rotate(15,14,29)"
+        />
+        <circle cx="21" cy="17" r="8" fill="#2ECC71" />
+        <path
+          d="M30 10 Q33 8 32 12"
+          stroke="#6EE7A4"
+          strokeWidth="1.5"
+          fill="none"
+          strokeLinecap="round"
+        />
+        <path
+          d="M32 6 Q36 4 35 9"
+          stroke="rgba(110,231,164,0.6)"
+          strokeWidth="1"
+          fill="none"
+          strokeLinecap="round"
+        />
+        <path
+          d="M28 14 Q31 13 30 17"
+          stroke="rgba(110,231,164,0.5)"
+          strokeWidth="1"
+          fill="none"
+          strokeLinecap="round"
+        />
+      </svg>
+    </div>
+  )
+}
+
+function VaultAvatar() {
+  return (
+    <div
+      className="w-[42px] h-[42px] rounded-[13px] overflow-hidden flex items-end justify-center flex-shrink-0"
+      style={{ background: 'rgba(255,179,71,0.2)' }}
+    >
+      <svg width="42" height="42" viewBox="0 0 42 42">
+        <rect x="13" y="25" width="16" height="13" rx="4" fill="#1A8F50" />
+        <rect x="15" y="29" width="12" height="3" rx="1" fill="rgba(110,231,164,0.35)" />
+        <rect x="15" y="34" width="9" height="2" rx="1" fill="rgba(110,231,164,0.2)" />
+        <rect x="14" y="11" width="14" height="15" rx="4" fill="#2ECC71" />
+        <circle cx="30" cy="10" r="5.5" fill="#FFD700" stroke="#B8860B" strokeWidth="1" />
+        <text x="30" y="13.5" fontSize="6" fontWeight="700" fill="#7A5800" textAnchor="middle">
+          $
+        </text>
+      </svg>
+    </div>
+  )
+}
+
+// ─── Mission Card ─────────────────────────────────────────────────────────────
+
+function MissionCard({
+  avatar,
+  dimensionLabel,
+  characterName,
+  questTitle,
+  badge,
+  xpReward,
+  progressPct,
+  progressLabel,
+  linkLabel,
+  accentColor,
+  cardBg,
+  cardBorder,
+  children,
+}: {
+  avatar: ReactNode
+  dimensionLabel: string
+  characterName: string
+  questTitle: string
+  badge: string
+  xpReward: number
+  progressPct: number
+  progressLabel: string
+  linkLabel: string
+  accentColor: string
+  cardBg: string
+  cardBorder: string
+  children?: ReactNode
+}) {
+  return (
+    <div
+      className="rounded-[18px] p-[11px_13px] mb-[7px]"
+      style={{ background: cardBg, border: `1px solid ${cardBorder}` }}
+    >
+      <div className="flex items-center gap-[10px]">
+        {avatar}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-[5px] mb-[2px]">
+            <p
+              className="text-[9px] font-semibold m-0 tracking-[0.08em]"
+              style={{ color: accentColor }}
+            >
+              {characterName} · {dimensionLabel}
+            </p>
+            <span className="text-[8px] text-white/[0.28] bg-white/[0.08] px-[5px] py-[1px] rounded">
+              {badge}
+            </span>
+          </div>
+          <p className="text-[12px] font-semibold text-white m-0 truncate">{questTitle}</p>
+        </div>
+        <span
+          className="text-[10px] font-bold flex-shrink-0 px-[7px] py-[3px] rounded-md"
+          style={{ color: accentColor, background: `${accentColor}30` }}
+        >
+          +{xpReward} XP
+        </span>
+      </div>
+
+      {children}
+
+      <div className="mt-[8px] h-[2px] bg-white/[0.08] rounded-full">
+        <div
+          className="h-[2px] rounded-full transition-all duration-1000"
+          style={{ width: `${Math.max(progressPct, 2)}%`, background: accentColor }}
+        />
+      </div>
+      <div className="flex justify-between mt-[4px]">
+        <span className="text-[8px] text-white/[0.22]">{progressLabel}</span>
+        <span className="text-[8px] text-white/[0.22]">{linkLabel} ↗</span>
       </div>
     </div>
   )
 }
 
-function StatPill({
-  label,
-  value,
-  color = '#ffffff70',
-  icon,
-}: {
-  label: string
-  value: string
-  color?: string
-  icon?: string
-}) {
-  return (
-    <div className="flex flex-col items-center gap-1 px-3 py-2.5 rounded-xl bg-white/5 border border-white/10 min-w-[72px] shrink-0">
-      {icon && <span className="text-sm">{icon}</span>}
-      <span className="text-sm font-bold" style={{ color }}>
-        {value}
-      </span>
-      <span className="text-xs text-white/40 text-center leading-tight">{label}</span>
-    </div>
-  )
-}
+// ─── Main Dashboard ───────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
-  const [briefing, setBriefing] = useState<string | null>(null)
-  const [briefingLoading, setBriefingLoading] = useState(true)
   const [oura, setOura] = useState<OuraData | null>(null)
   const [events, setEvents] = useState<CalendarEvent[]>([])
-  const [gmail, setGmail] = useState<{
-    unread_count: number
-    needs_reply_count: number
-    action_items: ActionItem[]
-  } | null>(null)
   const [quests, setQuests] = useState<Quest[]>([])
-  const [xp, setXp] = useState<Record<string, number>>({})
+  const [wealth, setWealth] = useState<WealthData | null>(null)
   const [loaded, setLoaded] = useState(false)
   const userId = useRef(getUserId())
 
-  const generateBriefing = useCallback(async (uid: string) => {
-    setBriefingLoading(true)
-    try {
-      const res = await fetch('/api/dashboard/briefing', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: uid }),
-      })
-      const data = await res.json()
-      if (data.briefing) setBriefing(data.briefing)
-    } finally {
-      setBriefingLoading(false)
-    }
+  useEffect(() => {
+    void loadAll()
   }, [])
 
-  const syncBackground = useCallback(async (uid: string, today: string) => {
+  async function loadAll() {
+    const uid = userId.current
+    const today = new Date().toISOString().split('T')[0]
+
+    const [ouraRes, calRes, questRes, wealthRes] = await Promise.allSettled([
+      fetch(`/api/oura/sync?userId=${encodeURIComponent(uid)}`).then((r) => r.json()),
+      fetch(`/api/calendar/sync?userId=${encodeURIComponent(uid)}`).then((r) => r.json()),
+      fetch(`/api/quests/today?userId=${encodeURIComponent(uid)}`).then((r) => r.json()),
+      fetch(`/api/wealth?userId=${encodeURIComponent(uid)}`).then((r) => r.json()),
+    ])
+
+    if (ouraRes.status === 'fulfilled' && ouraRes.value?.data) {
+      setOura(ouraRes.value.data)
+    }
+    if (calRes.status === 'fulfilled' && calRes.value?.events) {
+      setEvents(
+        calRes.value.events.filter((e: CalendarEvent) => e.event_date === today)
+      )
+    }
+    if (questRes.status === 'fulfilled' && questRes.value?.quests?.length) {
+      setQuests(questRes.value.quests)
+    } else {
+      const completedIds = loadCompletedQuests()
+      const localQuests = loadTodayQuests().map((q) => ({
+        id: q.id,
+        title: q.title,
+        dimension: q.dimensionId,
+        xp_reward: q.xpReward,
+        completed: completedIds.has(q.id),
+      }))
+      if (localQuests.length > 0) setQuests(localQuests)
+    }
+    if (wealthRes.status === 'fulfilled' && wealthRes.value) {
+      setWealth(wealthRes.value)
+    }
+    setLoaded(true)
+
+    void syncBackground(uid, today)
+  }
+
+  async function syncBackground(uid: string, today: string) {
     try {
       const ouraSync = await fetch('/api/oura/sync', {
         method: 'POST',
@@ -279,523 +459,279 @@ export default function DashboardPage() {
       }).then((r) => r.json())
       if (calSync.events) {
         setEvents(
-          calSync.events
-            .filter((e: CalendarEvent) => e.event_date === today)
-            .map((e: Record<string, unknown>) => mapCalendarEvent(e))
+          calSync.events.filter((e: CalendarEvent) => e.event_date === today)
         )
       }
     } catch {
       // optional
     }
+  }
 
-    try {
-      const gmailSync = await fetch('/api/gmail/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: uid }),
-      }).then((r) => r.json())
-      if (gmailSync.digest) setGmail(gmailSync.digest)
-    } catch {
-      // optional
-    }
-  }, [])
-
-  const loadAll = useCallback(async () => {
-    const uid = userId.current
-
-    const [ouraRes, calRes, gmailRes, briefRes, questRes, xpRes] =
-      await Promise.allSettled([
-        fetch(`/api/oura/sync?userId=${encodeURIComponent(uid)}`).then((r) => r.json()),
-        fetch(`/api/calendar/sync?userId=${encodeURIComponent(uid)}`).then((r) =>
-          r.json()
-        ),
-        fetch(`/api/gmail/sync?userId=${encodeURIComponent(uid)}`).then((r) => r.json()),
-        fetch(`/api/dashboard/briefing?userId=${encodeURIComponent(uid)}`).then((r) =>
-          r.json()
-        ),
-        fetch(`/api/quests/today?userId=${encodeURIComponent(uid)}`).then((r) =>
-          r.json()
-        ),
-        fetch(`/api/xp?userId=${encodeURIComponent(uid)}`).then((r) => r.json()),
-      ])
-
-    const today = new Date().toISOString().split('T')[0]
-
-    if (ouraRes.status === 'fulfilled' && ouraRes.value?.data) {
-      setOura(ouraRes.value.data)
-    }
-    if (calRes.status === 'fulfilled' && calRes.value?.events) {
-      setEvents(
-        calRes.value.events
-          .filter((e: Record<string, unknown>) => e.event_date === today)
-          .map(mapCalendarEvent)
-      )
-    }
-    if (gmailRes.status === 'fulfilled' && gmailRes.value?.digest) {
-      setGmail(gmailRes.value.digest)
-    }
-    if (briefRes.status === 'fulfilled' && briefRes.value?.briefing) {
-      setBriefing(briefRes.value.briefing)
-      setBriefingLoading(false)
-    }
-    if (questRes.status === 'fulfilled' && questRes.value?.quests?.length) {
-      setQuests(questRes.value.quests)
-    } else {
-      const completedIds = loadCompletedQuests()
-      const localQuests = loadTodayQuests().map((q) => ({
-        id: q.id,
-        title: q.title,
-        description: q.description,
-        dimension: q.dimensionId,
-        xp_reward: q.xpReward,
-        completed: completedIds.has(q.id),
-      }))
-      if (localQuests.length > 0) setQuests(localQuests)
-    }
-    const apiXp =
-      xpRes.status === 'fulfilled' && xpRes.value?.xp && Object.keys(xpRes.value.xp).length > 0
-        ? (xpRes.value.xp as Record<string, number>)
-        : null
-    setXp({ ...loadXP(), ...apiXp })
-
-    setLoaded(true)
-
-    if (briefRes.status !== 'fulfilled' || !briefRes.value?.briefing) {
-      void generateBriefing(uid)
-    }
-
-    void syncBackground(uid, today)
-  }, [generateBriefing, syncBackground])
-
-  useEffect(() => {
-    void loadAll()
-  }, [loadAll])
-
-  const today = new Date().toLocaleDateString('en-GB', {
+  const todayLabel = new Date().toLocaleDateString('en-GB', {
     weekday: 'long',
     day: 'numeric',
     month: 'long',
   })
 
-  const cycleKey = oura?.cycle_phase?.toLowerCase() ?? ''
-  const cycleInfo = cycleKey ? (CYCLE_PHASES[cycleKey] ?? null) : null
+  const verdict = oura ? getArcVerdict(oura) : null
+  const cyclePhase = oura?.cycle_phase
+    ? (CYCLE_PHASES[oura.cycle_phase.toLowerCase()] ?? null)
+    : null
+
+  const careerQuest = quests.find(
+    (q) => q.dimension === 'create' || q.dimension === 'career'
+  )
+  const socialQuest = quests.find((q) => q.dimension === 'social')
+  const wealthQuest = quests.find((q) => q.dimension === 'wealth')
+
+  const netWorth = wealth?.net_worth ?? null
+  const fireGoal = wealth?.fire_goal ?? 150_000
+  const fireYear = wealth?.fire_year ?? 2028
+  const firePct = netWorth ? Math.min(Math.round((netWorth / fireGoal) * 100), 100) : 0
+  const remaining = netWorth ? fireGoal - netWorth : fireGoal
+
+  function formatTime(iso: string) {
+    return new Date(iso).toLocaleTimeString('en-GB', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    })
+  }
+
+  function isNext(event: CalendarEvent) {
+    const upcoming = events.filter(
+      (e) => e.start_time && new Date(e.start_time).getTime() > Date.now()
+    )
+    return upcoming[0]?.id === event.id
+  }
+
+  function isPast(event: CalendarEvent) {
+    return !!(event.end_time && new Date(event.end_time).getTime() < Date.now())
+  }
 
   return (
-    <div className="min-h-screen bg-[#0D0820] text-white pb-28 overflow-x-hidden">
-      <div className="relative px-4 pt-10 pb-6 overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-b from-violet-950/40 to-transparent pointer-events-none" />
-        <p className="text-xs text-white/30 uppercase tracking-[0.2em] mb-1 relative">
-          {today}
+    <div className="min-h-screen pb-28 overflow-x-hidden" style={{ background: '#0D0820' }}>
+      {/* ── Header ── */}
+      <div className="px-4 pt-10 pb-4">
+        <p className="text-[10px] text-white/[0.28] mb-[2px] tracking-[0.14em] uppercase">
+          {todayLabel}
         </p>
-        <h1 className="text-3xl font-black bg-gradient-to-r from-violet-300 via-fuchsia-300 to-pink-300 bg-clip-text text-transparent relative">
-          Your Day
-        </h1>
+        <h1 className="text-[26px] font-bold text-white m-0">Your Day</h1>
       </div>
 
-      <div className="mx-4 mb-6">
-        <div className="relative rounded-3xl overflow-hidden border border-violet-500/25 bg-gradient-to-br from-violet-950/60 to-fuchsia-950/40 p-5 backdrop-blur-sm">
-          <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-violet-400/60 to-transparent" />
-          <div className="absolute -top-8 -right-8 w-32 h-32 bg-violet-600/10 rounded-full blur-2xl pointer-events-none" />
-          <div className="flex items-start gap-3 relative">
-            <div className="w-9 h-9 rounded-2xl bg-gradient-to-br from-violet-500 to-fuchsia-600 flex items-center justify-center text-lg shrink-0 shadow-lg shadow-violet-500/30">
-              🔮
-            </div>
-            <div className="flex-1">
-              <p className="text-xs font-semibold text-violet-300/70 mb-2 uppercase tracking-wider">
-                Arc
-              </p>
-              {briefingLoading ? (
-                <div className="space-y-2">
-                  {[100, 85, 70].map((w) => (
-                    <div
-                      key={w}
-                      className="h-3 bg-white/10 rounded-full animate-pulse"
-                      style={{ width: `${w}%` }}
-                    />
-                  ))}
-                </div>
-              ) : briefing ? (
-                <p className="text-sm text-white/85 leading-relaxed">{briefing}</p>
-              ) : (
-                <p className="text-sm text-white/40 italic">Gathering your data...</p>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {oura && (
-        <div className="mx-4 mb-6">
-          <div className="flex items-center justify-between mb-3 px-1">
-            <div className="flex items-center gap-2">
-              <span>💍</span>
-              <span className="text-xs font-semibold text-white/50 uppercase tracking-wider">
-                Biometrics
-              </span>
-            </div>
-            <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-sm shadow-emerald-400/50" />
-          </div>
-
-          <div className="bg-white/5 rounded-3xl border border-white/10 p-5 mb-3 backdrop-blur-sm">
-            <div className="flex justify-around mb-5">
-              <ScoreRing score={oura.readiness_score} label="Readiness" size={76} />
-              <ScoreRing score={oura.sleep_score} label="Sleep" size={76} />
-              <ScoreRing score={oura.activity_score} label="Activity" size={76} />
-            </div>
-
-            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-              {oura.hrv_balance !== null && (
-                <StatPill
-                  label="HRV Balance"
-                  value={String(oura.hrv_balance)}
-                  color="#c084fc"
-                  icon="💜"
-                />
-              )}
-              {oura.steps !== null && (
-                <StatPill
-                  label="Steps"
-                  value={oura.steps.toLocaleString()}
-                  color="#34d399"
-                  icon="👟"
-                />
-              )}
-              {oura.sleep_total_seconds !== null && (
-                <StatPill
-                  label="Total Sleep"
-                  value={formatTime(oura.sleep_total_seconds)}
-                  color="#60a5fa"
-                  icon="🌙"
-                />
-              )}
-              {oura.recovery_index !== null && (
-                <StatPill
-                  label="Recovery"
-                  value={String(oura.recovery_index)}
-                  color="#f472b6"
-                  icon="⚡"
-                />
-              )}
-              {oura.respiratory_rate !== null && (
-                <StatPill
-                  label="Breath"
-                  value={`${oura.respiratory_rate.toFixed(1)}/m`}
-                  color="#94a3b8"
-                  icon="🫁"
-                />
-              )}
-            </div>
-          </div>
-
-          {(oura.deep_sleep_seconds ||
-            oura.rem_sleep_seconds ||
-            oura.light_sleep_seconds) && (
-            <div className="bg-white/5 rounded-3xl border border-white/10 p-4 mb-3 backdrop-blur-sm">
-              <p className="text-xs font-semibold text-white/40 uppercase tracking-wider mb-3">
-                Sleep Stages
-              </p>
-              <div className="space-y-2.5">
-                {[
-                  {
-                    label: 'Deep',
-                    seconds: oura.deep_sleep_seconds,
-                    color: '#1e40af',
-                  },
-                  { label: 'REM', seconds: oura.rem_sleep_seconds, color: '#7c3aed' },
-                  {
-                    label: 'Light',
-                    seconds: oura.light_sleep_seconds,
-                    color: '#0369a1',
-                  },
-                ].map((stage) => {
-                  if (!stage.seconds) return null
-                  const total = oura.sleep_total_seconds ?? 1
-                  const pct = Math.round((stage.seconds / total) * 100)
-                  return (
-                    <div key={stage.label}>
-                      <div className="flex justify-between mb-1">
-                        <span className="text-xs text-white/60">{stage.label}</span>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-white/40">{pct}%</span>
-                          <span className="text-xs font-semibold text-white/80">
-                            {formatTime(stage.seconds)}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="h-2 bg-white/10 rounded-full overflow-hidden">
-                        <div
-                          className="h-full rounded-full"
-                          style={{
-                            width: `${pct}%`,
-                            backgroundColor: stage.color,
-                            boxShadow: `0 0 8px ${stage.color}80`,
-                          }}
-                        />
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          )}
-
-          {oura.body_temperature_deviation !== null &&
-            Math.abs(oura.body_temperature_deviation) > 0.05 &&
-            Math.abs(oura.body_temperature_deviation) < 5 && (
-              <div className="bg-white/5 rounded-2xl border border-white/10 px-4 py-3 mb-3 flex items-center justify-between backdrop-blur-sm">
-                <div className="flex items-center gap-2">
-                  <span>🌡️</span>
-                  <span className="text-xs text-white/60">Body Temp</span>
-                </div>
-                <span
-                  className={`text-sm font-bold ${
-                    oura.body_temperature_deviation > 0.2
-                      ? 'text-red-400'
-                      : oura.body_temperature_deviation < -0.2
-                        ? 'text-blue-400'
-                        : 'text-white/70'
-                  }`}
-                >
-                  {oura.body_temperature_deviation > 0 ? '+' : ''}
-                  {oura.body_temperature_deviation.toFixed(2)}°C
+      {/* ── Body Status Card ── */}
+      <div className="mx-4 mb-[10px]">
+        <div
+          className="rounded-[22px] p-[14px]"
+          style={{
+            background: 'rgba(255,255,255,0.05)',
+            border: '1px solid rgba(255,255,255,0.09)',
+          }}
+        >
+          <div className="flex justify-between items-center mb-[13px]">
+            <p className="text-[9px] text-white/[0.28] tracking-[0.13em] m-0 uppercase">
+              Body Status
+            </p>
+            {cyclePhase ? (
+              <div
+                className="flex items-center gap-1 px-[9px] py-[3px] rounded-lg"
+                style={{
+                  background: 'rgba(244,114,182,0.16)',
+                  border: '1px solid rgba(244,114,182,0.32)',
+                }}
+              >
+                <span className="text-[10px]">{cyclePhase.emoji}</span>
+                <span className="text-[9px] font-semibold" style={{ color: '#f9a8d4' }}>
+                  {cyclePhase.label}
+                  {oura?.cycle_day ? ` · Day ${oura.cycle_day}` : ''}
                 </span>
               </div>
+            ) : (
+              <div className="w-2 h-2 rounded-full bg-emerald-400/60" />
             )}
+          </div>
 
-          {cycleInfo && (
+          <div className="flex justify-around mb-[12px]">
+            <ScoreRing
+              score={oura?.readiness_score ?? null}
+              label="Readiness"
+              color="#34d399"
+            />
+            <ScoreRing score={oura?.sleep_score ?? null} label="Sleep" color="#60a5fa" />
+            <ScoreRing
+              score={oura?.activity_score ?? null}
+              label="Activity"
+              color="#fb923c"
+            />
+          </div>
+
+          {verdict && (
             <div
-              className="rounded-3xl border p-4 backdrop-blur-sm"
-              style={{
-                backgroundColor: `${cycleInfo.color}12`,
-                borderColor: `${cycleInfo.color}30`,
-              }}
+              className="flex items-start gap-2 pt-[10px]"
+              style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}
             >
-              <div className="flex items-center gap-3">
-                <span className="text-xl">{cycleInfo.emoji}</span>
-                <div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-sm font-bold text-white">
-                      {cycleInfo.label} Phase
-                    </span>
-                    {oura.cycle_day !== null && (
-                      <span
-                        className="text-xs px-2 py-0.5 rounded-full text-white/60"
-                        style={{ backgroundColor: `${cycleInfo.color}20` }}
-                      >
-                        Day {oura.cycle_day}
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-xs text-white/55 mt-0.5 leading-relaxed">
-                    {cycleInfo.note}
-                  </p>
-                </div>
-              </div>
+              <div
+                className="w-[7px] h-[7px] rounded-full flex-shrink-0 mt-[3px]"
+                style={{ background: verdict.color }}
+              />
+              <p className="text-[11px] text-white/[0.78] m-0 leading-[1.5]">{verdict.text}</p>
             </div>
           )}
         </div>
-      )}
+      </div>
 
-      {quests.length > 0 && (
-        <div className="mx-4 mb-6">
-          <div className="flex items-center justify-between mb-3 px-1">
-            <div className="flex items-center gap-2">
-              <span>⚔️</span>
-              <span className="text-xs font-semibold text-white/50 uppercase tracking-wider">
-                Today&apos;s Quests
-              </span>
-            </div>
-            <span className="text-xs text-white/30">
-              {quests.filter((q) => q.completed).length}/{quests.length} done
-            </span>
-          </div>
-          <div className="space-y-3">
-            {quests.map((quest) => {
-              const dim = DIMENSIONS.find((d) => d.key === quest.dimension)
-              return (
-                <div
-                  key={quest.id}
-                  className={`rounded-3xl border p-4 transition-all backdrop-blur-sm ${
-                    quest.completed
-                      ? 'bg-white/5 border-white/5 opacity-50'
-                      : 'bg-white/5 border-white/10'
-                  }`}
-                  style={
-                    !quest.completed && dim
-                      ? {
-                          borderColor: `${dim.color}30`,
-                          background: `${dim.color}08`,
-                        }
-                      : undefined
-                  }
-                >
-                  <div className="flex items-start gap-3">
-                    <div
-                      className="w-10 h-10 rounded-2xl flex items-center justify-center text-xl shrink-0"
-                      style={{
-                        backgroundColor: dim
-                          ? `${dim.color}20`
-                          : 'rgba(255,255,255,0.05)',
-                      }}
-                    >
-                      {dim?.emoji ?? '🎯'}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1 flex-wrap">
-                        <span
-                          className="text-xs font-semibold uppercase tracking-wide"
-                          style={{ color: dim?.color ?? '#ffffff60' }}
-                        >
-                          {dim?.label ?? quest.dimension}
-                        </span>
-                        <span className="text-xs font-bold text-amber-400">
-                          +{quest.xp_reward} XP
-                        </span>
-                        {quest.completed && (
-                          <span className="text-xs text-emerald-400">✓ Done</span>
-                        )}
-                      </div>
-                      <p
-                        className={`text-sm font-bold mb-1 ${quest.completed ? 'line-through text-white/40' : 'text-white'}`}
-                      >
-                        {quest.title}
-                      </p>
-                      <p className="text-xs text-white/50 leading-relaxed">
-                        {quest.description}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
+      {/* ── Active Missions ── */}
+      <div className="mx-4 mb-1">
+        <div className="flex justify-between items-center mb-[7px]">
+          <p className="text-[9px] text-white/[0.28] tracking-[0.13em] m-0 uppercase">
+            Active Missions
+          </p>
+          <p className="text-[9px] text-white/[0.22] m-0">see all →</p>
         </div>
-      )}
 
-      {loaded && (
-        <div className="mx-4 mb-6">
-          <div className="flex items-center gap-2 mb-3 px-1">
-            <span>🏆</span>
-            <span className="text-xs font-semibold text-white/50 uppercase tracking-wider">
-              Character Stats
-            </span>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            {DIMENSIONS.map((dim) => {
-              const dimXp = xp[dim.key] ?? 0
-              const level = Math.floor(dimXp / XP_PER_LEVEL) + 1
-              const progress = (dimXp % XP_PER_LEVEL) / XP_PER_LEVEL
-              const nextLevelXp = XP_PER_LEVEL - (dimXp % XP_PER_LEVEL)
-              return (
+        <MissionCard
+          avatar={<ForgeAvatar />}
+          characterName="Forge"
+          dimensionLabel="Career"
+          questTitle={careerQuest?.title ?? 'No quest today — tap to add one'}
+          badge="DAILY"
+          xpReward={careerQuest?.xp_reward ?? 50}
+          progressPct={careerQuest?.completed ? 100 : 0}
+          progressLabel="CPTO interviews in progress"
+          linkLabel="CPTO Hunt"
+          accentColor="#fbbf24"
+          cardBg="rgba(232,148,26,0.09)"
+          cardBorder="rgba(232,148,26,0.28)"
+        />
+
+        <MissionCard
+          avatar={<EchoAvatar />}
+          characterName="Echo"
+          dimensionLabel="Social"
+          questTitle={socialQuest?.title ?? 'Message one new person this week'}
+          badge="WEEKLY"
+          xpReward={socialQuest?.xp_reward ?? 30}
+          progressPct={5}
+          progressLabel="0 of 1 connections this week"
+          linkLabel="London Circle"
+          accentColor="#6ee7a4"
+          cardBg="rgba(46,204,113,0.09)"
+          cardBorder="rgba(46,204,113,0.28)"
+        />
+
+        <MissionCard
+          avatar={<VaultAvatar />}
+          characterName="Vault"
+          dimensionLabel="Finances"
+          questTitle={
+            wealth?.last_resist_item
+              ? `${wealth.total_resisted > 0 ? `€${wealth.total_resisted.toLocaleString()} saved` : ''} · log a resist`
+              : 'Log a resist · start building your vault'
+          }
+          badge="LOG RESIST"
+          xpReward={wealthQuest?.xp_reward ?? 20}
+          progressPct={firePct}
+          progressLabel={
+            netWorth
+              ? `€${netWorth.toLocaleString()} · ${firePct}% to goal`
+              : 'Add your net worth to track progress'
+          }
+          linkLabel="Vault"
+          accentColor="#FFB347"
+          cardBg="rgba(255,179,71,0.09)"
+          cardBorder="rgba(255,179,71,0.30)"
+        >
+          {netWorth !== null && (
+            <div
+              className="mt-[9px] rounded-lg px-[10px] py-[8px]"
+              style={{ background: 'rgba(255,255,255,0.05)' }}
+            >
+              <div className="flex justify-between items-baseline mb-[5px]">
+                <span className="text-[10px] font-bold text-white">
+                  €{netWorth.toLocaleString()}
+                </span>
+                <span className="text-[8px] text-white/[0.30]">
+                  goal €{fireGoal.toLocaleString()} by {fireYear}
+                </span>
+              </div>
+              <div
+                className="h-[4px] rounded-full"
+                style={{ background: 'rgba(255,255,255,0.08)' }}
+              >
                 <div
-                  key={dim.key}
-                  className="rounded-2xl border p-3.5 backdrop-blur-sm"
+                  className="h-[4px] rounded-full transition-all duration-1000"
                   style={{
-                    backgroundColor: `${dim.color}08`,
-                    borderColor: `${dim.color}25`,
+                    width: `${firePct}%`,
+                    background: 'linear-gradient(90deg,#FFB347,#FFD47A)',
                   }}
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <span className="text-base">{dim.emoji}</span>
-                      <span className="text-xs font-semibold text-white/70">
-                        {dim.label}
-                      </span>
-                    </div>
-                    <span
-                      className="text-xs font-black px-2 py-0.5 rounded-full"
-                      style={{
-                        color: dim.color,
-                        backgroundColor: `${dim.color}20`,
-                      }}
-                    >
-                      Lv.{level}
-                    </span>
-                  </div>
-                  <div className="h-1.5 bg-white/10 rounded-full overflow-hidden mb-1.5">
-                    <div
-                      className="h-full rounded-full transition-all duration-1000"
-                      style={{
-                        width: `${Math.min(progress * 100, 100)}%`,
-                        backgroundColor: dim.color,
-                        boxShadow: `0 0 6px ${dim.color}60`,
-                      }}
-                    />
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-xs text-white/30">{dimXp} XP</span>
-                    <span className="text-xs text-white/25">{nextLevelXp} to next</span>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      )}
-
-      {events.length > 0 && (
-        <div className="mx-4 mb-6">
-          <div className="flex items-center justify-between mb-3 px-1">
-            <div className="flex items-center gap-2">
-              <span>📅</span>
-              <span className="text-xs font-semibold text-white/50 uppercase tracking-wider">
-                Schedule
-              </span>
+                />
+              </div>
+              <div className="flex justify-between mt-[4px]">
+                <span className="text-[8px] font-semibold" style={{ color: '#FFB347' }}>
+                  {firePct}% there
+                </span>
+                <span className="text-[8px] text-white/[0.22]">
+                  €{remaining.toLocaleString()} to go
+                </span>
+              </div>
             </div>
-            <span className="text-xs text-white/25">{events.length} events</span>
-          </div>
-          <div className="bg-white/5 rounded-3xl border border-white/10 p-4 space-y-2 backdrop-blur-sm">
-            {events.map((event) => {
-              const happening = isHappening(event)
-              const next = isNext(events, event)
-              const past =
-                event.end_time && new Date(event.end_time).getTime() < Date.now()
+          )}
+          {wealth?.last_resist_item && wealth.last_resist_amount !== null && (
+            <p className="text-[8px] text-white/[0.22] m-0 mt-[6px]">
+              Last resist: {wealth.last_resist_item} €{wealth.last_resist_amount} → €
+              {Math.round(wealth.last_resist_amount * 1.97)} in 10y
+            </p>
+          )}
+        </MissionCard>
+      </div>
+
+      {/* ── Today Schedule ── */}
+      {events.length > 0 && (
+        <div className="mx-4 mt-[4px]">
+          <div
+            className="rounded-[16px] p-[11px_14px]"
+            style={{
+              background: 'rgba(255,255,255,0.04)',
+              border: '1px solid rgba(255,255,255,0.07)',
+            }}
+          >
+            <p className="text-[9px] text-white/[0.28] tracking-[0.13em] m-0 mb-[8px] uppercase">
+              Today
+            </p>
+            {events.map((event, i) => {
+              const next = isNext(event)
+              const past = isPast(event)
               return (
                 <div
                   key={event.id}
-                  className={`flex items-center gap-3 rounded-2xl px-3 py-2.5 transition-all ${
-                    happening
-                      ? 'bg-violet-500/15 border border-violet-400/20'
-                      : 'border border-transparent'
-                  } ${past ? 'opacity-30' : ''}`}
+                  className={`flex items-center gap-[9px] py-[2px] ${i > 0 ? 'mt-[4px]' : ''} ${past ? 'opacity-30' : ''}`}
                 >
-                  <div className="text-right w-10 shrink-0">
-                    {event.all_day ? (
-                      <span className="text-xs text-white/25">all day</span>
-                    ) : event.start_time ? (
-                      <span
-                        className={`text-xs font-bold ${happening ? 'text-violet-300' : 'text-white/40'}`}
-                      >
-                        {formatEventTime(event.start_time)}
-                      </span>
-                    ) : null}
-                  </div>
+                  <span
+                    className="text-[10px] font-semibold w-[30px] text-right flex-shrink-0"
+                    style={{ color: next ? '#38bdf8' : 'rgba(255,255,255,0.28)' }}
+                  >
+                    {event.all_day
+                      ? 'all'
+                      : event.start_time
+                        ? formatTime(event.start_time)
+                        : ''}
+                  </span>
                   <div
-                    className={`w-2 h-2 rounded-full shrink-0 ${
-                      happening
-                        ? 'bg-violet-400 shadow-sm shadow-violet-400'
-                        : next
-                          ? 'bg-white/40'
-                          : 'bg-white/15'
-                    }`}
+                    className="w-[5px] h-[5px] rounded-full flex-shrink-0"
+                    style={{ background: next ? '#38bdf8' : 'rgba(255,255,255,0.15)' }}
                   />
-                  <div className="flex-1 min-w-0">
-                    <p
-                      className={`text-xs font-semibold truncate ${happening ? 'text-white' : 'text-white/70'}`}
-                    >
-                      {event.title}
-                    </p>
-                    {event.location && (
-                      <p className="text-xs text-white/25 truncate">📍 {event.location}</p>
-                    )}
-                  </div>
-                  {happening && (
-                    <span className="text-xs bg-violet-500 text-white px-2 py-0.5 rounded-full font-bold shrink-0">
-                      NOW
+                  <span
+                    className="text-[11px] flex-1 truncate"
+                    style={{
+                      color: next ? 'rgba(255,255,255,0.75)' : 'rgba(255,255,255,0.45)',
+                    }}
+                  >
+                    {event.title}
+                  </span>
+                  {next && (
+                    <span className="text-[9px] flex-shrink-0" style={{ color: '#38bdf8' }}>
+                      next
                     </span>
-                  )}
-                  {next && !happening && (
-                    <span className="text-xs text-cyan-400/70 shrink-0">next</span>
                   )}
                 </div>
               )
@@ -804,68 +740,24 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {gmail && gmail.unread_count > 0 && (
-        <div className="mx-4 mb-6">
-          <div className="flex items-center justify-between mb-3 px-1">
-            <div className="flex items-center gap-2">
-              <span>📧</span>
-              <span className="text-xs font-semibold text-white/50 uppercase tracking-wider">
-                Inbox
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              {gmail.action_items.some((i) => i.urgency === 'high') && (
-                <span className="text-xs bg-red-500/20 text-red-400 px-2 py-0.5 rounded-full font-semibold">
-                  urgent
-                </span>
-              )}
-              <span className="text-xs text-white/25">{gmail.unread_count} unread</span>
-            </div>
-          </div>
-          <div className="bg-white/5 rounded-3xl border border-white/10 p-4 space-y-2 backdrop-blur-sm">
-            {gmail.needs_reply_count > 0 && (
-              <p className="text-xs text-amber-400 font-semibold mb-3">
-                ↩ {gmail.needs_reply_count} thread
-                {gmail.needs_reply_count !== 1 ? 's' : ''} waiting for reply
-              </p>
-            )}
-            {gmail.action_items.slice(0, 4).map((item, i) => (
-              <div
-                key={`${item.subject}-${i}`}
-                className="flex items-center gap-2.5 rounded-xl bg-white/5 px-3 py-2.5"
-              >
-                <div
-                  className={`w-2 h-2 rounded-full shrink-0 ${
-                    item.urgency === 'high'
-                      ? 'bg-red-400'
-                      : item.urgency === 'medium'
-                        ? 'bg-amber-400'
-                        : 'bg-white/20'
-                  }`}
-                />
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-semibold text-white/75 truncate">{item.from}</p>
-                  <p className="text-xs text-white/40 truncate">{item.subject}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {loaded && !oura && events.length === 0 && !gmail && quests.length === 0 && (
+      {loaded && !oura && events.length === 0 && (
         <div className="flex flex-col items-center justify-center py-20 px-8 text-center">
           <div className="text-5xl mb-4">🔮</div>
           <h2 className="text-lg font-bold text-white/60 mb-2">Your dashboard awaits</h2>
           <p className="text-sm text-white/30 mb-6">
             Connect your integrations to bring it to life.
           </p>
-          <Link
+          <a
             href="/quests"
-            className="px-6 py-3 rounded-2xl bg-violet-600/30 border border-violet-500/30 text-sm text-violet-300 font-semibold no-underline"
+            className="px-6 py-3 rounded-2xl text-sm font-semibold"
+            style={{
+              background: 'rgba(123,63,228,0.3)',
+              border: '1px solid rgba(123,63,228,0.3)',
+              color: '#a78bfa',
+            }}
           >
             Connect integrations →
-          </Link>
+          </a>
         </div>
       )}
     </div>
