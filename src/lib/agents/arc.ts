@@ -4,6 +4,7 @@ import {
   saveDimensionMemory,
   getOuraDaily,
   getCalendarEvents,
+  getGmailDigest,
 } from '@/lib/db'
 import {
   buildCalendarContext,
@@ -190,6 +191,16 @@ export async function consultArc(input: ArcInput): Promise<ArcOutput> {
 
   const { calendarContext, freeBlocks } = await loadCalendarContextForUser(userId)
 
+  let gmailContext = ''
+  try {
+    const gmailDigest = await getGmailDigest(userId)
+    if (gmailDigest?.arc_summary) {
+      gmailContext = gmailDigest.arc_summary as string
+    }
+  } catch {
+    // Gmail not connected — continue without it
+  }
+
   const allDimensions: DimensionId[] = isCheckIn(userMessage)
     ? ['vitality', 'mind', 'create', 'social', 'love', 'family', 'wealth']
     : detectDimensions(userMessage)
@@ -207,8 +218,8 @@ export async function consultArc(input: ArcInput): Promise<ArcOutput> {
   const specialistResults = await Promise.all(
     allDimensions.map((dim) => {
       const specialistExtra =
-        dim === 'create' && calendarContext
-          ? `TODAY'S SCHEDULE CONTEXT:\n${calendarContext}\nFree blocks for deep work: ${freeBlocks.join(', ') || 'Check calendar'}`
+        dim === 'create' && (calendarContext || gmailContext)
+          ? `WORK CONTEXT TODAY:\n${calendarContext || ''}\n${gmailContext ? `Inbox: ${gmailContext}` : ''}\nFree blocks: ${freeBlocks.join(', ') || 'check calendar'}`
           : dim === 'love' && calendarContext
             ? `Schedule note: ${calendarContext.split('\n')[0]}`
             : undefined
@@ -243,6 +254,7 @@ export async function consultArc(input: ArcInput): Promise<ArcOutput> {
       : '',
     calendarContext ? `SCHEDULE FOR TODAY:\n${calendarContext}` : '',
     freeBlocks.length > 0 ? `FREE BLOCKS FOR DEEP WORK:\n${freeBlocks.join('\n')}` : '',
+    gmailContext ? `INBOX STATUS:\n${gmailContext}` : '',
   ]
     .filter(Boolean)
     .join('\n\n')

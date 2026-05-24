@@ -428,3 +428,39 @@ export async function deleteCalendarEventsForDate(userId: string, date: string) 
     .eq('user_id', userId)
     .eq('event_date', date)
 }
+
+// ── Gmail digest ───────────────────────────────────────
+
+export async function saveGmailDigest(userId: string, digest: Record<string, unknown>) {
+  if (!isSupabaseConfigured()) return
+
+  const today = new Date().toISOString().split('T')[0]
+  const { error } = await supabase.from('gmail_digest').upsert(
+    {
+      user_id: userId,
+      date: today,
+      ...digest,
+      fetched_at: new Date().toISOString(),
+    },
+    { onConflict: 'user_id,date' }
+  )
+  if (error) throw error
+}
+
+export async function getGmailDigest(userId: string) {
+  if (!isSupabaseConfigured()) return null
+
+  const today = new Date().toISOString().split('T')[0]
+  const { data, error } = await supabase
+    .from('gmail_digest')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('date', today)
+    .maybeSingle()
+
+  if (error) {
+    console.error('getGmailDigest error:', error)
+    return null
+  }
+  return data
+}

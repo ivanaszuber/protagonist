@@ -11,6 +11,7 @@ import {
 import { VoiceCheckin } from '@/components/checkin/VoiceCheckin'
 import OuraWidget from '@/components/oura/OuraWidget'
 import CalendarWidget from '@/components/calendar/CalendarWidget'
+import GmailWidget from '@/components/gmail/GmailWidget'
 import { QuestCard } from '@/components/quests/QuestCard'
 import { QuestProof } from '@/components/quests/QuestProof'
 import { DimensionBars } from '@/components/xp/DimensionBars'
@@ -308,6 +309,9 @@ export default function QuestsPage() {
         </ErrorBoundary>
         <ErrorBoundary>
           <CalendarWidget />
+        </ErrorBoundary>
+        <ErrorBoundary>
+          <GmailWidget />
         </ErrorBoundary>
       </div>
 
