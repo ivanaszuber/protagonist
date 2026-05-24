@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { fetchOuraDailyData, refreshOuraTokens } from '@/lib/oura'
+import { fetchOuraDailyData, ouraRowToDailyData, refreshOuraTokens } from '@/lib/oura'
 import { getOuraTokens, saveOuraTokens, saveOuraDaily, getOuraDaily } from '@/lib/db'
 
 export async function POST(request: Request) {
@@ -51,6 +51,13 @@ export async function POST(request: Request) {
       active_calories: data.active_calories,
       resilience_level: data.resilience_level,
       hrv_average: data.hrv_average,
+      deep_sleep_seconds: data.deep_sleep_seconds,
+      rem_sleep_seconds: data.rem_sleep_seconds,
+      light_sleep_seconds: data.light_sleep_seconds,
+      respiratory_rate: data.respiratory_rate,
+      skin_temperature_deviation: data.skin_temperature_deviation,
+      cycle_day: data.cycle_day,
+      cycle_phase: data.cycle_phase,
     })
 
     return NextResponse.json({ success: true, connected: true, data })
@@ -71,7 +78,8 @@ export async function GET(request: Request) {
   if (!stored) return NextResponse.json({ connected: false })
 
   const today = new Date().toISOString().split('T')[0]
-  const data = await getOuraDaily(userId, today)
+  const row = await getOuraDaily(userId, today)
+  const data = row ? ouraRowToDailyData(row) : null
 
   return NextResponse.json({ connected: true, data })
 }

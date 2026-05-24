@@ -24,45 +24,80 @@ export interface OuraDailyData {
   active_calories: number | null
   resilience_level: string | null
   hrv_average: number | null
+  deep_sleep_seconds: number | null
+  rem_sleep_seconds: number | null
+  light_sleep_seconds: number | null
+  respiratory_rate: number | null
+  skin_temperature_deviation: number | null
+  cycle_day: number | null
+  cycle_phase: string | null
 }
 
 export interface OuraDbRow {
   date: string
-  sleep_score: number | null
-  sleep_total_seconds: number | null
-  sleep_rem_seconds: number | null
-  sleep_deep_seconds: number | null
-  sleep_efficiency: number | null
-  sleep_latency_seconds: number | null
-  readiness_score: number | null
-  hrv_balance: number | null
-  recovery_index: number | null
-  body_temperature_deviation: number | null
-  activity_score: number | null
-  steps: number | null
-  active_calories: number | null
-  resilience_level: string | null
-  hrv_average: number | null
+  sleep_score?: number | null
+  sleep_total_seconds?: number | null
+  sleep_rem_seconds?: number | null
+  sleep_deep_seconds?: number | null
+  sleep_efficiency?: number | null
+  sleep_latency_seconds?: number | null
+  readiness_score?: number | null
+  hrv_balance?: number | null
+  recovery_index?: number | null
+  body_temperature_deviation?: number | null
+  activity_score?: number | null
+  steps?: number | null
+  active_calories?: number | null
+  resilience_level?: string | null
+  hrv_average?: number | null
+  deep_sleep_seconds?: number | null
+  rem_sleep_seconds?: number | null
+  light_sleep_seconds?: number | null
+  respiratory_rate?: number | null
+  skin_temperature_deviation?: number | null
+  cycle_day?: number | null
+  cycle_phase?: string | null
+}
+
+interface OuraSleepPeriod {
+  total_sleep_duration?: number
+  rem_sleep_duration?: number
+  deep_sleep_duration?: number
+  light_sleep_duration?: number
+  efficiency?: number
+  latency?: number
+  average_breath?: number
 }
 
 export function ouraRowToDailyData(row: OuraDbRow): OuraDailyData {
+  const deep =
+    row.deep_sleep_seconds ?? row.sleep_deep_seconds ?? null
+  const rem = row.rem_sleep_seconds ?? row.sleep_rem_seconds ?? null
+
   return {
     date: row.date,
-    sleep_score: row.sleep_score,
-    sleep_total_seconds: row.sleep_total_seconds,
-    sleep_rem_seconds: row.sleep_rem_seconds,
-    sleep_deep_seconds: row.sleep_deep_seconds,
-    sleep_efficiency: row.sleep_efficiency,
-    sleep_latency_seconds: row.sleep_latency_seconds,
-    readiness_score: row.readiness_score,
-    hrv_balance: row.hrv_balance,
-    recovery_index: row.recovery_index,
-    body_temperature_deviation: row.body_temperature_deviation,
-    activity_score: row.activity_score,
-    steps: row.steps,
-    active_calories: row.active_calories,
-    resilience_level: row.resilience_level,
-    hrv_average: row.hrv_average,
+    sleep_score: row.sleep_score ?? null,
+    sleep_total_seconds: row.sleep_total_seconds ?? null,
+    sleep_rem_seconds: row.sleep_rem_seconds ?? null,
+    sleep_deep_seconds: row.sleep_deep_seconds ?? deep,
+    sleep_efficiency: row.sleep_efficiency ?? null,
+    sleep_latency_seconds: row.sleep_latency_seconds ?? null,
+    readiness_score: row.readiness_score ?? null,
+    hrv_balance: row.hrv_balance ?? null,
+    recovery_index: row.recovery_index ?? null,
+    body_temperature_deviation: row.body_temperature_deviation ?? null,
+    activity_score: row.activity_score ?? null,
+    steps: row.steps ?? null,
+    active_calories: row.active_calories ?? null,
+    resilience_level: row.resilience_level ?? null,
+    hrv_average: row.hrv_average ?? null,
+    deep_sleep_seconds: deep,
+    rem_sleep_seconds: rem,
+    light_sleep_seconds: row.light_sleep_seconds ?? null,
+    respiratory_rate: row.respiratory_rate ?? null,
+    skin_temperature_deviation: row.skin_temperature_deviation ?? null,
+    cycle_day: row.cycle_day ?? null,
+    cycle_phase: row.cycle_phase ?? null,
   }
 }
 
@@ -133,11 +168,14 @@ export async function fetchOuraDailyData(
   const headers = { Authorization: `Bearer ${accessToken}` }
   const params = `?start_date=${date}&end_date=${date}`
 
-  const [sleepRes, readinessRes, activityRes] = await Promise.allSettled([
-    fetch(`${OURA_BASE}/usercollection/daily_sleep${params}`, { headers }),
-    fetch(`${OURA_BASE}/usercollection/daily_readiness${params}`, { headers }),
-    fetch(`${OURA_BASE}/usercollection/daily_activity${params}`, { headers }),
-  ])
+  const [sleepRes, readinessRes, activityRes, detailedSleepRes, cycleRes] =
+    await Promise.allSettled([
+      fetch(`${OURA_BASE}/usercollection/daily_sleep${params}`, { headers }),
+      fetch(`${OURA_BASE}/usercollection/daily_readiness${params}`, { headers }),
+      fetch(`${OURA_BASE}/usercollection/daily_activity${params}`, { headers }),
+      fetch(`${OURA_BASE}/usercollection/sleep${params}`, { headers }),
+      fetch(`${OURA_BASE}/usercollection/daily_cycle_insights${params}`, { headers }),
+    ])
 
   const result: OuraDailyData = {
     date,
@@ -156,6 +194,13 @@ export async function fetchOuraDailyData(
     active_calories: null,
     resilience_level: null,
     hrv_average: null,
+    deep_sleep_seconds: null,
+    rem_sleep_seconds: null,
+    light_sleep_seconds: null,
+    respiratory_rate: null,
+    skin_temperature_deviation: null,
+    cycle_day: null,
+    cycle_phase: null,
   }
 
   if (sleepRes.status === 'fulfilled' && sleepRes.value.ok) {
@@ -189,6 +234,41 @@ export async function fetchOuraDailyData(
     }
   }
 
+  if (detailedSleepRes.status === 'fulfilled' && detailedSleepRes.value.ok) {
+    const sleepDetail = await detailedSleepRes.value.json()
+    const periods: OuraSleepPeriod[] = sleepDetail.data ?? []
+    const mainSleep = periods.reduce<OuraSleepPeriod | null>((best, period) => {
+      const duration = period.total_sleep_duration ?? 0
+      const bestDuration = best?.total_sleep_duration ?? 0
+      return duration > bestDuration ? period : best
+    }, null)
+
+    if (mainSleep) {
+      result.sleep_total_seconds = mainSleep.total_sleep_duration ?? null
+      result.deep_sleep_seconds = mainSleep.deep_sleep_duration ?? null
+      result.rem_sleep_seconds = mainSleep.rem_sleep_duration ?? null
+      result.light_sleep_seconds = mainSleep.light_sleep_duration ?? null
+      result.sleep_deep_seconds = result.deep_sleep_seconds
+      result.sleep_rem_seconds = result.rem_sleep_seconds
+      result.respiratory_rate = mainSleep.average_breath ?? null
+      if (result.sleep_efficiency === null && mainSleep.efficiency != null) {
+        result.sleep_efficiency = mainSleep.efficiency
+      }
+      if (result.sleep_latency_seconds === null && mainSleep.latency != null) {
+        result.sleep_latency_seconds = mainSleep.latency
+      }
+    }
+  }
+
+  if (cycleRes.status === 'fulfilled' && cycleRes.value.ok) {
+    const cycleData = await cycleRes.value.json()
+    const cycle = cycleData.data?.[0]
+    if (cycle) {
+      result.cycle_day = cycle.cycle_day ?? null
+      result.cycle_phase = cycle.current_phase ?? cycle.cycle_phase ?? null
+    }
+  }
+
   return result
 }
 
@@ -216,6 +296,9 @@ export function buildOuraContext(data: OuraDailyData): string {
   }
   if (data.steps !== null) {
     parts.push(`Steps: ${data.steps.toLocaleString()}`)
+  }
+  if (data.cycle_phase) {
+    parts.push(`Cycle: ${data.cycle_phase}${data.cycle_day ? ` (day ${data.cycle_day})` : ''}`)
   }
   return parts.length === 0
     ? 'No Oura data available.'
