@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { getLevel } from '@/lib/xp'
-import { CHARACTERS, type Dimension } from '@/lib/character'
+import type { Dimension } from '@/lib/character'
 import { getUserId } from '@/lib/user'
 import MoodTracker from '@/components/MoodTracker'
 
