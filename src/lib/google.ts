@@ -3,10 +3,8 @@
 const GOOGLE_AUTH = 'https://accounts.google.com/o/oauth2'
 const CALENDAR_BASE = 'https://www.googleapis.com/calendar/v3'
 
-const SCOPES = [
-  'https://www.googleapis.com/auth/calendar.readonly',
-  'https://www.googleapis.com/auth/userinfo.email',
-].join(' ')
+const SCOPES =
+  'https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/userinfo.email'
 
 export interface GoogleTokens {
   access_token: string
@@ -64,7 +62,8 @@ export function getGoogleAuthUrl(state: string, baseUrl: string): string {
     response_type: 'code',
     scope: SCOPES,
     access_type: 'offline',
-    prompt: 'consent',
+    prompt: 'select_account consent',
+    include_granted_scopes: 'false',
     state,
   })
   return `${GOOGLE_AUTH}/auth?${params}`
