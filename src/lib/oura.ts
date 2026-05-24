@@ -68,18 +68,14 @@ export function ouraRowToDailyData(row: OuraDbRow): OuraDailyData {
   }
 }
 
-function appUrl(): string {
-  return process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
-}
-
 export function isOuraConfigured(): boolean {
   return Boolean(process.env.OURA_CLIENT_ID && process.env.OURA_CLIENT_SECRET)
 }
 
-export function getOuraAuthUrl(state: string): string {
+export function getOuraAuthUrl(state: string, baseUrl: string): string {
   const params = new URLSearchParams({
     client_id: process.env.OURA_CLIENT_ID!,
-    redirect_uri: `${appUrl()}/api/oura/callback`,
+    redirect_uri: `${baseUrl}/api/oura/callback`,
     response_type: 'code',
     scope: 'daily heartrate personal session sleep workout',
     state,
@@ -87,14 +83,14 @@ export function getOuraAuthUrl(state: string): string {
   return `${OURA_AUTH}/authorize?${params}`
 }
 
-export async function exchangeOuraCode(code: string): Promise<OuraTokens> {
+export async function exchangeOuraCode(code: string, baseUrl: string): Promise<OuraTokens> {
   const res = await fetch(`${OURA_AUTH}/token`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
       grant_type: 'authorization_code',
       code,
-      redirect_uri: `${appUrl()}/api/oura/callback`,
+      redirect_uri: `${baseUrl}/api/oura/callback`,
       client_id: process.env.OURA_CLIENT_ID!,
       client_secret: process.env.OURA_CLIENT_SECRET!,
     }),

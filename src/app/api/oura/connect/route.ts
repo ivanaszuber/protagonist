@@ -10,8 +10,8 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'userId required' }, { status: 400 })
   }
 
-  const state = Buffer.from(JSON.stringify({ userId })).toString('base64url')
-  const authUrl = getOuraAuthUrl(state)
+  const state = Buffer.from(JSON.stringify({ userId, baseUrl })).toString('base64url')
+  const authUrl = getOuraAuthUrl(state, baseUrl)
 
   return NextResponse.redirect(authUrl)
 }

@@ -17,7 +17,7 @@ export async function GET(request: Request) {
     const { userId } = JSON.parse(Buffer.from(state, 'base64url').toString()) as {
       userId: string
     }
-    const tokens = await exchangeOuraCode(code)
+    const tokens = await exchangeOuraCode(code, baseUrl)
     await saveOuraTokens(userId, tokens)
     return NextResponse.redirect(`${baseUrl}/quests?oura=connected`)
   } catch (err) {
