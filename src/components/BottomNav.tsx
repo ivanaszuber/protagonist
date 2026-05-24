@@ -56,13 +56,59 @@ export default function BottomNav() {
       href: '/dashboard',
       label: 'Home',
       icon: (active) => (
-        <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
-          <path
-            d="M2.5 10.5L11 3L19.5 10.5V20H14.5V14.5H7.5V20H2.5V10.5Z"
+        <svg width="24" height="26" viewBox="0 0 28 30" fill="none">
+          <circle
+            cx="4"
+            cy="12"
+            r="2.2"
+            fill={active ? '#ef4444' : '#6A5A8A'}
+            opacity={active ? 0.85 : 0.35}
+          />
+          <circle
+            cx="14"
+            cy="8"
+            r="2.2"
+            fill={active ? '#22c55e' : '#6A5A8A'}
+            opacity={active ? 0.85 : 0.35}
+          />
+          <circle
+            cx="24"
+            cy="12"
+            r="2.2"
+            fill={active ? '#60a5fa' : '#6A5A8A'}
+            opacity={active ? 0.85 : 0.35}
+          />
+          <path d="M4 12 L8 6 L14 10 L20 6 L24 12Z" fill={active ? '#5A3A8A' : '#2D1B55'} />
+          <rect x="3" y="10" width="22" height="17" rx="6" fill={active ? '#9333EA' : '#2D1B55'} />
+          <line
+            x1="7"
+            y1="16"
+            x2="21"
+            y2="16"
             stroke={active ? '#C084FC' : '#6A5A8A'}
             strokeWidth="1.5"
-            strokeLinejoin="round"
-            fill="none"
+            strokeLinecap="round"
+            opacity={active ? 0.7 : 0.4}
+          />
+          <line
+            x1="7"
+            y1="21"
+            x2="17"
+            y2="21"
+            stroke={active ? '#C084FC' : '#6A5A8A'}
+            strokeWidth="1.2"
+            strokeLinecap="round"
+            opacity={active ? 0.45 : 0.25}
+          />
+          <line
+            x1="7"
+            y1="25"
+            x2="13"
+            y2="25"
+            stroke={active ? '#C084FC' : '#6A5A8A'}
+            strokeWidth="1"
+            strokeLinecap="round"
+            opacity={active ? 0.3 : 0.15}
           />
         </svg>
       ),
