@@ -1,10 +1,10 @@
 'use client'
 
-import { useEffect, useState, useRef, useCallback } from 'react'
+import { useEffect, useState, useRef, useCallback, type FC } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { getLevel, getTier } from '@/lib/xp'
+import { getLevel } from '@/lib/xp'
 import { CHARACTERS, type Dimension } from '@/lib/character'
 import { getUserId } from '@/lib/user'
 import MoodTracker from '@/components/MoodTracker'
@@ -116,6 +116,13 @@ function getOracleVerdict(
     color: '#f472b6',
     text: 'Low readiness — protect your energy. One focused task per character.',
   }
+}
+
+function daysUntil(dateStr: string | null): number {
+  if (!dateStr) return 0
+  const target = new Date(dateStr)
+  const now = new Date()
+  return Math.ceil((target.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
 }
 
 function formatCyclePhase(phase: string | null, day: number | null): string {
@@ -253,7 +260,7 @@ function VaultCharacter() {
   )
 }
 
-const CHARACTER_COMPONENTS: Record<string, React.FC> = {
+const CHARACTER_COMPONENTS: Record<string, FC> = {
   career: ForgeCharacter,
   social: EchoCharacter,
   wealth: VaultCharacter,
@@ -271,10 +278,10 @@ const CHARACTER_COLORS: Record<string, string> = {
   wealth: '#1D9E75',
 }
 
-const LEFT_BORDER_COLORS: Record<string, string> = {
-  career: '#EF9F27',
-  social: '#F0997B',
-  wealth: '#1D9E75',
+const CHAR_PAGE: Record<string, string> = {
+  career: '/forge',
+  social: '/echo',
+  wealth: '/vault',
 }
 
 function MissionCard({
@@ -282,45 +289,115 @@ function MissionCard({
   dimension,
   xp,
   level,
-  tierLabel,
-  todayTasks,
+  todayTask,
+  milestone,
+  onCompleteTask,
+  completingTaskId,
 }: {
-  quest: { title: string }
+  quest: { title: string; vision?: string } | null
   dimension: string
   xp: number
   level: number
-  tierLabel: string
-  todayTasks: { completed: boolean }[]
+  todayTask: { id: string; title: string; completed: boolean; xp_reward: number } | null
+  milestone: { title: string; daysLeft: number } | null
+  onCompleteTask: (taskId: string, xpReward: number, dimension: string) => void
+  completingTaskId: string | null
 }) {
   const CharSvg = CHARACTER_COMPONENTS[dimension] ?? ForgeCharacter
   const areaLabel = AREA_LABELS[dimension] ?? dimension
   const color = CHARACTER_COLORS[dimension] ?? '#9333EA'
   const charName =
     dimension === 'career' ? 'Forge' : dimension === 'social' ? 'Echo' : 'Vault'
+  const floatDelay =
+    dimension === 'career' ? '0s' : dimension === 'social' ? '0.5s' : '1s'
 
   const xpInLevel = xp % 500
-  const xpNeeded = 500
-  const pct = Math.round((xpInLevel / xpNeeded) * 100)
-
-  const doneTasks = todayTasks.filter((t) => t.completed).length
-  const totalTasks = todayTasks.length
+  const pct = Math.round((xpInLevel / 500) * 100)
 
   const router = useRouter()
+
+  if (!quest) {
+    return (
+      <div
+        style={{
+          background: '#140C28',
+          borderRadius: 14,
+          border: '0.5px solid #2D1B55',
+          padding: '12px 12px 12px 14px',
+          marginBottom: 8,
+          position: 'relative',
+          overflow: 'hidden',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+        }}
+      >
+        <div
+          style={{
+            position: 'absolute',
+            left: 0,
+            top: 0,
+            bottom: 0,
+            width: 3,
+            background: color,
+          }}
+        />
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <span style={{ fontSize: 15, fontWeight: 500, color: '#E8E0F0' }}>{areaLabel}</span>
+          <span style={{ fontSize: 9, color: '#3D3358' }}>No active quest yet</span>
+          <button
+            type="button"
+            onClick={() => router.push(CHAR_PAGE[dimension] ?? '/quests')}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 5,
+              background: '#1E0D40',
+              border: '0.5px solid #3D2070',
+              borderRadius: 8,
+              padding: '6px 12px',
+              cursor: 'pointer',
+              fontSize: 10,
+              color: '#7A5FA0',
+              width: 'fit-content',
+            }}
+          >
+            + Add quest
+          </button>
+        </div>
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 2,
+            flexShrink: 0,
+            opacity: 0.4,
+          }}
+        >
+          <div
+            style={{
+              animation: 'protagonist-float 3.2s ease-in-out infinite',
+              animationDelay: floatDelay,
+            }}
+          >
+            <CharSvg />
+          </div>
+          <span style={{ fontSize: 9, fontWeight: 500, color }}>{charName}</span>
+          <span style={{ fontSize: 8, color: '#5A4A7A' }}>Lv {level}</span>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div
       role="button"
       tabIndex={0}
-      onClick={() =>
-        router.push(
-          dimension === 'career' ? '/forge' : dimension === 'social' ? '/echo' : '/vault'
-        )
-      }
+      onClick={() => router.push(CHAR_PAGE[dimension] ?? '/quests')}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
-          router.push(
-            dimension === 'career' ? '/forge' : dimension === 'social' ? '/echo' : '/vault'
-          )
+          router.push(CHAR_PAGE[dimension] ?? '/quests')
         }
       }}
       style={{
@@ -332,7 +409,7 @@ function MissionCard({
         position: 'relative',
         overflow: 'hidden',
         display: 'flex',
-        alignItems: 'center',
+        alignItems: 'stretch',
         gap: 10,
         cursor: 'pointer',
       }}
@@ -344,24 +421,120 @@ function MissionCard({
           top: 0,
           bottom: 0,
           width: 3,
-          background: LEFT_BORDER_COLORS[dimension] ?? '#9333EA',
+          background: color,
         }}
       />
 
-      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 5 }}>
-        <span style={{ fontSize: 16, fontWeight: 500, color: '#E8E0F0', lineHeight: 1 }}>
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <span style={{ fontSize: 15, fontWeight: 500, color: '#E8E0F0', lineHeight: 1 }}>
           {areaLabel}
         </span>
-        <span style={{ fontSize: 10, color: '#5A4A7A', lineHeight: 1.3 }}>{quest.title}</span>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-          <span style={{ fontSize: 9, color: '#5A4A7A', whiteSpace: 'nowrap' }}>
-            {xpInLevel}/{xpNeeded} XP
+        {quest.vision && (
+          <span style={{ fontSize: 9, color: '#5A4A7A', fontStyle: 'italic', lineHeight: 1.4 }}>
+            {quest.vision}
+          </span>
+        )}
+
+        {milestone && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+              fontSize: 9,
+              color: '#7A5FA0',
+            }}
+          >
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+              <path
+                d="M2 1V9M2 1L8 4L2 7"
+                stroke="#7A5FA0"
+                strokeWidth="1.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            {milestone.title} · {milestone.daysLeft}d left
+          </div>
+        )}
+
+        {todayTask && (
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={(e) => {
+              e.stopPropagation()
+              if (!todayTask.completed && completingTaskId !== todayTask.id) {
+                onCompleteTask(todayTask.id, todayTask.xp_reward, dimension)
+              }
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.stopPropagation()
+                if (!todayTask.completed && completingTaskId !== todayTask.id) {
+                  onCompleteTask(todayTask.id, todayTask.xp_reward, dimension)
+                }
+              }
+            }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              background: '#1A0D35',
+              borderRadius: 8,
+              padding: '6px 8px',
+              cursor: todayTask.completed ? 'default' : 'pointer',
+              border: '0.5px solid #2D1B55',
+            }}
+          >
+            <div
+              style={{
+                width: 14,
+                height: 14,
+                borderRadius: '50%',
+                border: `1.5px solid ${todayTask.completed ? '#34d399' : color}`,
+                background: todayTask.completed ? '#34d399' : 'transparent',
+                flexShrink: 0,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              {completingTaskId === todayTask.id && (
+                <div
+                  style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: '50%',
+                    border: `1.5px solid ${color}`,
+                    borderTopColor: 'transparent',
+                    animation: 'spin 0.6s linear infinite',
+                  }}
+                />
+              )}
+            </div>
+            <span
+              style={{
+                fontSize: 9,
+                color: todayTask.completed ? '#5A4A7A' : '#C0B0E0',
+                lineHeight: 1.3,
+                textDecoration: todayTask.completed ? 'line-through' : 'none',
+              }}
+            >
+              {todayTask.title}
+            </span>
+          </div>
+        )}
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
+          <span style={{ fontSize: 8, color: '#3D3358', whiteSpace: 'nowrap' }}>
+            {xpInLevel} / 500 XP
           </span>
           <div
             style={{
               flex: 1,
-              height: 4,
+              height: 3,
               background: '#1E0D40',
               borderRadius: 2,
               overflow: 'hidden',
@@ -378,24 +551,6 @@ function MissionCard({
             />
           </div>
         </div>
-
-        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-          {todayTasks.map((t, i) => (
-            <div
-              key={i}
-              style={{
-                width: 6,
-                height: 6,
-                borderRadius: '50%',
-                background: t.completed ? '#34d399' : '#1E0D40',
-                border: t.completed ? 'none' : '0.5px solid #3D2878',
-              }}
-            />
-          ))}
-          <span style={{ fontSize: 9, color: '#5A4A7A', marginLeft: 3 }}>
-            {doneTasks} of {totalTasks} today
-          </span>
-        </div>
       </div>
 
       <div
@@ -403,6 +558,7 @@ function MissionCard({
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
+          justifyContent: 'center',
           gap: 2,
           flexShrink: 0,
         }}
@@ -410,16 +566,13 @@ function MissionCard({
         <div
           style={{
             animation: 'protagonist-float 3.2s ease-in-out infinite',
-            animationDelay:
-              dimension === 'career' ? '0s' : dimension === 'social' ? '0.5s' : '1s',
+            animationDelay: floatDelay,
           }}
         >
           <CharSvg />
         </div>
         <span style={{ fontSize: 9, fontWeight: 500, color }}>{charName}</span>
-        <span style={{ fontSize: 8, color: '#5A4A7A' }}>
-          Lv {level} · {tierLabel}
-        </span>
+        <span style={{ fontSize: 8, color: '#5A4A7A' }}>Lv {level}</span>
       </div>
     </div>
   )
@@ -433,6 +586,7 @@ export default function DashboardPage() {
   const [nextEvent, setNextEvent] = useState<CalendarEvent | null>(null)
   const [loading, setLoading] = useState(true)
   const [todayMood, setTodayMood] = useState<number | null>(null)
+  const [completingTaskId, setCompletingTaskId] = useState<string | null>(null)
 
   const loadDashboard = useCallback(async () => {
     const uid = userId.current
@@ -475,6 +629,33 @@ export default function DashboardPage() {
     void loadDashboard()
   }, [loadDashboard])
 
+  async function handleCompleteTask(taskId: string, xpReward: number, dimension: string) {
+    setCompletingTaskId(taskId)
+    try {
+      const res = await fetch(`/api/quests/tasks/${taskId}/complete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: userId.current }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setQuests((prev) =>
+          prev.map((q) =>
+            q.dimension === dimension && q.today_task?.id === taskId
+              ? {
+                  ...q,
+                  xp: q.xp + (data.xp_earned ?? xpReward),
+                  today_task: { ...q.today_task!, completed: true },
+                }
+              : q
+          )
+        )
+      }
+    } finally {
+      setCompletingTaskId(null)
+    }
+  }
+
   async function handleSyncOura() {
     try {
       const ouraSync = await fetch('/api/oura/sync', {
@@ -503,10 +684,6 @@ export default function DashboardPage() {
   const cycleLabel = oura ? formatCyclePhase(oura.cycle_phase, oura.cycle_day) : ''
 
   const ORDER: Dimension[] = ['career', 'social', 'wealth']
-  const sortedQuests = [...quests].sort(
-    (a, b) =>
-      ORDER.indexOf(a.dimension as Dimension) - ORDER.indexOf(b.dimension as Dimension)
-  )
 
   return (
     <main
@@ -700,45 +877,42 @@ export default function DashboardPage() {
           <div style={{ textAlign: 'center', padding: '40px 0', color: '#3D3358', fontSize: 13 }}>
             Loading your quests...
           </div>
-        ) : sortedQuests.length === 0 ? (
-          <Link
-            href="/quests"
-            style={{
-              display: 'block',
-              textAlign: 'center',
-              padding: '20px',
-              background: '#140C28',
-              borderRadius: 16,
-              border: '0.5px solid rgba(255,255,255,0.07)',
-              color: '#6A6080',
-              fontSize: 13,
-              textDecoration: 'none',
-              marginBottom: 10,
-            }}
-          >
-            No quests yet — tap to begin your journey
-          </Link>
         ) : (
-          sortedQuests.map((q) => {
-            const dim = q.dimension as Dimension
-            const char = CHARACTERS[dim] ?? CHARACTERS.career
-            const tier = getTier(q.xp)
-            const level = getLevel(q.xp)
-            const tierLabel = char.tierLabels[tier - 1]
-            const todayTasks = (q.todays_tasks ?? []).map((t) => ({
-              completed: Boolean(t.completed),
-            }))
-            const subtitle = q.active_milestone?.title ?? q.vision
+          ORDER.map((dim) => {
+            const q = quests.find((quest) => quest.dimension === dim) ?? null
+            const level = getLevel(q?.xp ?? 0)
+
+            const milestone = q?.active_milestone
+              ? {
+                  title: q.active_milestone.title,
+                  daysLeft: daysUntil(q.active_milestone.target_date),
+                }
+              : null
+
+            const todayTask = q?.today_task
+              ? {
+                  id: q.today_task.id,
+                  title: q.today_task.title,
+                  completed: q.today_task.completed,
+                  xp_reward: q.today_task.xp_reward,
+                }
+              : null
 
             return (
               <MissionCard
-                key={q.id}
-                quest={{ title: subtitle }}
-                dimension={q.dimension}
-                xp={q.xp}
+                key={dim}
+                quest={
+                  q
+                    ? { title: q.vision, vision: q.vision }
+                    : null
+                }
+                dimension={dim}
+                xp={q?.xp ?? 0}
                 level={level}
-                tierLabel={tierLabel}
-                todayTasks={todayTasks}
+                todayTask={todayTask}
+                milestone={milestone}
+                onCompleteTask={handleCompleteTask}
+                completingTaskId={completingTaskId}
               />
             )
           })

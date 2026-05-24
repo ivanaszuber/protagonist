@@ -55,13 +55,22 @@ export async function GET(request: Request) {
       const focusTask =
         taskList.find((task) => !task.completed) ?? taskList[0] ?? null
 
+      const activeMilestone = milestones?.[0]
+      const daysLeft = activeMilestone?.target_date
+        ? Math.ceil(
+            (new Date(activeMilestone.target_date).getTime() - Date.now()) /
+              (1000 * 60 * 60 * 24)
+          )
+        : 0
+
       return {
         ...quest,
-        active_milestone: milestones?.[0]
+        active_milestone: activeMilestone
           ? {
-              id: milestones[0].id,
-              title: milestones[0].title,
-              target_date: milestones[0].target_date,
+              id: activeMilestone.id,
+              title: activeMilestone.title,
+              target_date: activeMilestone.target_date,
+              days_left: daysLeft,
             }
           : null,
         today_task: focusTask
