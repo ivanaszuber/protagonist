@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
+import { usePathname } from 'next/navigation'
 import { getUserId } from '@/lib/user'
 
 type ChatState = 'closed' | 'open' | 'recording' | 'thinking'
@@ -11,10 +12,18 @@ interface Message {
 }
 
 export function ArcChat() {
+  const pathname = usePathname()
+  const hideDefaultFab = pathname === '/dashboard'
   const [chatState, setChatState] = useState<ChatState>('closed')
   const [messages, setMessages] = useState<Message[]>([])
   const [inputText, setInputText] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const openOracle = () => setChatState('open')
+    window.addEventListener('protagonist:open-oracle', openOracle)
+    return () => window.removeEventListener('protagonist:open-oracle', openOracle)
+  }, [])
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -103,6 +112,8 @@ export function ArcChat() {
   }
 
   if (chatState === 'closed') {
+    if (hideDefaultFab) return null
+
     return (
       <button
         type="button"

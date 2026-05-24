@@ -51,10 +51,28 @@ export async function GET(request: Request) {
         .eq('dimension', quest.dimension)
         .maybeSingle()
 
+      const taskList = tasks ?? []
+      const focusTask =
+        taskList.find((task) => !task.completed) ?? taskList[0] ?? null
+
       return {
         ...quest,
-        active_milestone: milestones?.[0] ?? null,
-        todays_tasks: tasks ?? [],
+        active_milestone: milestones?.[0]
+          ? {
+              id: milestones[0].id,
+              title: milestones[0].title,
+              target_date: milestones[0].target_date,
+            }
+          : null,
+        today_task: focusTask
+          ? {
+              id: focusTask.id,
+              title: focusTask.title,
+              completed: Boolean(focusTask.completed),
+              xp_reward: focusTask.xp_reward ?? 50,
+            }
+          : null,
+        todays_tasks: taskList,
         xp: xpRow?.xp ?? 0,
       }
     })
