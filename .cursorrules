@@ -1,0 +1,626 @@
+# Protagonist — Cursor AI Context
+
+You are building **Protagonist**, an AI-powered life coaching app with RPG game mechanics.
+Always read this file fully before writing any code. Every decision should align with this context.
+
+---
+
+## What This App Is
+
+Protagonist is a voice-first, AI-powered life companion that turns the user's real life into an RPG.
+The user talks to an AI coach called **The Oracle (Arc)**. The Oracle listens, understands their
+emotional state and life context, generates 3 calibrated daily quests, tracks progress across 7 life
+dimensions, and witnesses the user's growth over time.
+
+**Core principle:** The user should never have to type. Voice is the primary interface.
+**Core mechanic:** Talk → Get quests → Live life → Protagonist tracks the rest.
+**Core differentiator:** The app adapts to the user's real energy and circumstances daily.
+It knows when to push and when to hold space.
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Framework | Next.js 14+ (App Router) |
+| Language | TypeScript (strict mode) |
+| Styling | Tailwind CSS |
+| Database + Auth | Supabase |
+| AI / Agents | Anthropic Claude API (claude-sonnet-4-6) |
+| Voice Transcription | Web Speech API (browser) + Whisper API fallback |
+| Health Data | Oura Ring API (sleep, HRV, readiness) |
+| Movement Data | Apple HealthKit (via API routes) |
+| Email + Calendar | Google Calendar API, Gmail API |
+| Photo AI | Claude Vision API (multimodal) |
+| Deployment | Vercel |
+
+**Environment variables required:**
+```
+ANTHROPIC_API_KEY=
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+OURA_CLIENT_ID=
+OURA_CLIENT_SECRET=
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+```
+
+---
+
+## Project Structure
+
+```
+protagonist/
+├── src/
+│   ├── app/
+│   │   ├── (auth)/
+│   │   │   ├── login/page.tsx
+│   │   │   └── onboarding/page.tsx
+│   │   ├── (app)/
+│   │   │   ├── layout.tsx           # App shell with nav
+│   │   │   ├── dashboard/page.tsx   # Day-at-a-glance view
+│   │   │   ├── quests/page.tsx      # Today's 3 quests
+│   │   │   ├── champions/page.tsx   # 7 dimension champions + XP
+│   │   │   ├── bosses/page.tsx      # Weekly boss battles
+│   │   │   ├── memory/page.tsx      # The Witness / memory board
+│   │   │   ├── goals/page.tsx       # Long-term goals + vision board
+│   │   │   └── profile/page.tsx
+│   │   ├── api/
+│   │   │   ├── checkin/route.ts     # POST: process voice check-in
+│   │   │   ├── quests/
+│   │   │   │   ├── generate/route.ts  # POST: generate today's quests
+│   │   │   │   └── complete/route.ts  # POST: mark quest complete
+│   │   │   ├── voice/route.ts       # POST: transcribe audio
+│   │   │   ├── witness/route.ts     # GET: surface memory/growth moments
+│   │   │   ├── boss/route.ts        # GET/POST: weekly boss battle
+│   │   │   ├── oura/route.ts        # GET: Oura data sync
+│   │   │   ├── photo/route.ts       # POST: upload + analyze photo
+│   │   │   └── calendar/route.ts    # GET: today's calendar events
+│   │   ├── layout.tsx
+│   │   └── page.tsx                 # Landing/marketing page
+│   ├── components/
+│   │   ├── ui/                      # Base components (Button, Card, XPBar, etc.)
+│   │   ├── oracle/                  # The Oracle/Arc character components
+│   │   ├── quests/                  # QuestCard, QuestList, QuestProof
+│   │   ├── champions/               # ChampionCard, DimensionGrid
+│   │   ├── bosses/                  # BossCard, BossHP
+│   │   ├── dashboard/               # DayView, EnergyWidget, CalendarStrip
+│   │   ├── checkin/                 # VoiceInput, CheckInFlow
+│   │   └── memory/                  # MemoryCard, PhotoBoard
+│   ├── lib/
+│   │   ├── anthropic.ts             # Claude client + agent helpers
+│   │   ├── supabase.ts              # Supabase client (server + browser)
+│   │   ├── oura.ts                  # Oura API helpers
+│   │   ├── google.ts                # Google Calendar/Gmail helpers
+│   │   ├── voice.ts                 # Voice recording + transcription
+│   │   └── xp.ts                   # XP calculation logic
+│   ├── types/
+│   │   └── index.ts                 # All shared TypeScript types
+│   ├── hooks/
+│   │   ├── useVoice.ts              # Voice recording hook
+│   │   ├── useQuests.ts             # Quest state management
+│   │   ├── useXP.ts                 # XP + dimension state
+│   │   └── useOura.ts               # Oura data hook
+│   └── constants/
+│       ├── dimensions.ts            # 7 dimension definitions
+│       └── champions.ts             # Champion character data
+├── .cursorrules                     # This file
+├── .env.local
+└── public/
+```
+
+---
+
+## Architecture Patterns
+
+### API Routes (Server-side AI calls)
+All calls to the Anthropic API happen server-side in `/src/app/api/` routes.
+Never call Claude directly from the browser. Always use fetch to your own API routes.
+
+```typescript
+// Example pattern for an API route
+// src/app/api/quests/generate/route.ts
+import Anthropic from '@anthropic-ai/sdk'
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
+
+export async function POST(request: Request) {
+  const { checkinText, ouraData, userId } = await request.json()
+  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+  // ... generate quests
+}
+```
+
+### Server vs Client Components
+- Default to **Server Components**
+- Use `'use client'` only when you need: browser APIs, event handlers, useState, useEffect
+- Voice recording = client component
+- Quest display = server component
+- XP animations = client component
+
+### Supabase Pattern
+```typescript
+// Server component
+import { createServerComponentClient } from '@supabase/auth-helpers-nextjs'
+import { cookies } from 'next/headers'
+
+// Client component
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+```
+
+### Error Handling
+Always handle errors gracefully. The app should never crash — it should degrade gracefully
+and show the user something useful. Voice transcription failing → show text input fallback.
+
+---
+
+## The AI Agent System
+
+Six agents power the intelligence layer. Each maps to an API route.
+
+| Agent | Route | Purpose |
+|-------|-------|---------|
+| **Check-In Agent** | `/api/checkin` | Transcribes + interprets voice check-in. Extracts: energy (1-10), mood, social battery, key concerns, what happened yesterday |
+| **Quest Agent** | `/api/quests/generate` | Generates exactly 3 quests using check-in + Oura data + dimension XP history + long-term goals |
+| **Proof Agent** | `/api/quests/complete` | Evaluates voice reflection to determine if quest was completed. Awards XP. |
+| **Witness Agent** | `/api/witness` | Maintains memory of user's journey. Surfaces growth moments. Powers the "I remember when..." mechanic |
+| **Boss Agent** | `/api/boss` | Weekly: analyzes avoidance patterns, generates the Boss Battle. Daily: tracks damage dealt |
+| **Vision Agent** | `/api/vision` | Monthly/annual: reviews progress against stated life goals across all 7 dimensions |
+
+### Claude Prompt Pattern
+```typescript
+const response = await anthropic.messages.create({
+  model: 'claude-sonnet-4-6',
+  max_tokens: 1024,
+  system: `You are Arc, the Oracle — a wise, witty, deeply perceptive AI life coach.
+You know the user deeply. You remember everything. You know when to push and when to hold space.
+Your tone: warm but direct, playful but serious when needed, never clinical.
+You never use corporate wellness language. You talk like a trusted friend who happens to
+be the most perceptive coach you've ever met.`,
+  messages: [{ role: 'user', content: userMessage }]
+})
+```
+
+---
+
+## Database Schema
+
+### Core Tables (Supabase / PostgreSQL)
+
+```sql
+-- Users profile (extends Supabase auth.users)
+profiles (
+  id uuid references auth.users primary key,
+  name text,
+  avatar_url text,
+  onboarding_complete boolean default false,
+  created_at timestamptz default now()
+)
+
+-- Daily check-ins
+check_ins (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references profiles,
+  date date not null,
+  transcript text,                    -- raw voice transcript
+  energy_level integer,               -- 1-10, extracted by AI
+  mood text,                          -- extracted by AI
+  social_battery integer,             -- 1-10
+  oura_readiness integer,             -- from Oura API
+  oura_sleep_score integer,
+  ai_summary text,                    -- Arc's interpretation
+  created_at timestamptz default now()
+)
+
+-- Daily quests
+quests (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references profiles,
+  date date not null,
+  dimension text not null,            -- 'vitality' | 'mind' | 'create' | 'social' | 'love' | 'family' | 'wealth'
+  title text not null,
+  description text,
+  xp_reward integer default 100,
+  status text default 'pending',      -- 'pending' | 'completed' | 'skipped'
+  proof_transcript text,              -- voice reflection on completion
+  completed_at timestamptz,
+  created_at timestamptz default now()
+)
+
+-- XP per dimension (running totals)
+dimension_xp (
+  user_id uuid references profiles,
+  dimension text not null,
+  total_xp integer default 0,
+  level integer default 1,
+  primary key (user_id, dimension)
+)
+
+-- Long-term goals
+goals (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references profiles,
+  dimension text not null,
+  title text not null,
+  description text,
+  target_date date,
+  status text default 'active',       -- 'active' | 'achieved' | 'abandoned'
+  created_at timestamptz default now()
+)
+
+-- Memory entries (Witness mechanic)
+memories (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references profiles,
+  date date,
+  content text not null,              -- what was said/felt/done
+  type text,                          -- 'fear' | 'win' | 'reflection' | 'milestone'
+  dimension text,
+  surfaced_at timestamptz,            -- when Arc surfaced this to user
+  created_at timestamptz default now()
+)
+
+-- Photo memories
+photos (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references profiles,
+  storage_path text,
+  ai_description text,                -- Claude's interpretation
+  taken_at timestamptz,               -- extracted from EXIF or AI guess
+  location text,
+  tags text[],
+  dimension text,
+  created_at timestamptz default now()
+)
+
+-- Achievements
+user_achievements (
+  user_id uuid references profiles,
+  achievement_id text not null,
+  unlocked_at timestamptz default now(),
+  primary key (user_id, achievement_id)
+)
+
+-- Boss battles
+boss_battles (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references profiles,
+  week_start date,
+  boss_name text,
+  boss_type text,                     -- 'isolator' | 'procrastinator' | 'burnout' | 'comparator' | 'custom'
+  description text,
+  max_hp integer default 1000,
+  current_hp integer default 1000,
+  status text default 'active',       -- 'active' | 'defeated' | 'escaped'
+  created_at timestamptz default now()
+)
+```
+
+---
+
+## The 7 Life Dimensions
+
+These are defined in `src/constants/dimensions.ts`. Never hardcode dimension data inline.
+
+```typescript
+export const DIMENSIONS = {
+  vitality: {
+    id: 'vitality',
+    name: 'Vitality',
+    champion: 'Blaze',
+    championClass: 'Warrior',
+    emoji: '💪',
+    color: '#FF6B35',
+    description: 'Energy, movement, sleep quality, recovery',
+    // NOTE: Vitality is about ENERGY and RECOVERY — never calories, weight, or body composition
+  },
+  mind: {
+    id: 'mind',
+    name: 'Mind',
+    champion: 'Sage',
+    championClass: 'Mystic',
+    emoji: '🧠',
+    color: '#7B3FE4',
+    description: 'Meditation, learning, focus, growth',
+  },
+  create: {
+    id: 'create',
+    name: 'Create',
+    champion: 'Forge',
+    championClass: 'Maker',
+    emoji: '✨',
+    color: '#E8941A',
+    description: 'Work, projects, building, shipping',
+  },
+  social: {
+    id: 'social',
+    name: 'Social',
+    champion: 'Echo',
+    championClass: 'Bard',
+    emoji: '🤝',
+    color: '#2ECC71',
+    description: 'Friends, community, connection, going out',
+  },
+  love: {
+    id: 'love',
+    name: 'Love',
+    champion: 'Sol',
+    championClass: 'Radiant',
+    emoji: '💕',
+    color: '#FF7A65',
+    description: 'Relationship, romance, partnership',
+  },
+  family: {
+    id: 'family',
+    name: 'Family',
+    champion: 'Root',
+    championClass: 'Guardian',
+    emoji: '👧',
+    color: '#9B84C2',
+    description: 'Daughter, family, intentional parenting',
+  },
+  wealth: {
+    id: 'wealth',
+    name: 'Wealth',
+    champion: 'Vault',
+    championClass: 'Strategist',
+    emoji: '💰',
+    color: '#2ECC71',
+    description: 'Finances, career, FIRE goal progress',
+  },
+} as const
+
+export type DimensionId = keyof typeof DIMENSIONS
+```
+
+---
+
+## Design System
+
+### Colors
+```css
+--bg: #0D0820          /* Deep space background */
+--bg2: #130E2A         /* Section backgrounds */
+--bg3: #1A1238         /* Card headers, inputs */
+--purple: #7B3FE4      /* Primary accent */
+--purple-light: #A87EF8
+--salmon: #FF7A65      /* Secondary accent — warm salmon/coral */
+--salmon-light: #FFB0A3
+--cyan: #00D4B8        /* Tertiary accent */
+--gold: #FFB347        /* XP, achievements, Oracle crown */
+--mint: #6EE7A4        /* Success, completion */
+--txt: #F0ECFF         /* Primary text */
+--txt2: #9B8EC4        /* Secondary text */
+--txt3: #6B5E8C        /* Muted text */
+--card: rgba(255,255,255,0.04)
+--card-border: rgba(255,255,255,0.08)
+```
+
+### Typography
+- **Headings:** Space Grotesk, 700 weight
+- **Body:** Space Grotesk, 400/500 weight
+- **Emotional moments / quotes:** Playfair Display, italic 700
+- Google Fonts import: `Space Grotesk` + `Playfair Display:ital,wght@1,700`
+
+### Key UI Patterns
+- XP bars: `background: linear-gradient(90deg, var(--purple), var(--salmon))`
+- Section tags: small uppercase pill labels above headings
+- Cards: dark background + subtle border + slight hover lift
+- Buttons: salmon-filled (primary) or ghost outline (secondary)
+- Animations: `float` (Oracle), `pulse-glow` (active elements), `xp-fill` (XP bars)
+- Always dark theme — no light mode for now
+
+### Tailwind Config
+Extend the theme with the design tokens above. Add them to `tailwind.config.ts`.
+
+---
+
+## Key Features Reference
+
+### Voice Check-In Flow
+1. User taps mic button → Web Speech API records
+2. Audio → POST `/api/voice` → Whisper transcription
+3. Transcript → POST `/api/checkin` → Claude extracts structured data
+4. Structured data → POST `/api/quests/generate` → 3 quests returned
+5. Quests saved to DB + displayed to user
+
+### Quest Generation Rules
+- Always generate exactly 3 quests
+- One quest per dimension type: Body/Recovery, Mind/Create, Social/Connection
+- Calibrate difficulty to energy level: if energy < 5 OR oura_readiness < 60 → gentle quests
+- Quests must be specific, actionable, completable in one day
+- Include XP reward (50-200 based on difficulty)
+
+### The Witness Mechanic
+- Every check-in, notable phrases are extracted and stored in `memories` table
+- On a cadence (weekly), the Witness Agent scans memories for growth moments
+- Surfaces them to the user: "X weeks ago you said [quote]. Look at you now."
+- This is the most emotionally powerful feature — handle it with care
+
+### Photo Memory
+1. User uploads photo → POST `/api/photo`
+2. Image → Claude Vision → extracts: description, mood, when (EXIF or AI guess), location, tags
+3. Stored in Supabase storage + photos table
+4. Displayed in memory board, tagged to relevant dimension
+
+### Dashboard (Day at a Glance)
+Shows: today's date + greeting, Oura sleep/readiness scores, today's calendar events,
+today's quests status, energy level indicator, after-work plans, week XP progress.
+Data sources: Oura API, Google Calendar API, quests table.
+
+---
+
+## TypeScript Types
+
+```typescript
+// src/types/index.ts
+
+export type DimensionId = 'vitality' | 'mind' | 'create' | 'social' | 'love' | 'family' | 'wealth'
+
+export interface CheckIn {
+  id: string
+  userId: string
+  date: string
+  transcript: string
+  energyLevel: number        // 1-10
+  mood: string
+  socialBattery: number      // 1-10
+  ouraReadiness?: number
+  ouraSleepScore?: number
+  aiSummary: string
+  createdAt: string
+}
+
+export interface Quest {
+  id: string
+  userId: string
+  date: string
+  dimension: DimensionId
+  title: string
+  description: string
+  xpReward: number
+  status: 'pending' | 'completed' | 'skipped'
+  proofTranscript?: string
+  completedAt?: string
+}
+
+export interface DimensionXP {
+  dimension: DimensionId
+  totalXp: number
+  level: number
+}
+
+export interface Memory {
+  id: string
+  date: string
+  content: string
+  type: 'fear' | 'win' | 'reflection' | 'milestone'
+  dimension?: DimensionId
+}
+
+export interface BossBattle {
+  id: string
+  weekStart: string
+  bossName: string
+  bossType: 'isolator' | 'procrastinator' | 'burnout' | 'comparator' | 'custom'
+  description: string
+  maxHp: number
+  currentHp: number
+  status: 'active' | 'defeated' | 'escaped'
+}
+
+export interface OuraData {
+  date: string
+  readinessScore: number
+  sleepScore: number
+  hrvBalance?: number
+  activityScore?: number
+}
+
+export interface DayDashboard {
+  date: string
+  checkIn?: CheckIn
+  quests: Quest[]
+  oura?: OuraData
+  calendarEvents: CalendarEvent[]
+  dimensionXP: DimensionXP[]
+  activeBoss?: BossBattle
+}
+
+export interface CalendarEvent {
+  id: string
+  title: string
+  startTime: string
+  endTime: string
+  location?: string
+  isAfterWork: boolean
+}
+```
+
+---
+
+## Coding Conventions
+
+### General
+- TypeScript strict mode — no `any`, no `@ts-ignore`
+- Named exports everywhere (no default exports except page components)
+- Descriptive variable names — never `data`, `res`, `temp`, `item`
+- Use `const` by default, `let` only when reassignment is needed
+- Async/await over `.then()` chains
+
+### Components
+```typescript
+// Good component pattern
+interface QuestCardProps {
+  quest: Quest
+  onComplete: (questId: string) => void
+  isLoading?: boolean
+}
+
+export function QuestCard({ quest, onComplete, isLoading = false }: QuestCardProps) {
+  // ...
+}
+```
+
+### API Routes
+- Always validate request body
+- Always handle errors with appropriate status codes
+- Always return typed responses
+- Log errors server-side, return clean messages to client
+
+### Supabase Queries
+- Use typed clients from `@/lib/supabase`
+- Always handle the `error` from Supabase responses
+- Use Row Level Security (RLS) — all tables must have RLS enabled
+
+### File Naming
+- Components: `PascalCase.tsx`
+- Utilities/hooks: `camelCase.ts`
+- Constants: `camelCase.ts`
+- API routes: always `route.ts`
+- Pages: always `page.tsx`
+
+---
+
+## What NOT To Do
+
+- **Never** call Anthropic API client-side — always via server API routes
+- **Never** store API keys in the frontend — use env vars server-side only
+- **Never** hardcode dimension names, colors, or champion data inline — use constants
+- **Never** build "all features at once" — build the core loop first (voice → quests → completion)
+- **Never** add calories, weight, BMI, or body composition metrics to the Vitality dimension
+- **Never** use light theme colors — this is a dark space theme only
+- **Never** use `any` TypeScript type
+- **Never** skip error handling on AI API calls — they fail, handle it gracefully
+- **Never** let a voice transcription failure crash the app — always show a text fallback
+- **Don't** over-engineer — if something can be a simple API route, keep it simple
+
+---
+
+## Build Order (V0 → V1)
+
+### V0 — Core Loop (build this first)
+1. Basic Next.js app with dark theme + design tokens
+2. Voice recording component (Web Speech API)
+3. `/api/checkin` — transcribe + extract energy/mood
+4. `/api/quests/generate` — generate 3 quests
+5. Quest display with champion colors + XP bars
+6. Quest completion with voice proof
+7. Single user, no auth, data in localStorage or simple Supabase table
+
+### V1 — Full MVP
+- Supabase auth + user profiles
+- Oura API integration
+- The Witness mechanic
+- Weekly boss battle
+- 7 dimension XP tracking
+- Dashboard view
+- Mobile-responsive UI
+
+### V2 — Public Beta
+- Google Calendar + Gmail sync
+- Photo memory upload
+- Vision board + long-term goals
+- Multi-user onboarding
+- Achievements system
