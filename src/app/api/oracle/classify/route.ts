@@ -59,7 +59,7 @@ Classify this input into one of three intents:
 For TASK, extract:
 - title: clean task title (remove filler words like "add task" or "remind me to")
 - dimension: one of "career", "social", "wealth" (infer from context — job/work/interview = career, people/relationships/social = social, money/finances/savings = wealth). If unclear, return null.
-- date: ISO date string if a date is mentioned (today, tomorrow, day names, etc.), otherwise null. Today = ${today}.
+- date: ISO date string. Default to "${today}" (today) UNLESS the user explicitly says "someday", "later", "no rush", "eventually", or mentions a specific future date. If they say "tomorrow" use the next day. If they say a weekday name use the next occurrence. Most tasks should get today's date.
 - milestoneId: match to one of the user's quest IDs above if clearly relevant, otherwise null
 - xpReward: 25 for tiny tasks, 50 for standard, 100 for hard/important ones
 - questId: the quest id if matched, otherwise null

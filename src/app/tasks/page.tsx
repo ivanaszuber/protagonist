@@ -1,6 +1,12 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import {
+  XpToastOverlay,
+  showXpFeedback,
+  type LevelUpToast,
+  type XpToast,
+} from '@/components/XpToastOverlay'
 import { getUserId } from '@/lib/user'
 
 type TabView = 'today' | 'upcoming' | 'someday'
@@ -48,6 +54,8 @@ export default function TasksPage() {
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
   const [completingId, setCompletingId] = useState<string | null>(null)
+  const [xpToast, setXpToast] = useState<XpToast | null>(null)
+  const [levelUpToast, setLevelUpToast] = useState<LevelUpToast | null>(null)
 
   const loadTasks = useCallback(async () => {
     setLoading(true)
@@ -86,15 +94,37 @@ export default function TasksPage() {
     void loadTasks()
   }, [loadTasks])
 
+  // Refresh when Oracle adds a task (fires even if this page is already open)
+  useEffect(() => {
+    const handler = () => void loadTasks()
+    window.addEventListener('protagonist:task-added', handler)
+    return () => window.removeEventListener('protagonist:task-added', handler)
+  }, [loadTasks])
+
   async function handleComplete(taskId: string) {
+    const task = tasks.find((t) => t.id === taskId)
+    if (!task || task.completed) return
+
     setCompletingId(taskId)
-    await fetch(`/api/quests/tasks/${taskId}/complete`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId }),
-    })
-    setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, completed: true } : t)))
-    setCompletingId(null)
+    try {
+      const res = await fetch(`/api/quests/tasks/${taskId}/complete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId }),
+      })
+      const data = (await res.json()) as {
+        xp_earned?: number
+        leveled_up?: boolean
+        new_level?: number
+      }
+
+      if (res.ok) {
+        setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, completed: true } : t)))
+        showXpFeedback(task, data, setXpToast, setLevelUpToast)
+      }
+    } finally {
+      setCompletingId(null)
+    }
   }
 
   const byDimension = DIMENSION_ORDER.reduce<Record<string, Task[]>>((acc, dim) => {
@@ -278,6 +308,8 @@ export default function TasksPage() {
           })
         )}
       </div>
+
+      <XpToastOverlay xpToast={xpToast} levelUpToast={levelUpToast} />
     </main>
   )
 }

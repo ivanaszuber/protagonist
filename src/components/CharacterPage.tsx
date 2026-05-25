@@ -11,6 +11,12 @@ import {
 import { getLevel } from '@/lib/xp'
 import { CHARACTERS, type Dimension } from '@/lib/character'
 import { DIMENSION_TO_SLUG, getTierName } from '@/lib/tierName'
+import {
+  XpToastOverlay,
+  showXpFeedback,
+  type LevelUpToast,
+  type XpToast,
+} from '@/components/XpToastOverlay'
 import { getUserId } from '@/lib/user'
 
 interface Milestone {
@@ -112,6 +118,8 @@ export function CharacterPage({ dimension }: CharacterPageProps) {
   const [newTaskTitle, setNewTaskTitle] = useState('')
   const [newTaskXp, setNewTaskXp] = useState(50)
   const [completingId, setCompletingId] = useState<string | null>(null)
+  const [xpToast, setXpToast] = useState<XpToast | null>(null)
+  const [levelUpToast, setLevelUpToast] = useState<LevelUpToast | null>(null)
 
   useEffect(() => {
     const uid = getUserId()
@@ -143,17 +151,25 @@ export function CharacterPage({ dimension }: CharacterPageProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: uid }),
       })
+      const data = (await res.json()) as {
+        xp_earned?: number
+        leveled_up?: boolean
+        new_level?: number
+      }
+
       if (res.ok) {
+        const earned = data.xp_earned ?? xpReward
         setQuest((prev) => {
           if (!prev) return prev
           return {
             ...prev,
-            xp: prev.xp + xpReward,
+            xp: prev.xp + earned,
             recent_tasks: prev.recent_tasks.map((t) =>
               t.id === taskId ? { ...t, completed: true } : t
             ),
           }
         })
+        showXpFeedback({ dimension }, data, setXpToast, setLevelUpToast)
       }
     } finally {
       setCompletingId(null)
@@ -699,6 +715,8 @@ export function CharacterPage({ dimension }: CharacterPageProps) {
           </LeftBorderCard>
         )}
       </div>
+
+      <XpToastOverlay xpToast={xpToast} levelUpToast={levelUpToast} />
     </main>
   )
 }

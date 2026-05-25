@@ -175,8 +175,23 @@ export function OracleSheet() {
           }),
         })
         await taskRes.json()
+        // Tell any open Tasks page to refresh
+        window.dispatchEvent(new CustomEvent('protagonist:task-added'))
         setState('task-done')
       } else if (data.intent === 'NOTE') {
+        const arcReply = await sendChatToArc(text)
+
+        fetch('/api/notes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId,
+            content: text,
+            oracleReply: arcReply,
+          }),
+        }).catch(() => {})
+
+        setResult({ ...data, oracleReply: arcReply })
         setState('note-done')
       } else {
         const reply =

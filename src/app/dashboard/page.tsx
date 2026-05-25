@@ -599,17 +599,19 @@ export default function DashboardPage() {
   const [nextEvent, setNextEvent] = useState<CalendarEvent | null>(null)
   const [loading, setLoading] = useState(true)
   const [todayMood, setTodayMood] = useState<number | null>(null)
+  const [hasCheckedInToday, setHasCheckedInToday] = useState(false)
   const [completingTaskId, setCompletingTaskId] = useState<string | null>(null)
 
   const loadDashboard = useCallback(async () => {
     const uid = userId.current
     setLoading(true)
 
-    const [ouraRes, questsRes, calRes, moodRes] = await Promise.allSettled([
+    const [ouraRes, questsRes, calRes, moodRes, checkInRes] = await Promise.allSettled([
       fetch(`/api/oura/sync?userId=${encodeURIComponent(uid)}`).then((r) => r.json()),
       fetch(`/api/quests/main?userId=${encodeURIComponent(uid)}`).then((r) => r.json()),
       fetch(`/api/calendar/next?userId=${encodeURIComponent(uid)}`).then((r) => r.json()),
       fetch(`/api/mood?userId=${encodeURIComponent(uid)}`).then((r) => r.json()),
+      fetch(`/api/checkin/today?userId=${encodeURIComponent(uid)}`).then((r) => r.json()),
     ])
 
     if (ouraRes.status === 'fulfilled' && ouraRes.value?.data) {
@@ -623,6 +625,9 @@ export default function DashboardPage() {
     }
     if (moodRes.status === 'fulfilled' && moodRes.value?.mood?.mood_score) {
       setTodayMood(moodRes.value.mood.mood_score)
+    }
+    if (checkInRes.status === 'fulfilled' && checkInRes.value?.hasCheckIn) {
+      setHasCheckedInToday(checkInRes.value.hasCheckIn)
     }
     setLoading(false)
 
@@ -853,6 +858,80 @@ export default function DashboardPage() {
                 {cycleLabel}
               </span>
             </div>
+          )}
+
+          {!hasCheckedInToday && (
+            <button
+              type="button"
+              onClick={() => {
+                window.dispatchEvent(
+                  new CustomEvent('protagonist:open-oracle', {
+                    detail: { prefill: 'Good morning, checking in for today. ' },
+                  })
+                )
+                setHasCheckedInToday(true)
+              }}
+              style={{
+                width: '100%',
+                padding: '13px 16px',
+                background: 'linear-gradient(135deg, #1A0D35 0%, #200A45 100%)',
+                border: '1px solid rgba(147,51,234,0.3)',
+                borderRadius: 14,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12,
+                cursor: 'pointer',
+                marginBottom: 12,
+                marginTop: 10,
+                textAlign: 'left',
+              }}
+            >
+              <div
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: '50%',
+                  background: '#200A45',
+                  border: '1.5px solid #9333EA',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                }}
+              >
+                <svg width="18" height="18" viewBox="0 0 16 16" fill="none">
+                  <ellipse cx="8" cy="8" rx="7" ry="4.5" stroke="#9333EA" strokeWidth="1.2" />
+                  <circle cx="8" cy="8" r="2.5" stroke="#C084FC" strokeWidth="1" />
+                  <circle cx="8" cy="8" r="1.2" fill="#E879F9" />
+                  <circle cx="7" cy="7" r=".6" fill="white" opacity={0.5} />
+                </svg>
+              </div>
+              <div>
+                <div
+                  style={{ fontSize: 13, fontWeight: 500, color: '#E8E0F0', marginBottom: 2 }}
+                >
+                  Good morning — check in with Oracle
+                </div>
+                <div style={{ fontSize: 11, color: '#5A4A7A' }}>
+                  Tell me how you&apos;re feeling · takes 30 seconds
+                </div>
+              </div>
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 16 16"
+                fill="none"
+                style={{ marginLeft: 'auto', flexShrink: 0 }}
+              >
+                <path
+                  d="M6 4l4 4-4 4"
+                  stroke="#5A4A7A"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
           )}
 
           <MoodTracker
