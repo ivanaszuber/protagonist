@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
+import { CHARACTERS, type Dimension } from '@/lib/character'
 import { getUserId } from '@/lib/user'
 
 type SheetState =
@@ -29,16 +30,13 @@ interface ClassifyResult {
   oracleReply: string | null
 }
 
-const DIMENSION_LABELS: Record<string, string> = {
-  career: 'Forge · Career',
-  social: 'Echo · Social',
-  wealth: 'Vault · Finances',
+function dimensionLabel(dim: string): string {
+  const c = CHARACTERS[dim as Dimension]
+  return c ? `${c.name} · ${c.tagline}` : dim
 }
 
-const DIMENSION_COLORS: Record<string, string> = {
-  career: '#EF9F27',
-  social: '#F0997B',
-  wealth: '#1D9E75',
+function dimensionColor(dim: string): string {
+  return CHARACTERS[dim as Dimension]?.color ?? '#9333EA'
 }
 
 function OracleEye({ size = 16, pulse = false }: { size?: number; pulse?: boolean }) {
@@ -272,7 +270,7 @@ export function OracleSheet() {
       : state === 'thinking'
         ? 'reading your intent...'
         : state === 'task-done'
-          ? `saved · ${result?.task?.dimension ? (DIMENSION_LABELS[result.task.dimension] ?? '') : ''}`
+          ? `saved · ${result?.task?.dimension ? dimensionLabel(result.task.dimension) : ''}`
           : state === 'note-done'
             ? 'reflecting on your note...'
             : 'speak, type, or drop an image'
@@ -546,12 +544,12 @@ export function OracleSheet() {
                         padding: '3px 8px',
                         borderRadius: 6,
                         fontSize: 10,
-                        background: `${DIMENSION_COLORS[result.task.dimension]}1a`,
-                        border: `0.5px solid ${DIMENSION_COLORS[result.task.dimension]}4d`,
-                        color: DIMENSION_COLORS[result.task.dimension],
+                        background: `${dimensionColor(result.task.dimension)}1a`,
+                        border: `0.5px solid ${dimensionColor(result.task.dimension)}4d`,
+                        color: dimensionColor(result.task.dimension),
                       }}
                     >
-                      {DIMENSION_LABELS[result.task.dimension]}
+                      {dimensionLabel(result.task.dimension)}
                     </span>
                   )}
                   {result.task.date && (

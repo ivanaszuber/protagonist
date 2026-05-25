@@ -7,6 +7,7 @@ import {
   type LevelUpToast,
   type XpToast,
 } from '@/components/XpToastOverlay'
+import { ALL_DIMENSIONS, CHARACTERS } from '@/lib/character'
 import { getUserId } from '@/lib/user'
 
 type TabView = 'today' | 'upcoming' | 'someday'
@@ -20,13 +21,18 @@ interface Task {
   xp_reward: number
 }
 
-const DIMENSION_ORDER = ['career', 'social', 'wealth'] as const
+const DIMENSION_ORDER = ALL_DIMENSIONS
 
-const DIMENSION_META = {
-  career: { label: 'Forge · Career', color: '#EF9F27', dot: '#EF9F27' },
-  social: { label: 'Echo · Social', color: '#F0997B', dot: '#F0997B' },
-  wealth: { label: 'Vault · Finances', color: '#1D9E75', dot: '#1D9E75' },
-} as const
+const DIMENSION_META = Object.fromEntries(
+  ALL_DIMENSIONS.map((dim) => [
+    dim,
+    {
+      label: `${CHARACTERS[dim].name} · ${CHARACTERS[dim].tagline}`,
+      color: CHARACTERS[dim].color,
+      dot: CHARACTERS[dim].color,
+    },
+  ])
+) as Record<string, { label: string; color: string; dot: string }>
 
 function getDaysFromNow(date: string): number {
   const d = new Date(date + 'T12:00:00')
@@ -429,7 +435,7 @@ function AddTaskRow({ dimension, color }: { dimension: string; color: string }) 
       onClick={() =>
         window.dispatchEvent(
           new CustomEvent('protagonist:open-oracle', {
-            detail: { prefill: `add task for ${dimension} — ` },
+            detail: { prefill: `add ${dimension} task — ` },
           })
         )
       }
@@ -437,7 +443,7 @@ function AddTaskRow({ dimension, color }: { dimension: string; color: string }) 
         if (e.key === 'Enter' || e.key === ' ') {
           window.dispatchEvent(
             new CustomEvent('protagonist:open-oracle', {
-              detail: { prefill: `add task for ${dimension} — ` },
+              detail: { prefill: `add ${dimension} task — ` },
             })
           )
         }

@@ -3,7 +3,15 @@ import { cookies } from 'next/headers'
 import { isQuestDbConfigured, QUEST_XP_TABLE } from '@/lib/quest-db'
 import { supabase } from '@/lib/supabase'
 
-const VALID_DIMENSIONS = new Set(['career', 'social', 'wealth'])
+const VALID_DIMENSIONS = new Set([
+  'career',
+  'social',
+  'wealth',
+  'vitality',
+  'mind',
+  'love',
+  'family',
+])
 
 async function resolveUserId(request: Request): Promise<string | null> {
   const fromQuery = new URL(request.url).searchParams.get('userId')

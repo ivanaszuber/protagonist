@@ -1,11 +1,15 @@
 'use client'
 
-import { useEffect, useState, type CSSProperties, type ReactNode } from 'react'
+import { useEffect, useState, type ComponentType, type CSSProperties, type ReactNode } from 'react'
 import Link from 'next/link'
 import { StatBar } from '@/components/StatBar'
 import {
+  BlazeCharacterLarge,
   EchoCharacterLarge,
   ForgeCharacterLarge,
+  RootCharacterLarge,
+  SageCharacterLarge,
+  SolCharacterLarge,
   VaultCharacterLarge,
 } from '@/components/characters/CharacterHeroArt'
 import { getLevel } from '@/lib/xp'
@@ -51,17 +55,24 @@ interface OuraData {
   activity_score: number | null
 }
 
-const HERO_ART = {
+const HERO_ART: Record<Dimension, ComponentType> = {
   career: ForgeCharacterLarge,
   social: EchoCharacterLarge,
   wealth: VaultCharacterLarge,
-} as const
+  vitality: BlazeCharacterLarge,
+  mind: SageCharacterLarge,
+  love: SolCharacterLarge,
+  family: RootCharacterLarge,
+}
 
-/** Character nav dimensions → dimension_memories.dimension_id */
-const MEMORY_DIMENSION_ID: Record<Dimension, string> = {
-  career: 'create',
-  social: 'social',
-  wealth: 'wealth',
+const FLOAT_DELAYS: Record<Dimension, string> = {
+  career: '0s',
+  social: '0.5s',
+  wealth: '1s',
+  vitality: '0.25s',
+  mind: '0.75s',
+  love: '1.25s',
+  family: '1.5s',
 }
 
 function daysUntil(dateStr: string | null): number {
@@ -115,8 +126,7 @@ export function CharacterPage({ dimension }: CharacterPageProps) {
   const characterSlug = DIMENSION_TO_SLUG[dimension]
   const accentColor = char.color
   const HeroArt = HERO_ART[dimension]
-  const floatDelay =
-    dimension === 'career' ? '0s' : dimension === 'social' ? '0.5s' : '1s'
+  const floatDelay = FLOAT_DELAYS[dimension]
 
   const [quest, setQuest] = useState<QuestData | null>(null)
   const [oura, setOura] = useState<OuraData | null>(null)
@@ -131,24 +141,33 @@ export function CharacterPage({ dimension }: CharacterPageProps) {
 
   useEffect(() => {
     const uid = getUserId()
-    const memoryDim = MEMORY_DIMENSION_ID[dimension]
-    Promise.allSettled([
+    const memoryDim = CHARACTERS[dimension].memoryId
+    const fetches: Promise<unknown>[] = [
       fetch(`/api/quests/character/${dimension}?userId=${encodeURIComponent(uid)}`).then(
         (r) => r.json()
       ),
-      fetch(`/api/oura/sync?userId=${encodeURIComponent(uid)}`).then((r) => r.json()),
       fetch(
         `/api/memories?userId=${encodeURIComponent(uid)}&dimension=${encodeURIComponent(memoryDim)}&limit=3`
       ).then((r) => r.json()),
-    ]).then(([questRes, ouraRes, memoriesRes]) => {
+    ]
+    if (dimension === 'vitality') {
+      fetches.push(fetch(`/api/oura/sync?userId=${encodeURIComponent(uid)}`).then((r) => r.json()))
+    }
+    Promise.allSettled(fetches).then((results) => {
+      const questRes = results[0]
+      const memoriesRes = results[1]
+      const ouraRes = dimension === 'vitality' ? results[2] : null
       if (questRes.status === 'fulfilled') {
-        setQuest(questRes.value.quest ?? null)
-      }
-      if (ouraRes.status === 'fulfilled' && ouraRes.value?.data) {
-        setOura(ouraRes.value.data)
+        const val = questRes.value as { quest?: QuestData | null }
+        setQuest(val.quest ?? null)
       }
       if (memoriesRes.status === 'fulfilled') {
-        setOracleMemories(memoriesRes.value.memories ?? [])
+        const val = memoriesRes.value as { memories?: string[] }
+        setOracleMemories(val.memories ?? [])
+      }
+      if (ouraRes?.status === 'fulfilled') {
+        const val = ouraRes.value as { data?: OuraData }
+        if (val.data) setOura(val.data)
       }
       setLoading(false)
     })
@@ -350,23 +369,24 @@ export function CharacterPage({ dimension }: CharacterPageProps) {
           </div>
         </div>
 
-        {/* Today's stats */}
-        <LeftBorderCard accentColor={accentColor}>
-          <span style={{ fontSize: 11, color: '#5A4A7A', display: 'block', marginBottom: 10 }}>
-            Today&apos;s stats
-          </span>
-          <StatBar
-            label="Resilience"
-            value={oura?.readiness_score ?? null}
-            color="#34d399"
-          />
-          <StatBar label="Sleep" value={oura?.sleep_score ?? null} color="#60a5fa" />
-          <StatBar
-            label="Activity"
-            value={oura?.activity_score ?? null}
-            color="#EF9F27"
-          />
-        </LeftBorderCard>
+        {dimension === 'vitality' && (
+          <LeftBorderCard accentColor={accentColor}>
+            <span style={{ fontSize: 11, color: '#5A4A7A', display: 'block', marginBottom: 10 }}>
+              Today&apos;s stats
+            </span>
+            <StatBar
+              label="Resilience"
+              value={oura?.readiness_score ?? null}
+              color="#34d399"
+            />
+            <StatBar label="Sleep" value={oura?.sleep_score ?? null} color="#60a5fa" />
+            <StatBar
+              label="Activity"
+              value={oura?.activity_score ?? null}
+              color="#EF9F27"
+            />
+          </LeftBorderCard>
+        )}
 
         {/* Active quest */}
         {quest ? (

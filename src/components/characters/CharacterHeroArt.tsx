@@ -74,3 +74,8 @@ export function VaultCharacterLarge() {
     </svg>
   )
 }
+
+export { BlazeCharacterLarge } from './BlazeCharacter'
+export { SageCharacterLarge } from './SageCharacter'
+export { SolCharacterLarge } from './SolCharacter'
+export { RootCharacterLarge } from './RootCharacter'

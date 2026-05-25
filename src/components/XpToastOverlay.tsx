@@ -1,3 +1,5 @@
+import { CHARACTERS, type Dimension } from '@/lib/character'
+
 export interface XpToast {
   amount: number
   dimension: string
@@ -8,16 +10,12 @@ export interface LevelUpToast {
   dimension: string
 }
 
-const DIM_COLORS: Record<string, string> = {
-  career: '#EF9F27',
-  social: '#F0997B',
-  wealth: '#1D9E75',
+function dimColor(dimension: string): string {
+  return CHARACTERS[dimension as Dimension]?.color ?? '#9333EA'
 }
 
-const DIM_LABELS: Record<string, string> = {
-  career: 'Forge',
-  social: 'Echo',
-  wealth: 'Vault',
+function dimLabel(dimension: string): string {
+  return CHARACTERS[dimension as Dimension]?.name ?? 'Champion'
 }
 
 export function XpToastOverlay({
@@ -27,12 +25,8 @@ export function XpToastOverlay({
   xpToast: XpToast | null
   levelUpToast: LevelUpToast | null
 }) {
-  const dimColor = levelUpToast
-    ? (DIM_COLORS[levelUpToast.dimension] ?? '#9333EA')
-    : '#9333EA'
-  const dimLabel = levelUpToast
-    ? (DIM_LABELS[levelUpToast.dimension] ?? 'Champion')
-    : ''
+  const levelColor = levelUpToast ? dimColor(levelUpToast.dimension) : '#9333EA'
+  const levelLabel = levelUpToast ? dimLabel(levelUpToast.dimension) : ''
 
   return (
     <>
@@ -69,12 +63,12 @@ export function XpToastOverlay({
             bottom: 110,
             left: '50%',
             transform: 'translateX(-50%)',
-            background: `${dimColor}18`,
-            border: `1px solid ${dimColor}55`,
+            background: `${levelColor}18`,
+            border: `1px solid ${levelColor}55`,
             borderRadius: 14,
             padding: '12px 20px',
             fontSize: 13,
-            color: dimColor,
+            color: levelColor,
             zIndex: 60,
             pointerEvents: 'none',
             animation: 'xp-float 3s ease-out forwards',
@@ -84,7 +78,7 @@ export function XpToastOverlay({
         >
           <div style={{ fontSize: 18, marginBottom: 4 }}>⬆</div>
           <div style={{ fontWeight: 600 }}>
-            {dimLabel} Level {levelUpToast.level}
+            {levelLabel} Level {levelUpToast.level}
           </div>
           <div style={{ fontSize: 11, opacity: 0.7, marginTop: 2 }}>Level up!</div>
         </div>

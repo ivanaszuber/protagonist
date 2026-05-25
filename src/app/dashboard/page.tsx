@@ -5,7 +5,8 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { getLevel } from '@/lib/xp'
-import type { Dimension } from '@/lib/character'
+import { CHARACTERS, type Dimension } from '@/lib/character'
+import { DIMENSION_TO_SLUG } from '@/lib/tierName'
 import { getUserId } from '@/lib/user'
 import MoodTracker from '@/components/MoodTracker'
 import { StatBar } from '@/components/StatBar'
@@ -237,23 +238,23 @@ const CHARACTER_COMPONENTS: Record<string, FC> = {
   wealth: VaultCharacter,
 }
 
-const AREA_LABELS: Record<string, string> = {
-  career: 'Career',
-  social: 'Social',
-  wealth: 'Finances',
-}
+const AREA_LABELS: Record<Dimension, string> = Object.fromEntries(
+  (['career', 'social', 'wealth'] as Dimension[]).map((d) => [
+    d,
+    CHARACTERS[d].tagline.split(' & ')[0] ?? CHARACTERS[d].name,
+  ])
+) as Record<Dimension, string>
 
-const CHARACTER_COLORS: Record<string, string> = {
-  career: '#EF9F27',
-  social: '#F0997B',
-  wealth: '#1D9E75',
-}
+const CHARACTER_COLORS: Record<Dimension, string> = Object.fromEntries(
+  (['career', 'social', 'wealth'] as Dimension[]).map((d) => [d, CHARACTERS[d].color])
+) as Record<Dimension, string>
 
-const CHAR_PAGE: Record<string, string> = {
-  career: '/forge',
-  social: '/echo',
-  wealth: '/vault',
-}
+const CHAR_PAGE: Record<Dimension, string> = Object.fromEntries(
+  (['career', 'social', 'wealth'] as Dimension[]).map((d) => [
+    d,
+    `/${DIMENSION_TO_SLUG[d]}`,
+  ])
+) as Record<Dimension, string>
 
 function MissionCard({
   quest,
@@ -266,19 +267,18 @@ function MissionCard({
   completingTaskId,
 }: {
   quest: { title: string; vision?: string } | null
-  dimension: string
+  dimension: Dimension
   xp: number
   level: number
   todayTask: { id: string; title: string; completed: boolean; xp_reward: number } | null
   milestone: { title: string; daysLeft: number } | null
-  onCompleteTask: (taskId: string, xpReward: number, dimension: string) => void
+  onCompleteTask: (taskId: string, xpReward: number, dimension: Dimension) => void
   completingTaskId: string | null
 }) {
   const CharSvg = CHARACTER_COMPONENTS[dimension] ?? ForgeCharacter
   const areaLabel = AREA_LABELS[dimension] ?? dimension
   const color = CHARACTER_COLORS[dimension] ?? '#9333EA'
-  const charName =
-    dimension === 'career' ? 'Forge' : dimension === 'social' ? 'Echo' : 'Vault'
+  const charName = CHARACTERS[dimension].name
   const floatDelay =
     dimension === 'career' ? '0s' : dimension === 'social' ? '0.5s' : '1s'
 
@@ -773,6 +773,28 @@ export default function DashboardPage() {
               month: 'short',
             })}
           </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Link
+            href="/settings"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 32,
+              height: 32,
+              borderRadius: '50%',
+              background: '#140C28',
+              border: '0.5px solid #2D1B55',
+              color: '#5A4A7A',
+            }}
+            aria-label="Settings"
+          >
+            <svg width="16" height="12" viewBox="0 0 16 12" fill="none">
+              <line x1="0" y1="1" x2="16" y2="1" stroke="#5A4A7A" strokeWidth="1.5" strokeLinecap="round" />
+              <line x1="0" y1="6" x2="16" y2="6" stroke="#5A4A7A" strokeWidth="1.5" strokeLinecap="round" />
+              <line x1="0" y1="11" x2="16" y2="11" stroke="#5A4A7A" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
+          </Link>
           <button
             type="button"
             onClick={() => void handleSyncOura()}
@@ -795,6 +817,7 @@ export default function DashboardPage() {
               />
             </svg>
           </button>
+          </div>
         </div>
 
         <div
