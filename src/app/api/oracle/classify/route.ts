@@ -52,9 +52,9 @@ The user's active quests:
 ${questContext}
 
 Classify this input into one of three intents:
-1. TASK — user wants to create a task/to-do (keywords: "add", "remind", "schedule", "I need to", "don't forget", "book", "call", "send", "prep", "do", or any action item)
+1. TASK — ALWAYS use this if the message starts with or contains "add task", "add a task", "new task", "create task", "remind me to", "I need to", "don't forget", "book", "schedule", "prep", or any clear action item the user wants to track. When in doubt between TASK and CHAT, choose TASK.
 2. NOTE — user is journaling, reflecting, or sharing feelings (emotional, reflective, no clear action item)
-3. CHAT — user has a question or wants Oracle's guidance
+3. CHAT — ONLY use this for questions, requests for advice, or open-ended conversation with no action item to track. Never use CHAT if there's an action item present.
 
 For TASK, extract:
 - title: clean task title (remove filler words like "add task" or "remind me to")

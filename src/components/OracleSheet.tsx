@@ -145,14 +145,7 @@ export function OracleSheet() {
     if (!inChat) setState('thinking')
 
     try {
-      if (inChat) {
-        setChatMessages((prev) => [...prev, { role: 'user', text }])
-        setInputText('')
-        const reply = await sendChatToArc(text)
-        setChatMessages((prev) => [...prev, { role: 'oracle', text: reply }])
-        return
-      }
-
+      // Always classify first — even mid-chat, so "add task X" works in any state
       const res = await fetch('/api/oracle/classify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -194,14 +187,18 @@ export function OracleSheet() {
         setResult({ ...data, oracleReply: arcReply })
         setState('note-done')
       } else {
-        const reply =
-          data.oracleReply ?? (await sendChatToArc(text))
-        setChatMessages([
-          { role: 'user', text },
-          { role: 'oracle', text: reply },
-        ])
-        setInputText('')
-        setState('chat')
+        // CHAT intent — works whether starting fresh or already mid-conversation
+        if (inChat) {
+          setChatMessages((prev) => [...prev, { role: 'user', text }])
+          setInputText('')
+          const reply = await sendChatToArc(text)
+          setChatMessages((prev) => [...prev, { role: 'oracle', text: reply }])
+        } else {
+          const reply = data.oracleReply ?? (await sendChatToArc(text))
+          setChatMessages([{ role: 'user', text }, { role: 'oracle', text: reply }])
+          setInputText('')
+          setState('chat')
+        }
       }
     } catch {
       if (!inChat) setState('idle')
