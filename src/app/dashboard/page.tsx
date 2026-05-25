@@ -301,7 +301,7 @@ const CHARACTER_COLORS: Record<Dimension, string> = Object.fromEntries(
 ) as Record<Dimension, string>
 
 const CHAR_PAGE: Record<Dimension, string> = Object.fromEntries(
-  Object.keys(CHARACTERS).map((d) => [d, `/${DIMENSION_TO_SLUG[d]}`])
+  Object.keys(CHARACTERS).map((d) => [d, `/${DIMENSION_TO_SLUG[d as Dimension]}`])
 ) as Record<Dimension, string>
 
 function MissionCard({
