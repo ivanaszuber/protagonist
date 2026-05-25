@@ -200,6 +200,69 @@ export default function BottomNav() {
         </svg>
       ),
     },
+    {
+      href: '/tasks',
+      label: 'Tasks',
+      icon: (active) => (
+        <svg width="20" height="22" viewBox="0 0 24 26" fill="none">
+          <rect
+            x="3"
+            y="3"
+            width="18"
+            height="20"
+            rx="4"
+            fill={active ? 'rgba(147,51,234,0.15)' : 'transparent'}
+            stroke={active ? '#9333EA' : '#2D1B55'}
+            strokeWidth="1.2"
+          />
+          <rect x="8" y="1" width="8" height="4" rx="2" fill={active ? '#9333EA' : '#2D1B55'} />
+          <circle cx="7.5" cy="10" r="1.5" fill={active ? '#9333EA' : '#6A5A8A'} />
+          <line
+            x1="10.5"
+            y1="10"
+            x2="18"
+            y2="10"
+            stroke={active ? '#9333EA' : '#6A5A8A'}
+            strokeWidth="1.2"
+            strokeLinecap="round"
+          />
+          <circle
+            cx="7.5"
+            cy="15"
+            r="1.5"
+            fill={active ? '#C084FC' : '#6A5A8A'}
+            opacity={active ? 0.7 : 0.5}
+          />
+          <line
+            x1="10.5"
+            y1="15"
+            x2="16"
+            y2="15"
+            stroke={active ? '#C084FC' : '#6A5A8A'}
+            strokeWidth="1.2"
+            strokeLinecap="round"
+            opacity={active ? 0.7 : 0.5}
+          />
+          <circle
+            cx="7.5"
+            cy="20"
+            r="1.5"
+            fill={active ? '#C084FC' : '#6A5A8A'}
+            opacity={active ? 0.4 : 0.3}
+          />
+          <line
+            x1="10.5"
+            y1="20"
+            x2="14"
+            y2="20"
+            stroke={active ? '#C084FC' : '#6A5A8A'}
+            strokeWidth="1.2"
+            strokeLinecap="round"
+            opacity={active ? 0.4 : 0.3}
+          />
+        </svg>
+      ),
+    },
   ]
 
   return (

@@ -5,7 +5,9 @@ import { supabase } from '@/lib/supabase'
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const userId = searchParams.get('userId')
-  const date = searchParams.get('date') ?? new Date().toISOString().split('T')[0]
+  const date = searchParams.get('date')
+  const someday = searchParams.get('someday') === 'true'
+  const dimension = searchParams.get('dimension')
 
   if (!userId) {
     return NextResponse.json({ error: 'userId required' }, { status: 400 })
@@ -15,12 +17,23 @@ export async function GET(request: Request) {
     return NextResponse.json({ tasks: [] })
   }
 
-  const { data, error } = await supabase
+  let query = supabase
     .from('tasks')
     .select('*')
     .eq('user_id', userId)
-    .eq('task_date', date)
-    .order('created_at')
+    .order('created_at', { ascending: true })
+
+  if (someday) {
+    query = query.is('task_date', null)
+  } else if (date) {
+    query = query.eq('task_date', date)
+  }
+
+  if (dimension) {
+    query = query.eq('dimension', dimension)
+  }
+
+  const { data, error } = await query
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
@@ -41,6 +54,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Database not configured' }, { status: 503 })
   }
 
+  const resolvedDate =
+    taskDate === undefined || taskDate === ''
+      ? null
+      : taskDate
+
   const { data, error } = await supabase
     .from('tasks')
     .insert({
@@ -48,7 +66,7 @@ export async function POST(request: Request) {
       dimension,
       title,
       xp_reward: xpReward,
-      task_date: taskDate ?? new Date().toISOString().split('T')[0],
+      task_date: resolvedDate,
       milestone_id: milestoneId ?? null,
     })
     .select()

@@ -497,6 +497,50 @@ function MissionCard({
           </div>
         )}
 
+        {!todayTask && (
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={(e) => {
+              e.stopPropagation()
+              window.dispatchEvent(
+                new CustomEvent('protagonist:open-oracle', {
+                  detail: { prefill: `add task for ${areaLabel} today — `, dimension },
+                })
+              )
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.stopPropagation()
+                window.dispatchEvent(
+                  new CustomEvent('protagonist:open-oracle', {
+                    detail: { prefill: `add task for ${areaLabel} today — `, dimension },
+                  })
+                )
+              }
+            }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              cursor: 'pointer',
+              padding: '2px 0',
+            }}
+          >
+            <div
+              style={{
+                width: 14,
+                height: 14,
+                borderRadius: '50%',
+                border: `1.5px dashed ${color}`,
+                flexShrink: 0,
+                opacity: 0.5,
+              }}
+            />
+            <span style={{ fontSize: 9, color: '#5A4A7A' }}>+ Add task for today</span>
+          </div>
+        )}
+
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
           <span style={{ fontSize: 8, color: '#3D3358', whiteSpace: 'nowrap' }}>
             {xpInLevel} / 500 XP
@@ -549,7 +593,6 @@ function MissionCard({
 }
 
 export default function DashboardPage() {
-  const router = useRouter()
   const userId = useRef(getUserId())
   const [oura, setOura] = useState<OuraData | null>(null)
   const [quests, setQuests] = useState<MainQuest[]>([])
@@ -924,65 +967,6 @@ export default function DashboardPage() {
             </span>
           </div>
         )}
-      </div>
-
-      <div
-        style={{
-          position: 'fixed',
-          bottom: 96,
-          right: 20,
-          width: 54,
-          height: 54,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 40,
-        }}
-      >
-        <div
-          style={{
-            position: 'absolute',
-            inset: 0,
-            borderRadius: '50%',
-            border: '1.5px solid #9333EA',
-            animation: 'oracle-ring 2.2s ease-out infinite',
-          }}
-        />
-        <div
-          style={{
-            position: 'absolute',
-            inset: 0,
-            borderRadius: '50%',
-            border: '1.5px solid #9333EA',
-            animation: 'oracle-ring 2.2s ease-out infinite',
-            animationDelay: '1.1s',
-          }}
-        />
-        <button
-          type="button"
-          onClick={() => router.push('/oracle')}
-          aria-label="Oracle"
-          style={{
-            width: 54,
-            height: 54,
-            borderRadius: '50%',
-            background: '#200A45',
-            border: '2px solid #9333EA',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: 'pointer',
-            position: 'relative',
-            animation: 'oracle-breathe 3s ease-in-out infinite',
-          }}
-        >
-          <svg width="26" height="26" viewBox="0 0 26 26" fill="none">
-            <ellipse cx="13" cy="13" rx="11" ry="7.5" stroke="#9333EA" strokeWidth="1.5" />
-            <ellipse cx="13" cy="13" rx="4.5" ry="4.5" stroke="#C084FC" strokeWidth="1.2" />
-            <circle cx="13" cy="13" r="2.5" fill="#E879F9" />
-            <circle cx="11.5" cy="11.5" r="1" fill="white" opacity={0.55} />
-          </svg>
-        </button>
       </div>
 
     </main>

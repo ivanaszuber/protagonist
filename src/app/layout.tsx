@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import { Space_Grotesk } from 'next/font/google'
-import { ArcChat } from '@/components/arc/ArcChat'
+import { OracleSheet } from '@/components/OracleSheet'
 import BottomNav from '@/components/BottomNav'
 import './globals.css'
 
@@ -45,7 +45,7 @@ export default function RootLayout({
       >
         {children}
         <BottomNav />
-        <ArcChat />
+        <OracleSheet />
       </body>
     </html>
   )
