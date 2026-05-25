@@ -187,22 +187,8 @@ function EchoCharacter() {
       <circle cx="11" cy="18" r="2" fill="white" opacity={0.6} />
       <circle cx="24" cy="18" r="2" fill="white" opacity={0.6} />
       <rect x="7" y="34" width="22" height="16" rx="5" fill="#D85A30" />
-      <path
-        d="M33 30Q37 35 33 40"
-        stroke="#F0997B"
-        strokeWidth="2"
-        strokeLinecap="round"
-        fill="none"
-        opacity={0.85}
-      />
-      <path
-        d="M36 27Q42 35 36 43"
-        stroke="#F0997B"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        fill="none"
-        opacity={0.4}
-      />
+      <path d="M33 30Q37 35 33 40" stroke="#F0997B" strokeWidth="2" strokeLinecap="round" fill="none" opacity={0.85} />
+      <path d="M36 27Q42 35 36 43" stroke="#F0997B" strokeWidth="1.5" strokeLinecap="round" fill="none" opacity={0.4} />
     </svg>
   )
 }
@@ -219,15 +205,79 @@ function VaultCharacter() {
       <circle cx="11" cy="22" r="2" fill="white" opacity={0.6} />
       <circle cx="24" cy="22" r="2" fill="white" opacity={0.6} />
       <rect x="7" y="38" width="22" height="16" rx="5" fill="#0F6E56" />
-      <path
-        d="M11 51L16 47L20 49L26 44"
-        stroke="#1D9E75"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        fill="none"
-        opacity={0.75}
-      />
+      <path d="M11 51L16 47L20 49L26 44" stroke="#1D9E75" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" opacity={0.75} />
+    </svg>
+  )
+}
+
+function BlazeCharacter() {
+  return (
+    <svg width="44" height="54" viewBox="0 0 44 54" fill="none">
+      <path d="M18 8 C18 4 22 2 22 2 C22 2 26 4 26 8 C26 12 22 14 22 14 C22 14 18 12 18 8Z" fill="#F43F5E" opacity={0.9} />
+      <path d="M20 9 C20 6.5 22 5 22 5 C22 5 24 6.5 24 9 C24 11 22 12.5 22 12.5 C22 12.5 20 11 20 9Z" fill="#FF6B85" opacity={0.7} />
+      <rect x="3" y="12" width="30" height="24" rx="9" fill="#F43F5E" />
+      <circle cx="13" cy="24" r="6" fill="#3B0010" />
+      <circle cx="26" cy="24" r="6" fill="#3B0010" />
+      <circle cx="11" cy="22" r="2" fill="white" opacity={0.6} />
+      <circle cx="24" cy="22" r="2" fill="white" opacity={0.6} />
+      <rect x="7" y="38" width="22" height="16" rx="5" fill="#BE123C" />
+      <polyline points="9,47 12,47 14,43 16,51 18,45 20,47 23,47 25,47 27,47" stroke="#F43F5E" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" fill="none" opacity={0.7} />
+    </svg>
+  )
+}
+
+function SageCharacter() {
+  return (
+    <svg width="44" height="54" viewBox="0 0 44 54" fill="none">
+      <circle cx="22" cy="6" r="3" fill="#818CF8" opacity={0.9} />
+      <circle cx="26" cy="3" r="2.2" fill="#818CF8" opacity={0.65} />
+      <circle cx="29" cy="1.5" r="1.4" fill="#818CF8" opacity={0.4} />
+      <rect x="3" y="10" width="30" height="24" rx="9" fill="#818CF8" />
+      <circle cx="12.5" cy="22" r="6.5" fill="#1E1B4B" />
+      <circle cx="26" cy="22" r="6.5" fill="#1E1B4B" />
+      <circle cx="10" cy="19.5" r="2.5" fill="white" opacity={0.6} />
+      <circle cx="23.5" cy="19.5" r="2.5" fill="white" opacity={0.6} />
+      <rect x="7" y="36" width="22" height="16" rx="5" fill="#4338CA" />
+      <circle cx="12" cy="41" r="1.8" fill="#818CF8" opacity={0.7} />
+      <circle cx="18" cy="44" r="1.8" fill="#818CF8" opacity={0.7} />
+      <circle cx="24" cy="41" r="1.8" fill="#818CF8" opacity={0.7} />
+      <line x1="12" y1="41" x2="18" y2="44" stroke="#818CF8" strokeWidth="1" opacity={0.5} />
+      <line x1="18" y1="44" x2="24" y2="41" stroke="#818CF8" strokeWidth="1" opacity={0.5} />
+    </svg>
+  )
+}
+
+function SolCharacter() {
+  return (
+    <svg width="44" height="54" viewBox="0 0 44 54" fill="none">
+      <path d="M22 10 C22 10 17 5 17 3 C17 1 19 0 20.5 1 C21.2 1.5 22 2.5 22 2.5 C22 2.5 22.8 1.5 23.5 1 C25 0 27 1 27 3 C27 5 22 10 22 10Z" fill="#F472B6" opacity={0.9} />
+      <rect x="3" y="11" width="30" height="24" rx="9" fill="#F472B6" />
+      <circle cx="13" cy="23" r="6" fill="#4A0020" />
+      <circle cx="26" cy="23" r="6" fill="#4A0020" />
+      <circle cx="11" cy="21" r="2" fill="white" opacity={0.6} />
+      <circle cx="24" cy="21" r="2" fill="white" opacity={0.6} />
+      <rect x="7" y="37" width="22" height="16" rx="5" fill="#BE185D" />
+      <circle cx="15" cy="45" r="4.5" fill="none" stroke="#F472B6" strokeWidth="1.5" opacity={0.7} />
+      <circle cx="21" cy="45" r="4.5" fill="none" stroke="#F472B6" strokeWidth="1.5" opacity={0.7} />
+    </svg>
+  )
+}
+
+function RootCharacter() {
+  return (
+    <svg width="44" height="54" viewBox="0 0 44 54" fill="none">
+      <path d="M22 10 C22 10 18 6 18 3 C18 1 20 0 22 2 C24 0 26 1 26 3 C26 6 22 10 22 10Z" fill="#4ADE80" opacity={0.9} />
+      <line x1="22" y1="10" x2="22" y2="13" stroke="#4ADE80" strokeWidth="1.2" opacity={0.6} />
+      <rect x="3" y="12" width="30" height="24" rx="9" fill="#4ADE80" />
+      <circle cx="13" cy="24" r="6" fill="#052E16" />
+      <circle cx="26" cy="24" r="6" fill="#052E16" />
+      <circle cx="11" cy="22" r="2" fill="white" opacity={0.6} />
+      <circle cx="24" cy="22" r="2" fill="white" opacity={0.6} />
+      <rect x="7" y="38" width="22" height="16" rx="5" fill="#16A34A" />
+      <rect x="11" y="41" width="6" height="8" rx="2" fill="#4ADE80" opacity={0.5} />
+      <circle cx="14" cy="40" r="2.5" fill="#4ADE80" opacity={0.6} />
+      <rect x="20" y="44" width="4" height="6" rx="1.5" fill="#4ADE80" opacity={0.4} />
+      <circle cx="22" cy="43" r="1.8" fill="#4ADE80" opacity={0.5} />
     </svg>
   )
 }
@@ -236,24 +286,22 @@ const CHARACTER_COMPONENTS: Record<string, FC> = {
   career: ForgeCharacter,
   social: EchoCharacter,
   wealth: VaultCharacter,
+  vitality: BlazeCharacter,
+  mind: SageCharacter,
+  love: SolCharacter,
+  family: RootCharacter,
 }
 
 const AREA_LABELS: Record<Dimension, string> = Object.fromEntries(
-  (['career', 'social', 'wealth'] as Dimension[]).map((d) => [
-    d,
-    CHARACTERS[d].tagline.split(' & ')[0] ?? CHARACTERS[d].name,
-  ])
+  Object.keys(CHARACTERS).map((d) => [d, CHARACTERS[d as Dimension].name])
 ) as Record<Dimension, string>
 
 const CHARACTER_COLORS: Record<Dimension, string> = Object.fromEntries(
-  (['career', 'social', 'wealth'] as Dimension[]).map((d) => [d, CHARACTERS[d].color])
+  Object.keys(CHARACTERS).map((d) => [d, CHARACTERS[d as Dimension].color])
 ) as Record<Dimension, string>
 
 const CHAR_PAGE: Record<Dimension, string> = Object.fromEntries(
-  (['career', 'social', 'wealth'] as Dimension[]).map((d) => [
-    d,
-    `/${DIMENSION_TO_SLUG[d]}`,
-  ])
+  Object.keys(CHARACTERS).map((d) => [d, `/${DIMENSION_TO_SLUG[d]}`])
 ) as Record<Dimension, string>
 
 function MissionCard({
@@ -279,8 +327,11 @@ function MissionCard({
   const areaLabel = AREA_LABELS[dimension] ?? dimension
   const color = CHARACTER_COLORS[dimension] ?? '#9333EA'
   const charName = CHARACTERS[dimension].name
-  const floatDelay =
-    dimension === 'career' ? '0s' : dimension === 'social' ? '0.5s' : '1s'
+  const FLOAT_DELAYS: Record<string, string> = {
+    career: '0s', social: '0.3s', wealth: '0.6s',
+    vitality: '0.9s', mind: '1.2s', love: '1.5s', family: '1.8s',
+  }
+  const floatDelay = FLOAT_DELAYS[dimension] ?? '0s'
 
   const xpInLevel = xp % 500
   const pct = Math.round((xpInLevel / 500) * 100)
@@ -678,7 +729,7 @@ export default function DashboardPage() {
       .catch(() => {})
   }, [])
 
-  async function handleCompleteTask(taskId: string, xpReward: number, dimension: string) {
+  async function handleCompleteTask(taskId: string, xpReward: number, dimension: Dimension) {
     setCompletingTaskId(taskId)
     // Optimistic update — mark completed + add XP immediately so the UI snaps
     setQuests((prev) =>
@@ -767,7 +818,7 @@ export default function DashboardPage() {
   const oracle = oura ? getOracleVerdict(oura, todayMood) : null
   const cycleLabel = oura ? formatCyclePhase(oura.cycle_phase, oura.cycle_day) : ''
 
-  const ORDER: Dimension[] = ['career', 'social', 'wealth']
+  const ORDER: Dimension[] = ['career', 'social', 'wealth', 'vitality', 'mind', 'love', 'family']
 
   return (
     <main

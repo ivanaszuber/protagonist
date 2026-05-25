@@ -269,18 +269,22 @@ export async function fetchOuraDailyData(
     }
   }
 
-  // Oura only finalises daily_activity score after ~22:00 — fall back to yesterday if null
+  // Oura only finalises daily_activity score after ~22:00.
+  // Scan back up to 7 days in one request to find the most recent finalised score.
   if (result.activity_score === null) {
     try {
+      const weekAgo = new Date(Date.now() - 7 * 86_400_000).toISOString().split('T')[0]
       const yesterday = new Date(Date.now() - 86_400_000).toISOString().split('T')[0]
-      const yRes = await fetch(
-        `https://api.ouraring.com/v2/usercollection/daily_activity?start_date=${yesterday}&end_date=${yesterday}`,
+      const rangeRes = await fetch(
+        `${OURA_BASE}/usercollection/daily_activity?start_date=${weekAgo}&end_date=${yesterday}`,
         { headers }
       )
-      if (yRes.ok) {
-        const yData = await yRes.json()
-        const yActivity = yData.data?.[0]
-        if (yActivity?.score) result.activity_score = yActivity.score
+      if (rangeRes.ok) {
+        const rangeData = await rangeRes.json()
+        const activities = (rangeData.data ?? []) as Array<{ score?: number | null }>
+        // Oura returns ascending order — reverse to get most recent first
+        const recent = [...activities].reverse().find((a) => a.score != null)
+        if (recent?.score != null) result.activity_score = recent.score
       }
     } catch {
       // fallback failed — leave as null

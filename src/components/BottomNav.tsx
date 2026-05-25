@@ -7,23 +7,14 @@ import { DimensionNavIcon } from '@/components/DimensionNavIcon'
 import { CHARACTERS, type Dimension } from '@/lib/character'
 import { getPinnedDimensions } from '@/lib/pinnedDimensions'
 import { DIMENSION_TO_SLUG } from '@/lib/tierName'
-import { getLevel } from '@/lib/xp'
-import { getUserId } from '@/lib/user'
-
-interface MainQuestRow {
-  dimension: string
-  xp?: number
-}
 
 function CharacterNavSlot({
   dimension,
   slotIndex,
-  level,
   pathname,
 }: {
   dimension: Dimension
   slotIndex: number
-  level: number
   pathname: string
 }) {
   const router = useRouter()
@@ -82,12 +73,7 @@ function CharacterNavSlot({
       aria-label={`${char.name}. Long press to change pinned character.`}
     >
       <DimensionNavIcon dimension={dimension} active={isActive} />
-      <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-        <span style={{ fontSize: 10, color: isActive ? char.color : '#6A5A8A' }}>{char.name}</span>
-        <span style={{ fontSize: 8, color: isActive ? char.color : '#6A5A8A', opacity: 0.7 }}>
-          {level}
-        </span>
-      </div>
+      <span style={{ fontSize: 10, color: isActive ? char.color : '#6A5A8A' }}>{char.name}</span>
       {isActive && (
         <div
           style={{
@@ -113,43 +99,8 @@ export default function BottomNav() {
     'social',
     'wealth',
   ])
-  const [levels, setLevels] = useState<Record<Dimension, number>>({
-    career: 1,
-    social: 1,
-    wealth: 1,
-    vitality: 1,
-    mind: 1,
-    love: 1,
-    family: 1,
-  })
-
   useEffect(() => {
     setPinned(getPinnedDimensions())
-  }, [pathname])
-
-  useEffect(() => {
-    const uid = getUserId()
-    fetch(`/api/quests/main?userId=${encodeURIComponent(uid)}`)
-      .then((r) => r.json())
-      .then((data: { quests?: MainQuestRow[] }) => {
-        const map: Record<Dimension, number> = {
-          career: 1,
-          social: 1,
-          wealth: 1,
-          vitality: 1,
-          mind: 1,
-          love: 1,
-          family: 1,
-        }
-        for (const quest of data.quests ?? []) {
-          const dim = quest.dimension as Dimension
-          if (dim in map) {
-            map[dim] = getLevel(quest.xp ?? 0)
-          }
-        }
-        setLevels(map)
-      })
-      .catch(() => {})
   }, [pathname])
 
   return (
@@ -265,7 +216,6 @@ export default function BottomNav() {
           key={`${dim}-${i}`}
           dimension={dim}
           slotIndex={i}
-          level={levels[dim]}
           pathname={pathname}
         />
       ))}
