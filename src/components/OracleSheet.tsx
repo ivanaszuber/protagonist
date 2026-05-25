@@ -277,7 +277,7 @@ export function OracleSheet() {
           position: 'fixed',
           inset: 0,
           background: 'rgba(0,0,0,0.5)',
-          zIndex: 48,
+          zIndex: 55,
         }}
       />
 
@@ -287,7 +287,7 @@ export function OracleSheet() {
           bottom: 0,
           left: 0,
           right: 0,
-          zIndex: 49,
+          zIndex: 56,
           background: '#140C28',
           borderRadius: '20px 20px 0 0',
           borderTop: '0.5px solid #2D1B55',
