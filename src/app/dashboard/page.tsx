@@ -10,7 +10,7 @@ import { DIMENSION_TO_SLUG } from '@/lib/tierName'
 import { getUserId } from '@/lib/user'
 import MoodTracker from '@/components/MoodTracker'
 import { StatBar } from '@/components/StatBar'
-import { XpToastOverlay, type XpToast, type LevelUpToast } from '@/components/XpToastOverlay'
+import { XpToastOverlay, showXpFeedback, type XpToast, type LevelUpToast } from '@/components/XpToastOverlay'
 
 interface OuraData {
   readiness_score: number | null
@@ -680,6 +680,18 @@ export default function DashboardPage() {
 
   async function handleCompleteTask(taskId: string, xpReward: number, dimension: string) {
     setCompletingTaskId(taskId)
+    // Optimistic update — mark completed + add XP immediately so the UI snaps
+    setQuests((prev) =>
+      prev.map((q) =>
+        q.dimension === dimension && q.today_task?.id === taskId
+          ? {
+              ...q,
+              xp: q.xp + xpReward,
+              today_task: { ...q.today_task!, completed: true },
+            }
+          : q
+      )
+    )
     try {
       const res = await fetch(`/api/quests/tasks/${taskId}/complete`, {
         method: 'POST',
@@ -688,28 +700,41 @@ export default function DashboardPage() {
       })
       const data = await res.json()
       if (res.ok) {
+        showXpFeedback({ dimension }, data, setXpToast, setLevelUpToast)
+        // Silent re-fetch to sync actual XP from DB without showing loading spinner
+        fetch(`/api/quests/main?userId=${encodeURIComponent(userId.current)}`)
+          .then((r) => r.json())
+          .then((d: { quests?: MainQuest[] }) => {
+            if (d.quests) setQuests(d.quests)
+          })
+          .catch(() => {})
+      } else {
+        // Rollback optimistic update on failure
         setQuests((prev) =>
           prev.map((q) =>
             q.dimension === dimension && q.today_task?.id === taskId
               ? {
                   ...q,
-                  xp: q.xp + (data.xp_earned ?? xpReward),
-                  today_task: { ...q.today_task!, completed: true },
+                  xp: q.xp - xpReward,
+                  today_task: { ...q.today_task!, completed: false },
                 }
               : q
           )
         )
-        if (data.xp_earned) {
-          setXpToast({ amount: data.xp_earned, dimension })
-          setTimeout(() => setXpToast(null), 2500)
-        }
-        if (data.leveled_up && data.new_level) {
-          setTimeout(() => {
-            setLevelUpToast({ level: data.new_level, dimension })
-            setTimeout(() => setLevelUpToast(null), 3000)
-          }, 600)
-        }
       }
+    } catch {
+      // Rollback on network error
+      setQuests((prev) =>
+        prev.map((q) =>
+          q.dimension === dimension && q.today_task?.id === taskId
+            ? {
+                ...q,
+                xp: q.xp - xpReward,
+                today_task: { ...q.today_task!, completed: false },
+              }
+            : q
+        )
+      )
     } finally {
       setCompletingTaskId(null)
     }
@@ -924,7 +949,37 @@ export default function DashboardPage() {
             </div>
           )}
 
-          {!hasCheckedInToday && (
+          {hasCheckedInToday ? (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '8px 4px',
+                marginTop: 10,
+                marginBottom: 4,
+              }}
+            >
+              <div
+                style={{
+                  width: 18,
+                  height: 18,
+                  borderRadius: '50%',
+                  background: 'rgba(52,211,153,0.15)',
+                  border: '1px solid rgba(52,211,153,0.4)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                }}
+              >
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                  <path d="M2 5l2.5 2.5 4-4" stroke="#34d399" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </div>
+              <span style={{ fontSize: 11, color: '#34d399', opacity: 0.7 }}>Checked in today</span>
+            </div>
+          ) : (
             <button
               type="button"
               onClick={() => {
@@ -938,8 +993,8 @@ export default function DashboardPage() {
               style={{
                 width: '100%',
                 padding: '13px 16px',
-                background: 'linear-gradient(135deg, #1A0D35 0%, #200A45 100%)',
-                border: '1px solid rgba(147,51,234,0.3)',
+                background: 'rgba(147,51,234,0.06)',
+                border: '1px solid rgba(147,51,234,0.25)',
                 borderRadius: 14,
                 display: 'flex',
                 alignItems: 'center',

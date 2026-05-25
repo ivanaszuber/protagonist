@@ -5,10 +5,18 @@
   --foreground: #f0ecff;
 }
 
+html,
 body {
   background: var(--bg);
   color: var(--foreground);
   margin: 0;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  display: none;
 }
 
 .scrollbar-hide {
