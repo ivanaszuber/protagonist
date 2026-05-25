@@ -269,6 +269,24 @@ export async function fetchOuraDailyData(
     }
   }
 
+  // Oura only finalises daily_activity score after ~22:00 — fall back to yesterday if null
+  if (result.activity_score === null) {
+    try {
+      const yesterday = new Date(Date.now() - 86_400_000).toISOString().split('T')[0]
+      const yRes = await fetch(
+        `https://api.ouraring.com/v2/usercollection/daily_activity?start_date=${yesterday}&end_date=${yesterday}`,
+        { headers }
+      )
+      if (yRes.ok) {
+        const yData = await yRes.json()
+        const yActivity = yData.data?.[0]
+        if (yActivity?.score) result.activity_score = yActivity.score
+      }
+    } catch {
+      // fallback failed — leave as null
+    }
+  }
+
   if (detailedSleepRes.status === 'fulfilled' && detailedSleepRes.value.ok) {
     const sleepDetail = await detailedSleepRes.value.json()
     const periods: OuraSleepPeriod[] = sleepDetail.data ?? []

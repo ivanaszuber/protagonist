@@ -302,27 +302,14 @@ export default function BottomNav() {
             }}
           >
             {item.icon(isActive)}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-              <span
-                style={{
-                  fontSize: 10,
-                  color: isActive ? accent : '#6A5A8A',
-                }}
-              >
-                {item.label}
-              </span>
-              {level !== undefined && (
-                <span
-                  style={{
-                    fontSize: 8,
-                    color: isActive ? accent : '#6A5A8A',
-                    opacity: 0.7,
-                  }}
-                >
-                  {level}
-                </span>
-              )}
-            </div>
+            <span
+              style={{
+                fontSize: 10,
+                color: isActive ? accent : '#6A5A8A',
+              }}
+            >
+              {item.label}
+            </span>
             {isActive && (
               <div
                 style={{

@@ -9,6 +9,7 @@ import type { Dimension } from '@/lib/character'
 import { getUserId } from '@/lib/user'
 import MoodTracker from '@/components/MoodTracker'
 import { StatBar } from '@/components/StatBar'
+import { XpToastOverlay, type XpToast, type LevelUpToast } from '@/components/XpToastOverlay'
 
 interface OuraData {
   readiness_score: number | null
@@ -600,7 +601,11 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [todayMood, setTodayMood] = useState<number | null>(null)
   const [hasCheckedInToday, setHasCheckedInToday] = useState(false)
+  const [witnessInsight, setWitnessInsight] = useState<string | null>(null)
+  const [witnessDismissed, setWitnessDismissed] = useState(false)
   const [completingTaskId, setCompletingTaskId] = useState<string | null>(null)
+  const [xpToast, setXpToast] = useState<XpToast | null>(null)
+  const [levelUpToast, setLevelUpToast] = useState<LevelUpToast | null>(null)
 
   const loadDashboard = useCallback(async () => {
     const uid = userId.current
@@ -647,6 +652,32 @@ export default function DashboardPage() {
     void loadDashboard()
   }, [loadDashboard])
 
+  // Refresh quests when Oracle adds a task (so it appears on the card immediately)
+  useEffect(() => {
+    const handler = () => void loadDashboard()
+    window.addEventListener('protagonist:task-added', handler)
+    return () => window.removeEventListener('protagonist:task-added', handler)
+  }, [loadDashboard])
+
+  useEffect(() => {
+    const dismissedKey = `witness_dismissed_${new Date().toISOString().split('T')[0].slice(0, 7)}`
+    const alreadyDismissed = localStorage.getItem(dismissedKey) === 'true'
+    if (alreadyDismissed) {
+      setWitnessDismissed(true)
+      return
+    }
+
+    const uid = getUserId()
+    fetch(`/api/witness?userId=${encodeURIComponent(uid)}`)
+      .then((r) => r.json())
+      .then((d: { insight?: string | null }) => {
+        if (d.insight) {
+          setWitnessInsight(d.insight)
+        }
+      })
+      .catch(() => {})
+  }, [])
+
   async function handleCompleteTask(taskId: string, xpReward: number, dimension: string) {
     setCompletingTaskId(taskId)
     try {
@@ -668,6 +699,16 @@ export default function DashboardPage() {
               : q
           )
         )
+        if (data.xp_earned) {
+          setXpToast({ amount: data.xp_earned, dimension })
+          setTimeout(() => setXpToast(null), 2500)
+        }
+        if (data.leveled_up && data.new_level) {
+          setTimeout(() => {
+            setLevelUpToast({ level: data.new_level, dimension })
+            setTimeout(() => setLevelUpToast(null), 3000)
+          }, 600)
+        }
       }
     } finally {
       setCompletingTaskId(null)
@@ -940,6 +981,93 @@ export default function DashboardPage() {
           />
         </div>
 
+        {witnessInsight && !witnessDismissed && (
+          <div
+            style={{
+              background: 'linear-gradient(135deg, #12083A 0%, #1A0D35 100%)',
+              border: '1px solid rgba(147,51,234,0.25)',
+              borderLeft: '3px solid #9333EA',
+              borderRadius: 14,
+              padding: '14px 16px',
+              marginBottom: 12,
+              position: 'relative',
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => {
+                setWitnessDismissed(true)
+                const dismissedKey = `witness_dismissed_${new Date().toISOString().split('T')[0].slice(0, 7)}`
+                localStorage.setItem(dismissedKey, 'true')
+              }}
+              style={{
+                position: 'absolute',
+                top: 10,
+                right: 10,
+                background: 'transparent',
+                border: 'none',
+                color: '#3D2878',
+                cursor: 'pointer',
+                fontSize: 16,
+                lineHeight: 1,
+                padding: '2px 6px',
+              }}
+              aria-label="Dismiss"
+            >
+              ×
+            </button>
+
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, paddingRight: 24 }}>
+              <div
+                style={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: '50%',
+                  background: '#200A45',
+                  border: '1px solid rgba(147,51,234,0.4)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                  marginTop: 1,
+                }}
+              >
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                  <ellipse cx="8" cy="8" rx="7" ry="4.5" stroke="#9333EA" strokeWidth="1.2" />
+                  <circle cx="8" cy="8" r="2.5" stroke="#C084FC" strokeWidth="1" />
+                  <circle cx="8" cy="8" r="1.2" fill="#E879F9" />
+                  <circle cx="7" cy="7" r=".6" fill="white" opacity={0.5} />
+                </svg>
+              </div>
+
+              <div>
+                <div
+                  style={{
+                    fontSize: 9,
+                    fontWeight: 600,
+                    color: '#6B3FA0',
+                    letterSpacing: '0.08em',
+                    textTransform: 'uppercase',
+                    marginBottom: 5,
+                  }}
+                >
+                  The Witness
+                </div>
+                <div
+                  style={{
+                    fontSize: 13,
+                    color: '#C0B0E0',
+                    lineHeight: 1.6,
+                    fontStyle: 'italic',
+                  }}
+                >
+                  &ldquo;{witnessInsight}&rdquo;
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         <p
           style={{
             fontSize: 11,
@@ -1048,6 +1176,7 @@ export default function DashboardPage() {
         )}
       </div>
 
+      <XpToastOverlay xpToast={xpToast} levelUpToast={levelUpToast} />
     </main>
   )
 }

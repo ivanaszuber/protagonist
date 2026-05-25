@@ -57,6 +57,13 @@ const HERO_ART = {
   wealth: VaultCharacterLarge,
 } as const
 
+/** Character nav dimensions → dimension_memories.dimension_id */
+const MEMORY_DIMENSION_ID: Record<Dimension, string> = {
+  career: 'create',
+  social: 'social',
+  wealth: 'wealth',
+}
+
 function daysUntil(dateStr: string | null): number {
   if (!dateStr) return 0
   return Math.ceil((new Date(dateStr).getTime() - Date.now()) / 86400000)
@@ -120,20 +127,28 @@ export function CharacterPage({ dimension }: CharacterPageProps) {
   const [completingId, setCompletingId] = useState<string | null>(null)
   const [xpToast, setXpToast] = useState<XpToast | null>(null)
   const [levelUpToast, setLevelUpToast] = useState<LevelUpToast | null>(null)
+  const [oracleMemories, setOracleMemories] = useState<string[]>([])
 
   useEffect(() => {
     const uid = getUserId()
+    const memoryDim = MEMORY_DIMENSION_ID[dimension]
     Promise.allSettled([
       fetch(`/api/quests/character/${dimension}?userId=${encodeURIComponent(uid)}`).then(
         (r) => r.json()
       ),
       fetch(`/api/oura/sync?userId=${encodeURIComponent(uid)}`).then((r) => r.json()),
-    ]).then(([questRes, ouraRes]) => {
+      fetch(
+        `/api/memories?userId=${encodeURIComponent(uid)}&dimension=${encodeURIComponent(memoryDim)}&limit=3`
+      ).then((r) => r.json()),
+    ]).then(([questRes, ouraRes, memoriesRes]) => {
       if (questRes.status === 'fulfilled') {
         setQuest(questRes.value.quest ?? null)
       }
       if (ouraRes.status === 'fulfilled' && ouraRes.value?.data) {
         setOura(ouraRes.value.data)
+      }
+      if (memoriesRes.status === 'fulfilled') {
+        setOracleMemories(memoriesRes.value.memories ?? [])
       }
       setLoading(false)
     })
@@ -490,6 +505,72 @@ export function CharacterPage({ dimension }: CharacterPageProps) {
               + Add quest
             </Link>
           </LeftBorderCard>
+        )}
+
+        {oracleMemories.length > 0 && (
+          <div
+            style={{
+              background: '#0D0820',
+              border: '0.5px solid #1E1040',
+              borderLeft: '2px solid #9333EA',
+              borderRadius: '0 10px 10px 0',
+              padding: '12px 14px',
+              marginBottom: 16,
+            }}
+          >
+            <div
+              style={{
+                fontSize: 9,
+                fontWeight: 600,
+                color: '#4A2878',
+                letterSpacing: '0.1em',
+                textTransform: 'uppercase',
+                marginBottom: oracleMemories.length < 3 ? 4 : 8,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+              }}
+            >
+              <svg width="10" height="10" viewBox="0 0 16 16" fill="none">
+                <ellipse cx="8" cy="8" rx="7" ry="4.5" stroke="#6B3FA0" strokeWidth="1.2" />
+                <circle cx="8" cy="8" r="2" fill="#6B3FA0" />
+              </svg>
+              Oracle remembers
+            </div>
+            {oracleMemories.length < 3 && (
+              <div style={{ fontSize: 11, color: '#5A4A7A', marginBottom: 8, fontStyle: 'italic' }}>
+                Oracle is just starting to know you
+              </div>
+            )}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {oracleMemories.map((memory, i) => {
+                const dateMatch = memory.match(/^\[(\d{4}-\d{2}-\d{2})\]\s*(.+)$/)
+                const date = dateMatch?.[1]
+                const text = dateMatch?.[2] ?? memory
+                return (
+                  <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                    {date && (
+                      <span
+                        style={{
+                          fontSize: 9,
+                          color: '#3D2060',
+                          flexShrink: 0,
+                          marginTop: 2,
+                          fontVariantNumeric: 'tabular-nums',
+                        }}
+                      >
+                        {new Date(date + 'T12:00:00').toLocaleDateString('en-GB', {
+                          day: 'numeric',
+                          month: 'short',
+                        })}
+                      </span>
+                    )}
+                    <span style={{ fontSize: 12, color: '#7A5FA0', lineHeight: 1.5 }}>{text}</span>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
         )}
 
         {/* Completed milestones */}

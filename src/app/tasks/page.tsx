@@ -164,7 +164,15 @@ export default function TasksPage() {
           <span style={{ fontSize: 22, fontWeight: 500, color: '#E8E0F0' }}>Tasks</span>
           <button
             type="button"
-            onClick={() => window.dispatchEvent(new CustomEvent('protagonist:open-oracle'))}
+            onClick={() => {
+              const prefill =
+                tab === 'today' ? 'Add task for today: '
+                : tab === 'someday' ? 'Add task someday: '
+                : 'Add task for upcoming: '
+              window.dispatchEvent(
+                new CustomEvent('protagonist:open-oracle', { detail: { prefill } })
+              )
+            }}
             style={{
               background: 'none',
               border: 'none',
