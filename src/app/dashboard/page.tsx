@@ -74,7 +74,6 @@ interface TodayItem {
   color: string
 }
 
-type TodayTab = 'all' | 'tasks' | 'calendar'
 
 const HP_CIRCUMFERENCE = 2 * Math.PI * 34
 
@@ -299,7 +298,6 @@ export default function DashboardPage() {
   const [witnessDismissed, setWitnessDismissed] = useState(false)
   const [quests, setQuests] = useState<MainQuest[]>([])
   const [events, setEvents] = useState<CalendarEventRow[]>([])
-  const [todayTab, setTodayTab] = useState<TodayTab>('all')
   const [hpDisplay, setHpDisplay] = useState<number | null>(null)
   const [xpToast, setXpToast] = useState<XpToast | null>(null)
   const [levelUpToast, setLevelUpToast] = useState<LevelUpToast | null>(null)
@@ -579,11 +577,6 @@ export default function DashboardPage() {
     return items
   }, [quests, events])
 
-  const filteredToday = useMemo(() => {
-    if (todayTab === 'tasks') return todayItems.filter((i) => i.type === 'task')
-    if (todayTab === 'calendar') return todayItems.filter((i) => i.type === 'event')
-    return todayItems
-  }, [todayItems, todayTab])
 
   function handleMoodSelect(score: number) {
     setMoodScore(score)
@@ -1212,42 +1205,7 @@ export default function DashboardPage() {
           </div>
         )}
 
-        <div
-          style={{
-            display: 'flex',
-            borderBottom: '0.5px solid #2D1B55',
-            marginBottom: 12,
-          }}
-        >
-          {(['all', 'tasks', 'calendar'] as TodayTab[]).map((tab) => {
-            const active = todayTab === tab
-            const label = tab === 'all' ? 'All' : tab === 'tasks' ? 'Tasks' : 'Calendar'
-            return (
-              <button
-                key={tab}
-                type="button"
-                onClick={() => setTodayTab(tab)}
-                style={{
-                  flex: 1,
-                  padding: '8px 4px',
-                  background: 'none',
-                  border: 'none',
-                  borderBottom: active ? '2px solid #9333EA' : '2px solid transparent',
-                  color: active ? '#C084FC' : '#5A4A7A',
-                  fontWeight: active ? 500 : 400,
-                  fontSize: 12,
-                  cursor: 'pointer',
-                  fontFamily: 'inherit',
-                  textTransform: 'capitalize',
-                }}
-              >
-                {label}
-              </button>
-            )
-          })}
-        </div>
-
-        {filteredToday.length === 0 ? (
+        {todayItems.length === 0 ? (
           <button
             type="button"
             onClick={() => openOracle()}
@@ -1267,7 +1225,7 @@ export default function DashboardPage() {
           </button>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {filteredToday.map((item) =>
+            {todayItems.map((item) =>
               item.type === 'event' ? (
                 <div
                   key={item.id}
