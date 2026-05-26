@@ -92,7 +92,19 @@ export async function GET(request: Request) {
     })
   )
 
-  return NextResponse.json({ quests: enriched })
+  // Fetch XP for all 7 dimensions so the dashboard champion cards always
+  // show the correct level even for dimensions without an active quest.
+  const { data: allXpRows } = await supabase
+    .from('quest_dimension_xp')
+    .select('dimension, xp')
+    .eq('user_id', userId)
+
+  const dimXpMap: Record<string, number> = {}
+  for (const row of allXpRows ?? []) {
+    dimXpMap[row.dimension as string] = (row.xp as number) ?? 0
+  }
+
+  return NextResponse.json({ quests: enriched, dimXpMap })
 }
 
 export async function POST(request: Request) {

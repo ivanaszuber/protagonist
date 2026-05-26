@@ -23,7 +23,9 @@ import { XpToastOverlay, showXpFeedback, type LevelUpToast, type XpToast } from 
 import { ALL_DIMENSIONS, CHARACTERS, getCharacterTierLabel, type Dimension } from '@/lib/character'
 import { formatCyclePhase, getHpTier, getOracleVerdict } from '@/lib/oura'
 import { DIMENSION_TO_SLUG } from '@/lib/tierName'
-import { getLevel } from '@/lib/xp'
+import { getLevel, getLevelProgress } from '@/lib/xp'
+import { getMedalDefinitions } from '@/lib/medals'
+import type { MedalDefinition } from '@/lib/medals'
 import { getUserId } from '@/lib/user'
 import { openOracle } from '@/lib/oracle-events'
 import { TopNav } from '@/components/TopNav'
@@ -292,6 +294,34 @@ const ghostButtonStyle: CSSProperties = {
   fontFamily: 'inherit',
 }
 
+function ChampionMedalIcon({ icon, earned, color }: { icon: MedalDefinition['icon']; earned: boolean; color: string }) {
+  const stroke = earned ? color : '#3D2878'
+  const fill = earned ? color : 'none'
+  const common = { width: 8, height: 8, viewBox: '0 0 24 24', fill: 'none' as const }
+  let path: React.ReactNode
+  switch (icon) {
+    case 'sword':
+      path = <path d="M4 20L14 10M14 10L11 7L17 4L20 10L17 13L14 10Z" stroke={stroke} strokeWidth="1.5" fill={fill} />; break
+    case 'pulse':
+      path = <path d="M4 12H8L10 6L14 18L16 12H20" stroke={stroke} strokeWidth="1.5" />; break
+    case 'skull':
+      path = <><circle cx="12" cy="10" r="5" stroke={stroke} strokeWidth="1.5" fill={fill} /><path d="M8 20V16M12 20V16M16 20V16" stroke={stroke} strokeWidth="1.5" /></>; break
+    case 'flame':
+      path = <path d="M12 3C10 8 6 10 6 14C6 17.3 8.7 20 12 20C15.3 20 18 17.3 18 14C18 10 14 8 12 3Z" stroke={stroke} strokeWidth="1.5" fill={fill} />; break
+    case 'star':
+      path = <path d="M12 4L14 9H19L15 12L16.5 17L12 14L7.5 17L9 12L5 9H10L12 4Z" stroke={stroke} strokeWidth="1.5" fill={fill} />; break
+    case 'shield':
+      path = <path d="M12 3L5 6V12C5 16 8 19 12 21C16 19 19 16 19 12V6L12 3Z" stroke={stroke} strokeWidth="1.5" fill={fill} />; break
+    case 'trophy':
+      path = <><path d="M8 6H16V10C16 12 14 14 12 14C10 14 8 12 8 10V6Z" stroke={stroke} strokeWidth="1.5" fill={fill} /><path d="M12 14V17M9 20H15" stroke={stroke} strokeWidth="1.5" /></>; break
+    case 'coin':
+      path = <><circle cx="12" cy="12" r="8" stroke={stroke} strokeWidth="1.5" fill={fill} /><path d="M12 8v8M9 10.5h4.5a1.5 1.5 0 0 1 0 3H9" stroke={stroke} strokeWidth="1.5" strokeLinecap="round" /></>; break
+    default:
+      path = null
+  }
+  return <svg {...common}>{path}</svg>
+}
+
 export default function DashboardPage() {
   const router = useRouter()
   const userIdRef = useRef(getUserId())
@@ -320,6 +350,8 @@ export default function DashboardPage() {
     selectedDateRef.current = d
     setSelectedDate(d)
   }, [])
+  const [dimXpMap, setDimXpMap] = useState<Record<string, number>>({})
+  const [dimMedalsMap, setDimMedalsMap] = useState<Record<string, string[]>>({})
   const [verdictKey, setVerdictKey] = useState(0)
   const [showQuickAdd, setShowQuickAdd] = useState(false)
   const [quickAddTitle, setQuickAddTitle] = useState('')
@@ -363,13 +395,14 @@ export default function DashboardPage() {
 
     const dateStr = dateOverride ?? toDateStr(new Date())
 
-    const [vitalityRes, questsRes, calRes, checkInRes] = await Promise.allSettled([
+    const [vitalityRes, questsRes, calRes, checkInRes, medalsRes] = await Promise.allSettled([
       fetch(`/api/dashboard/vitality?userId=${encodeURIComponent(uid)}`).then((r) => r.json()),
       fetch(`/api/quests/main?userId=${encodeURIComponent(uid)}&date=${encodeURIComponent(dateStr)}`).then((r) => r.json()),
       fetch(`/api/calendar/next?userId=${encodeURIComponent(uid)}&limit=20&date=${encodeURIComponent(dateStr)}`).then((r) =>
         r.json()
       ),
       fetch(`/api/checkin/today?userId=${encodeURIComponent(uid)}`).then((r) => r.json()),
+      fetch(`/api/medals/all?userId=${encodeURIComponent(uid)}`).then((r) => r.json()),
     ])
 
     if (vitalityRes.status === 'fulfilled') {
@@ -380,6 +413,12 @@ export default function DashboardPage() {
     }
     if (questsRes.status === 'fulfilled') {
       setQuests((questsRes.value.quests ?? []) as MainQuest[])
+      if (questsRes.value.dimXpMap) {
+        setDimXpMap(questsRes.value.dimXpMap as Record<string, number>)
+      }
+    }
+    if (medalsRes.status === 'fulfilled') {
+      setDimMedalsMap((medalsRes.value.earned ?? {}) as Record<string, string[]>)
     }
     if (calRes.status === 'fulfilled') {
       const eventsData = (calRes.value.events ?? []) as CalendarEventRow[]
@@ -1427,12 +1466,15 @@ export default function DashboardPage() {
           {ALL_DIMENSIONS.map((dim) => {
             const quest = quests.find((q) => q.dimension === dim)
             const char = CHARACTERS[dim]
-            const xp = quest?.xp ?? 0
+            // Use dimXpMap for correct level even with no active quest
+            const xp = dimXpMap[dim] ?? quest?.xp ?? 0
             const level = getLevel(xp)
-            const pct = Math.round(((xp % 500) / 500) * 100)
+            const pct = Math.round(getLevelProgress(xp) * 100)
             const Hero = HERO_MINI[dim]
             const streak = quest?.streak_days ?? 0
             const taskCount = quest?.todays_tasks?.filter((t) => !t.completed).length ?? 0
+            const earnedKeys = dimMedalsMap[dim] ?? []
+            const medalDefs = getMedalDefinitions(dim).slice(0, 5)
 
             return (
               <div
@@ -1493,7 +1535,7 @@ export default function DashboardPage() {
                   </div>
                 </div>
 
-                {/* Middle: name + tier + task count, vision, XP bar */}
+                {/* Middle: name + tier + task count, vision, XP bar, medals */}
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: 5, marginBottom: 2 }}>
                     <span style={{ fontSize: 12, color: '#E8E0F0', fontWeight: 500 }}>
@@ -1526,6 +1568,7 @@ export default function DashboardPage() {
                       background: '#2D1B55',
                       borderRadius: 2,
                       overflow: 'hidden',
+                      marginBottom: 6,
                     }}
                   >
                     <div
@@ -1537,9 +1580,38 @@ export default function DashboardPage() {
                       }}
                     />
                   </div>
+                  {/* Medal icons row */}
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    {medalDefs.map((medal) => {
+                      const isEarned = earnedKeys.includes(medal.key)
+                      return (
+                        <div
+                          key={medal.key}
+                          title={isEarned ? medal.label : medal.hint}
+                          style={{
+                            width: 16,
+                            height: 16,
+                            borderRadius: '50%',
+                            background: isEarned ? `${char.color}20` : 'rgba(30,13,64,0.6)',
+                            border: `0.5px solid ${isEarned ? `${char.color}60` : '#1E0D40'}`,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0,
+                          }}
+                        >
+                          <ChampionMedalIcon
+                            icon={medal.icon}
+                            earned={isEarned}
+                            color={char.color}
+                          />
+                        </div>
+                      )
+                    })}
+                  </div>
                 </div>
 
-                {/* Right: dimension pill, level badge, streak */}
+                {/* Right: level badge + streak */}
                 <div
                   style={{
                     display: 'flex',
@@ -1550,20 +1622,6 @@ export default function DashboardPage() {
                     paddingLeft: 4,
                   }}
                 >
-                  <span
-                    style={{
-                      fontSize: 9,
-                      color: char.color,
-                      background: `${char.color}18`,
-                      border: `0.5px solid ${char.color}40`,
-                      borderRadius: 20,
-                      padding: '2px 7px',
-                      lineHeight: 1.4,
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    {dim.charAt(0).toUpperCase() + dim.slice(1)}
-                  </span>
                   <span
                     style={{
                       background: '#1E0D40',
