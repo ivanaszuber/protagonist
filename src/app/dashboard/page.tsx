@@ -68,6 +68,7 @@ interface TodayItem {
   title: string
   time: string | null
   timeEnd: string | null
+  endIso: string | null   // original ISO end time, used to detect past events
   dimension: Dimension | null
   completed: boolean
   xp_reward: number
@@ -212,6 +213,13 @@ function getWeekStart(d: Date): Date {
   const day = new Date(d)
   day.setDate(d.getDate() - d.getDay()) // Sunday
   return day
+}
+
+function getGreeting(): string {
+  const h = new Date().getHours()
+  if (h >= 5 && h < 12) return 'Good morning'
+  if (h >= 12 && h < 18) return 'Good afternoon'
+  return 'Good evening'
 }
 
 function formatMoodTimestamp(iso: string): string {
@@ -384,7 +392,7 @@ export default function DashboardPage() {
           body: JSON.stringify({ userId: uid }),
         })
           .then(() =>
-            fetch(`/api/calendar/next?userId=${encodeURIComponent(uid)}&limit=10`)
+            fetch(`/api/calendar/next?userId=${encodeURIComponent(uid)}&limit=10&date=${encodeURIComponent(dateStr)}`)
           )
           .then((r) => r.json())
           .then((d: { events?: CalendarEventRow[] }) => {
@@ -535,6 +543,7 @@ export default function DashboardPage() {
           title: task.title,
           time: null,
           timeEnd: null,
+          endIso: null,
           dimension: quest.dimension,
           completed: task.completed,
           xp_reward: task.xp_reward ?? 50,
@@ -550,6 +559,7 @@ export default function DashboardPage() {
         title: ev.title,
         time: formatTimeFromIso(ev.start),
         timeEnd: formatTimeFromIso(ev.end),
+        endIso: ev.end || null,
         dimension: null,
         completed: false,
         xp_reward: 0,
@@ -665,6 +675,12 @@ export default function DashboardPage() {
       <TopNav streakDays={maxStreak} />
 
       <div style={{ padding: '16px 16px 0' }}>
+
+      {/* Greeting */}
+      <p style={{ fontSize: 18, fontWeight: 500, color: '#E8E0F0', margin: '0 0 14px' }}>
+        {getGreeting()}, Ivana
+      </p>
+
       {/* Vital State */}
       <div
         style={{
@@ -1225,8 +1241,9 @@ export default function DashboardPage() {
           </button>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {todayItems.map((item) =>
-              item.type === 'event' ? (
+            {todayItems.map((item) => {
+              const isPast = item.type === 'event' && isToday && !!item.endIso && new Date(item.endIso) < new Date()
+              if (item.type === 'event') return (
                 <div
                   key={item.id}
                   style={{
@@ -1234,6 +1251,8 @@ export default function DashboardPage() {
                     alignItems: 'center',
                     gap: 8,
                     padding: '6px 0',
+                    opacity: isPast ? 0.38 : 1,
+                    transition: 'opacity 0.2s',
                   }}
                 >
                   <span
@@ -1244,6 +1263,7 @@ export default function DashboardPage() {
                       color: '#5A4A7A',
                       textAlign: 'right',
                       whiteSpace: 'nowrap',
+                      textDecoration: isPast ? 'line-through' : 'none',
                     }}
                   >
                     {item.time && item.timeEnd && item.timeEnd !== item.time
@@ -1287,7 +1307,8 @@ export default function DashboardPage() {
                     <path d="M3 9h18M8 3v4M16 3v4" stroke="#3b82f6" strokeWidth="1.5" />
                   </svg>
                 </div>
-              ) : (
+              )
+              return (
                 <div
                   key={item.id}
                   role="button"
@@ -1376,7 +1397,7 @@ export default function DashboardPage() {
                   </div>
                 </div>
               )
-            )}
+            })}
           </div>
         )}
       </div>

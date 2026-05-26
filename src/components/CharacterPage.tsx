@@ -81,13 +81,6 @@ const FLOAT_DELAYS: Record<Dimension, string> = {
   family: '1.5s',
 }
 
-function hexToRgba(hex: string, alpha: number): string {
-  const h = hex.replace('#', '')
-  const r = parseInt(h.substring(0, 2), 16)
-  const g = parseInt(h.substring(2, 4), 16)
-  const b = parseInt(h.substring(4, 6), 16)
-  return `rgba(${r},${g},${b},${alpha})`
-}
 
 function daysUntil(dateStr: string | null): number {
   if (!dateStr) return 0
@@ -145,11 +138,6 @@ export function CharacterPage({ dimension }: CharacterPageProps) {
   const [quest, setQuest] = useState<QuestData | null>(null)
   const [oura, setOura] = useState<OuraData | null>(null)
   const [loading, setLoading] = useState(true)
-  const [addingTask, setAddingTask] = useState(false)
-  const [newTaskTitle, setNewTaskTitle] = useState('')
-  const [newTaskXp, setNewTaskXp] = useState(50)
-  const [completingId, setCompletingId] = useState<string | null>(null)
-  const [justCompletedIds, setJustCompletedIds] = useState<Set<string>>(new Set())
   const [xpToast, setXpToast] = useState<XpToast | null>(null)
   const [levelUpToast, setLevelUpToast] = useState<LevelUpToast | null>(null)
   const [oracleMemories, setOracleMemories] = useState<string[]>([])
@@ -271,62 +259,6 @@ export function CharacterPage({ dimension }: CharacterPageProps) {
     setQuest(val.quest ?? null)
   }
 
-  async function handleTaskToggle(taskId: string, xpReward: number) {
-    const task = quest?.recent_tasks.find((t) => t.id === taskId)
-    if (!task || task.completed) return
-
-    setCompletingId(taskId)
-    const uid = getUserId()
-    try {
-      const res = await fetch(`/api/quests/tasks/${taskId}/complete`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: uid }),
-      })
-      const data = (await res.json()) as {
-        xp_earned?: number
-        leveled_up?: boolean
-        new_level?: number
-      }
-
-      if (res.ok) {
-        const earned = data.xp_earned ?? xpReward
-        setQuest((prev) => {
-          if (!prev) return prev
-          return {
-            ...prev,
-            xp: prev.xp + earned,
-            recent_tasks: prev.recent_tasks.map((t) =>
-              t.id === taskId ? { ...t, completed: true } : t
-            ),
-          }
-        })
-        showXpFeedback({ dimension }, data, setXpToast, setLevelUpToast)
-        setJustCompletedIds((prev) => new Set(prev).add(taskId))
-        setTimeout(() => {
-          setJustCompletedIds((prev) => {
-            const next = new Set(prev)
-            next.delete(taskId)
-            return next
-          })
-        }, 700)
-        // Re-check medals silently after every task completion
-        void fetch('/api/medals/check', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId: uid, dimension }),
-        })
-          .then((r) => r.json())
-          .then((d: { earned?: string[] }) => {
-            if (d.earned) setEarnedMedals(d.earned)
-          })
-          .catch(() => {})
-      }
-    } finally {
-      setCompletingId(null)
-    }
-  }
-
   async function deleteMilestone(milestoneId: string) {
     const uid = getUserId()
     const res = await fetch(
@@ -342,63 +274,11 @@ export function CharacterPage({ dimension }: CharacterPageProps) {
     }
   }
 
-  async function deleteTask(taskId: string) {
-    const uid = getUserId()
-    const res = await fetch(
-      `/api/quests/tasks?taskId=${encodeURIComponent(taskId)}&userId=${encodeURIComponent(uid)}`,
-      { method: 'DELETE' }
-    )
-    if (res.ok) {
-      setQuest((prev) =>
-        prev ? { ...prev, recent_tasks: prev.recent_tasks.filter((t) => t.id !== taskId) } : prev
-      )
-    }
-  }
-
-  async function addTask() {
-    if (!newTaskTitle.trim() || !quest) return
-    const today = new Date().toISOString().split('T')[0]
-    const activeMilestone = quest.milestones.find((m) => !m.completed)
-    const uid = getUserId()
-
-    const res = await fetch('/api/quests/tasks', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        userId: uid,
-        milestoneId: activeMilestone?.id ?? null,
-        dimension,
-        title: newTaskTitle.trim(),
-        xpReward: newTaskXp,
-        taskDate: today,
-      }),
-    })
-
-    if (res.ok) {
-      const data = await res.json()
-      setQuest((prev) =>
-        prev
-          ? {
-              ...prev,
-              recent_tasks: [data.task, ...prev.recent_tasks],
-            }
-          : prev
-      )
-      setNewTaskTitle('')
-      setAddingTask(false)
-    }
-  }
-
   const xp = quest?.xp ?? 0
   const level = getLevel(xp)
   const xpInLevel = xp % 500
   const tierLabel = getTierName(level, characterSlug)
   const activeMilestone = quest?.milestones.find((m) => !m.completed) ?? null
-  const todayStr = new Date().toISOString().split('T')[0]
-  const todayTasks =
-    quest?.recent_tasks.filter((t) => t.task_date === todayStr) ?? []
-  const focusTask =
-    todayTasks.find((t) => !t.completed) ?? todayTasks[0] ?? null
 
   const pageShellStyle: CSSProperties = {
     minHeight: '100dvh',
@@ -660,203 +540,6 @@ export function CharacterPage({ dimension }: CharacterPageProps) {
           </div>
         )}
 
-        {/* Today's quests */}
-        {quest && (
-          <LeftBorderCard accentColor={accentColor}>
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                marginBottom: 10,
-              }}
-            >
-              <span style={{ fontSize: 11, color: '#5A4A7A' }}>Today&apos;s tasks</span>
-              <button
-                type="button"
-                onClick={() => setAddingTask(!addingTask)}
-                style={{
-                  background: '#1E0D40',
-                  border: '0.5px solid #3D2070',
-                  borderRadius: 6,
-                  padding: '3px 10px',
-                  fontSize: 10,
-                  color: '#7A5FA0',
-                  cursor: 'pointer',
-                }}
-              >
-                + Add
-              </button>
-            </div>
-
-            {addingTask && (
-              <div style={{ marginBottom: 10 }}>
-                <input
-                  value={newTaskTitle}
-                  onChange={(e) => setNewTaskTitle(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && void addTask()}
-                  placeholder="What's the task?"
-                  autoFocus
-                  style={{
-                    width: '100%',
-                    background: '#1A0D35',
-                    border: '0.5px solid #2D1B55',
-                    borderRadius: 8,
-                    padding: '8px 10px',
-                    color: '#E8E0F0',
-                    fontSize: 12,
-                    outline: 'none',
-                    marginBottom: 8,
-                    boxSizing: 'border-box',
-                  }}
-                />
-                <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
-                  {[25, 50, 100, 200].map((xpVal) => (
-                    <button
-                      key={xpVal}
-                      type="button"
-                      onClick={() => setNewTaskXp(xpVal)}
-                      style={{
-                        flex: 1,
-                        background: newTaskXp === xpVal ? accentColor : '#1A0D35',
-                        border: '0.5px solid #2D1B55',
-                        borderRadius: 6,
-                        padding: '5px 0',
-                        fontSize: 10,
-                        color: newTaskXp === xpVal ? '#0D0820' : '#5A5070',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      {xpVal} XP
-                    </button>
-                  ))}
-                </div>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button
-                    type="button"
-                    onClick={() => void addTask()}
-                    style={{
-                      flex: 1,
-                      background: accentColor,
-                      border: 'none',
-                      borderRadius: 8,
-                      padding: '8px 0',
-                      fontSize: 12,
-                      color: '#0D0820',
-                      fontWeight: 500,
-                      cursor: 'pointer',
-                    }}
-                  >
-                    Add task
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setAddingTask(false)}
-                    style={{
-                      background: '#1A0D35',
-                      border: '0.5px solid #2D1B55',
-                      borderRadius: 8,
-                      padding: '8px 14px',
-                      fontSize: 12,
-                      color: '#5A5070',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {todayTasks.length === 0 && !addingTask && (
-              <span style={{ fontSize: 11, color: '#3D3358', fontStyle: 'italic' }}>
-                No quests today yet
-              </span>
-            )}
-
-            {todayTasks
-              .filter((t) => t.id !== focusTask?.id)
-              .map((task) => (
-                <div
-                  key={task.id}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 8,
-                    background: '#1A0D35',
-                    borderRadius: 8,
-                    padding: '7px 10px',
-                    marginBottom: 6,
-                    border: '0.5px solid #2D1B55',
-                  }}
-                >
-                  <div
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => void handleTaskToggle(task.id, task.xp_reward)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        void handleTaskToggle(task.id, task.xp_reward)
-                      }
-                    }}
-                    style={{
-                      width: 14,
-                      height: 14,
-                      borderRadius: '50%',
-                      flexShrink: 0,
-                      border: `1.5px solid ${task.completed ? '#34d399' : accentColor}`,
-                      background: task.completed ? '#34d399' : 'transparent',
-                      cursor: task.completed ? 'default' : 'pointer',
-                      '--glow-color': hexToRgba(accentColor, 0.65),
-                      '--glow-color-fade': hexToRgba(accentColor, 0),
-                      animation: justCompletedIds.has(task.id)
-                        ? 'task-check-glow 0.55s ease-out'
-                        : 'none',
-                    } as React.CSSProperties}
-                  />
-                  <span
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => void handleTaskToggle(task.id, task.xp_reward)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        void handleTaskToggle(task.id, task.xp_reward)
-                      }
-                    }}
-                    style={{
-                      fontSize: 10,
-                      color: task.completed ? '#5A4A7A' : '#C0B0E0',
-                      textDecoration: task.completed ? 'line-through' : 'none',
-                      flex: 1,
-                      cursor: task.completed ? 'default' : 'pointer',
-                    }}
-                  >
-                    {task.title}
-                  </span>
-                  {!task.completed && (
-                    <span style={{ fontSize: 9, color: '#3D3358' }}>+{task.xp_reward} XP</span>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => void deleteTask(task.id)}
-                    aria-label="Delete task"
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      color: '#2D1B55',
-                      fontSize: 14,
-                      lineHeight: 1,
-                      cursor: 'pointer',
-                      padding: '0 2px',
-                      flexShrink: 0,
-                    }}
-                  >
-                    ×
-                  </button>
-                </div>
-              ))}
-          </LeftBorderCard>
-        )}
       </div>
 
       <XpToastOverlay xpToast={xpToast} levelUpToast={levelUpToast} />
