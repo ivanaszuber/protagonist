@@ -2,7 +2,6 @@
 
 import Link from 'next/link'
 import { useEffect, useState, type ComponentType, type CSSProperties, type ReactNode } from 'react'
-import { StatBar } from '@/components/StatBar'
 import {
   BlazeCharacterLarge,
   EchoCharacterLarge,
@@ -55,12 +54,6 @@ interface QuestData {
   xp: number
   bosses_slain?: number
   streak_days?: number
-}
-
-interface OuraData {
-  readiness_score: number | null
-  sleep_score: number | null
-  activity_score: number | null
 }
 
 const HERO_ART: Record<Dimension, ComponentType> = {
@@ -138,7 +131,6 @@ export function CharacterPage({ dimension }: CharacterPageProps) {
   const floatDelay = FLOAT_DELAYS[dimension]
 
   const [quest, setQuest] = useState<QuestData | null>(null)
-  const [oura, setOura] = useState<OuraData | null>(null)
   const [loading, setLoading] = useState(true)
   const [xpToast, setXpToast] = useState<XpToast | null>(null)
   const [levelUpToast, setLevelUpToast] = useState<LevelUpToast | null>(null)
@@ -204,16 +196,12 @@ export function CharacterPage({ dimension }: CharacterPageProps) {
       ).then((r) => r.json()),
       loadBossAndMedals(uid),
     ]
-    if (dimension === 'vitality') {
-      fetches.push(fetch(`/api/oura/sync?userId=${encodeURIComponent(uid)}`).then((r) => r.json()))
-    }
     if (dimension === 'wealth') {
       fetches.push(fetch(`/api/vault/settings?userId=${encodeURIComponent(uid)}`).then((r) => r.json()))
     }
     Promise.allSettled(fetches).then((results) => {
       const questRes = results[0]
       const memoriesRes = results[1]
-      const ouraRes = dimension === 'vitality' ? results[3] : null
       const vaultRes = dimension === 'wealth' ? results[3] : null
       if (questRes.status === 'fulfilled') {
         const val = questRes.value as { quest?: QuestData | null }
@@ -222,10 +210,6 @@ export function CharacterPage({ dimension }: CharacterPageProps) {
       if (memoriesRes.status === 'fulfilled') {
         const val = memoriesRes.value as { memories?: string[] }
         setOracleMemories(val.memories ?? [])
-      }
-      if (ouraRes?.status === 'fulfilled') {
-        const val = ouraRes.value as { data?: OuraData }
-        if (val.data) setOura(val.data)
       }
       if (vaultRes?.status === 'fulfilled') {
         const val = vaultRes.value as {
@@ -529,24 +513,6 @@ export function CharacterPage({ dimension }: CharacterPageProps) {
           </>
         )}
 
-        {dimension === 'vitality' && (
-          <LeftBorderCard accentColor={accentColor}>
-            <span style={{ fontSize: 11, color: '#5A4A7A', display: 'block', marginBottom: 10 }}>
-              Today&apos;s stats
-            </span>
-            <StatBar
-              label="Resilience"
-              value={oura?.readiness_score ?? null}
-              color="#34d399"
-            />
-            <StatBar label="Sleep" value={oura?.sleep_score ?? null} color="#60a5fa" />
-            <StatBar
-              label="Activity"
-              value={oura?.activity_score ?? null}
-              color="#EF9F27"
-            />
-          </LeftBorderCard>
-        )}
 
         <LegendCard
           characterName={char.name}

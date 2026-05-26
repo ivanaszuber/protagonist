@@ -360,6 +360,8 @@ export default function DashboardPage() {
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null)
   const [reschedulingTaskId, setReschedulingTaskId] = useState<string | null>(null)
   const [pickerTaskId, setPickerTaskId] = useState<string | null>(null)
+  // Loading state specifically for the Today section (tasks + calendar)
+  const [todayLoading, setTodayLoading] = useState(() => _cache == null)
   const todayDate = useMemo(() => new Date(), [])
   const todayStr = useMemo(() => toDateStr(todayDate), [todayDate])
   const [selectedDate, setSelectedDate] = useState<Date>(todayDate)
@@ -488,12 +490,14 @@ export default function DashboardPage() {
 
     _cache = next
     setVitalityLoading(false)
+    setTodayLoading(false)
   }, [])
 
   // Light load for date navigation: only tasks + calendar events.
   // Vitality/medals/checkin don't change per date so we skip them.
   const loadDateData = useCallback(async (dateStr: string) => {
     const uid = userIdRef.current
+    setTodayLoading(true)
     const [questsRes, calRes] = await Promise.allSettled([
       fetch(`/api/quests/main?userId=${encodeURIComponent(uid)}&date=${encodeURIComponent(dateStr)}`).then((r) => r.json()),
       fetch(`/api/calendar/next?userId=${encodeURIComponent(uid)}&limit=20&date=${encodeURIComponent(dateStr)}`).then((r) => r.json()),
@@ -509,6 +513,7 @@ export default function DashboardPage() {
       setEvents(eventsData)
       if (_cache) { _cache.events = eventsData; _cache.dateStr = dateStr }
     }
+    setTodayLoading(false)
   }, [])
 
   const isInitialMount = useRef(true)
@@ -1367,7 +1372,18 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {todayItems.length === 0 ? (
+        {todayLoading ? (
+          /* Skeleton loader — matches the shape of task rows */
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '4px 0' }}>
+            {[0.7, 0.5, 0.85, 0.6].map((w, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0' }}>
+                <span style={{ width: 80, flexShrink: 0 }} />
+                <div style={{ width: 14, height: 14, borderRadius: '50%', background: '#1E0D40', flexShrink: 0 }} />
+                <div style={{ height: 10, borderRadius: 5, background: '#1E0D40', width: `${w * 100}%`, maxWidth: 200 }} />
+              </div>
+            ))}
+          </div>
+        ) : todayItems.length === 0 ? (
           <button
             type="button"
             onClick={() => openOracle()}
@@ -1386,7 +1402,17 @@ export default function DashboardPage() {
             Nothing scheduled for today. Ask Oracle to build your plan.
           </button>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 6,
+              maxHeight: 420,
+              overflowY: 'auto',
+              scrollbarWidth: 'none',
+              msOverflowStyle: 'none',
+            }}
+          >
             {todayItems.map((item) => {
               const isPast = item.type === 'event' && isToday && !!item.endIso && new Date(item.endIso) < new Date()
               if (item.type === 'event') return (
@@ -1708,8 +1734,8 @@ export default function DashboardPage() {
           {ALL_DIMENSIONS.map((dim) => {
             const quest = quests.find((q) => q.dimension === dim)
             const char = CHARACTERS[dim]
-            // Use dimXpMap for correct level even with no active quest
-            const xp = dimXpMap[dim] ?? quest?.xp ?? 0
+            // Take the higher of both XP sources — guards against stale zeros in either
+            const xp = Math.max(dimXpMap[dim] ?? 0, quest?.xp ?? 0)
             const level = getLevel(xp)
             const pct = Math.round(getLevelProgress(xp) * 100)
             const Hero = HERO_MINI[dim]
