@@ -513,9 +513,19 @@ export default function DashboardPage() {
     }
 
     items.sort((a, b) => {
-      if (a.time === null && b.time !== null) return -1
-      if (a.time !== null && b.time === null) return 1
-      if (a.time && b.time) return a.time.localeCompare(b.time)
+      // Events always before tasks
+      if (a.type === 'event' && b.type === 'task') return -1
+      if (a.type === 'task' && b.type === 'event') return 1
+      // Both events: sort by time
+      if (a.type === 'event' && b.type === 'event') {
+        if (a.time && b.time) return a.time.localeCompare(b.time)
+        if (a.time && !b.time) return -1
+        if (!a.time && b.time) return 1
+        return 0
+      }
+      // Both tasks: uncompleted first, completed sink to bottom
+      if (!a.completed && b.completed) return -1
+      if (a.completed && !b.completed) return 1
       return 0
     })
 
@@ -596,10 +606,12 @@ export default function DashboardPage() {
         padding: '44px 0 calc(120px + env(safe-area-inset-bottom, 0px))',
         fontFamily: 'var(--font-space-grotesk), system-ui, sans-serif',
         overflowY: 'auto',
+        overflowX: 'hidden',
         scrollbarWidth: 'none',
         msOverflowStyle: 'none',
         maxWidth: 430,
         margin: '0 auto',
+        width: '100%',
       }}
     >
       <TopNav streakDays={maxStreak} />
