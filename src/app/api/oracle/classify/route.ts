@@ -56,7 +56,8 @@ Classify this input into one of these intents:
 2. NOTE — user is journaling, reflecting, or sharing feelings (emotional, reflective, no clear action item)
 3. LEGEND — user is defining or confirming their long-term Legend (one-sentence life vision) for a character dimension. Use when they confirm a final legend sentence or say "save this as my legend".
 4. BOSS — user wants to create or restart a boss battle (keywords: boss battle, boss fight, attack moves, slay the boss, hunt it down)
-5. CHAT — questions, advice, open conversation. Never use CHAT if there's a clear action item.
+5. CALENDAR_CREATE — user wants to create, schedule, block, or add a new calendar event or appointment. Keywords: "block", "schedule", "add to calendar", "book time", "create event", "put in my calendar", "add a meeting", "add an appointment". Only when clearly creating a new event, not viewing existing ones.
+6. CHAT — questions, advice, open conversation. Never use CHAT if there's a clear action item.
 
 For TASK, extract:
 - title: clean task title (remove filler words like "add task" or "remind me to")
@@ -81,9 +82,17 @@ For LEGEND extract:
 For BOSS extract:
 - dimension: career | social | wealth | vitality | mind | love | family
 
+For CALENDAR_CREATE, extract:
+- title: clean event title (e.g. "Interview prep", "1:1 with Sarah", "Gym session")
+- date: ISO date. "tomorrow" = next day, "next Monday" = next Monday, "in 3 days" = today + 3, "this Friday" = next Friday. Default today if unspecified.
+- startTime: 24h HH:MM if specified, otherwise null (all-day)
+- durationMinutes: default 60. "30 mins" = 30, "1 hour" = 60, "90 minutes" = 90, "2 hours" = 120, "half an hour" = 30
+- description: extra context or null
+- location: explicit location or null
+
 Respond ONLY with valid JSON, no explanation:
 {
-  "intent": "TASK" | "NOTE" | "LEGEND" | "BOSS" | "CHAT",
+  "intent": "TASK" | "NOTE" | "LEGEND" | "BOSS" | "CALENDAR_CREATE" | "CHAT",
   "task": {
     "title": "...",
     "dimension": "career" | "social" | "wealth" | "vitality" | "mind" | "love" | "family" | null,
@@ -101,6 +110,14 @@ Respond ONLY with valid JSON, no explanation:
   } | null,
   "boss": {
     "dimension": "career" | "social" | "wealth" | "vitality" | "mind" | "love" | "family"
+  } | null,
+  "calendar_event": {
+    "title": "...",
+    "date": "YYYY-MM-DD",
+    "startTime": "HH:MM" | null,
+    "durationMinutes": 60,
+    "description": "..." | null,
+    "location": "..." | null
   } | null,
   "oracleReply": "..."
 }`

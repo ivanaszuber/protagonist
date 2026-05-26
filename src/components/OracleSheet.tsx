@@ -12,7 +12,18 @@ type SheetState =
   | 'thinking'
   | 'task-done'
   | 'note-done'
+  | 'calendar-confirm'
+  | 'calendar-done'
   | 'chat'
+
+interface CalendarEventInput {
+  title: string
+  date: string
+  startTime: string | null
+  durationMinutes: number
+  description?: string | null
+  location?: string | null
+}
 
 interface ParsedTask {
   title: string
@@ -24,12 +35,22 @@ interface ParsedTask {
 }
 
 interface ClassifyResult {
-  intent: 'TASK' | 'NOTE' | 'LEGEND' | 'BOSS' | 'CHAT'
+  intent: 'TASK' | 'NOTE' | 'LEGEND' | 'BOSS' | 'CALENDAR_CREATE' | 'CHAT'
   task: ParsedTask | null
   note: { text: string } | null
   legend?: { dimension: string; vision: string | null } | null
   boss?: { dimension: string } | null
+  calendar_event?: CalendarEventInput | null
   oracleReply: string | null
+}
+
+function buildCalendarConfirmMessage(ev: CalendarEventInput): string {
+  const timeStr = ev.startTime
+    ? `${ev.startTime} · ${ev.durationMinutes ?? 60} min`
+    : 'All day'
+  const desc = ev.description ? `\n${ev.description}` : ''
+  const loc = ev.location ? `\n📍 ${ev.location}` : ''
+  return `📅 Got it — adding to your calendar:\n\n${ev.title}\n${ev.date} · ${timeStr}${desc}${loc}`
 }
 
 function dimensionLabel(dim: string): string {
@@ -70,6 +91,9 @@ export function OracleSheet() {
     []
   )
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [calendarCreating, setCalendarCreating] = useState(false)
+  const [calendarInsufficientScope, setCalendarInsufficientScope] = useState(false)
+  const [calendarDoneTitle, setCalendarDoneTitle] = useState('')
   const recognitionRef = useRef<SpeechRecognition | null>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
@@ -99,11 +123,56 @@ export function OracleSheet() {
     setInputText('')
     setResult(null)
     setChatMessages([])
+    setCalendarInsufficientScope(false)
+    setCalendarDoneTitle('')
     if (recognitionRef.current) {
       recognitionRef.current.stop()
       recognitionRef.current = null
     }
   }, [])
+
+  const handleCalendarConfirm = useCallback(
+    async (ev: CalendarEventInput) => {
+      setCalendarCreating(true)
+      setCalendarInsufficientScope(false)
+      try {
+        const res = await fetch('/api/calendar/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId,
+            title: ev.title,
+            date: ev.date,
+            startTime: ev.startTime ?? undefined,
+            durationMinutes: ev.durationMinutes ?? 60,
+            description: ev.description ?? undefined,
+            location: ev.location ?? undefined,
+          }),
+        })
+        const data = (await res.json()) as { error?: string }
+
+        if (res.status === 403 && data.error === 'insufficient_scope') {
+          setCalendarInsufficientScope(true)
+          setState('calendar-done')
+        } else if (res.ok) {
+          setCalendarDoneTitle(ev.title)
+          setState('calendar-done')
+          window.dispatchEvent(new CustomEvent('protagonist:calendar-updated'))
+        } else {
+          setResult({
+            intent: 'CHAT',
+            task: null,
+            note: null,
+            oracleReply: "Couldn't add the event — try again.",
+          })
+          setState('note-done')
+        }
+      } finally {
+        setCalendarCreating(false)
+      }
+    },
+    [userId]
+  )
 
   const startVoice = useCallback(() => {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition
@@ -193,6 +262,9 @@ export function OracleSheet() {
           data.oracleReply ?? `Your Legend is set: "${data.legend.vision}"`
         setResult({ ...data, oracleReply: arcReply })
         setState('note-done')
+      } else if (data.intent === 'CALENDAR_CREATE' && data.calendar_event) {
+        setResult(data)
+        setState('calendar-confirm')
       } else if (data.intent === 'BOSS' && data.boss?.dimension) {
         const genRes = await fetch('/api/bosses/generate', {
           method: 'POST',
@@ -313,7 +385,11 @@ export function OracleSheet() {
           ? `saved · ${result?.task?.dimension ? dimensionLabel(result.task.dimension) : ''}`
           : state === 'note-done'
             ? 'reflecting on your note...'
-            : 'speak, type, or drop an image'
+            : state === 'calendar-confirm'
+              ? 'confirm calendar event'
+              : state === 'calendar-done'
+                ? 'calendar updated'
+                : 'speak, type, or drop an image'
 
   return (
     <>
@@ -385,7 +461,13 @@ export function OracleSheet() {
                   ? 'Listening...'
                   : state === 'task-done'
                     ? 'Task added'
-                    : 'Oracle'}
+                    : state === 'calendar-confirm'
+                      ? 'Calendar event'
+                      : state === 'calendar-done'
+                        ? calendarInsufficientScope
+                          ? 'Reconnect needed'
+                          : 'Event added'
+                        : 'Oracle'}
               </div>
               <div
                 style={{
@@ -399,7 +481,9 @@ export function OracleSheet() {
                           ? '#34d399'
                           : state === 'note-done'
                             ? '#C084FC'
-                            : '#5A4A7A',
+                            : state === 'calendar-confirm' || state === 'calendar-done'
+                              ? '#60a5fa'
+                              : '#5A4A7A',
                 }}
               >
                 {subtitle}
@@ -688,6 +772,141 @@ export function OracleSheet() {
                 >
                   Add another
                 </button>
+              </div>
+            </>
+          )}
+
+          {state === 'calendar-confirm' && result?.calendar_event && (
+            <>
+              <div
+                style={{
+                  background: '#0D0820',
+                  borderRadius: 12,
+                  border: '0.5px solid #3D2070',
+                  padding: '12px',
+                  marginBottom: 10,
+                  whiteSpace: 'pre-line',
+                  fontSize: 12,
+                  color: '#C0B0E0',
+                  lineHeight: 1.55,
+                }}
+              >
+                {buildCalendarConfirmMessage(result.calendar_event)}
+              </div>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setResult(null)
+                    setState('idle')
+                  }}
+                  disabled={calendarCreating}
+                  style={{
+                    flex: 1,
+                    height: 44,
+                    borderRadius: 10,
+                    background: '#1E0D40',
+                    border: '0.5px solid #2D1B55',
+                    color: '#7A5FA0',
+                    fontSize: 12,
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleCalendarConfirm(result.calendar_event!)}
+                  disabled={calendarCreating}
+                  style={{
+                    flex: 2,
+                    height: 44,
+                    borderRadius: 10,
+                    background: '#9333EA',
+                    border: 'none',
+                    color: 'white',
+                    fontSize: 12,
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                    opacity: calendarCreating ? 0.6 : 1,
+                    fontFamily: 'inherit',
+                  }}
+                >
+                  {calendarCreating ? 'Adding...' : 'Add to Calendar ✓'}
+                </button>
+              </div>
+            </>
+          )}
+
+          {state === 'calendar-done' && (
+            <>
+              <div
+                style={{
+                  background: '#0D0820',
+                  borderRadius: 12,
+                  border: '0.5px solid #2D1B55',
+                  padding: '12px',
+                  marginBottom: 10,
+                  fontSize: 12,
+                  color: '#C0B0E0',
+                  lineHeight: 1.55,
+                }}
+              >
+                {calendarInsufficientScope ? (
+                  <>
+                    🔐 To create events, reconnect Google Calendar with updated permissions.
+                  </>
+                ) : (
+                  <>✅ Added! {calendarDoneTitle} is in your calendar.</>
+                )}
+              </div>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+                {calendarInsufficientScope ? (
+                  <a
+                    href={`/api/calendar/connect?userId=${encodeURIComponent(userId)}`}
+                    style={{
+                      flex: 1,
+                      height: 44,
+                      borderRadius: 10,
+                      background: '#9333EA',
+                      border: 'none',
+                      color: 'white',
+                      fontSize: 12,
+                      fontWeight: 500,
+                      cursor: 'pointer',
+                      fontFamily: 'inherit',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      textDecoration: 'none',
+                    }}
+                  >
+                    Reconnect Google Calendar
+                  </a>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setResult(null)
+                      setState('idle')
+                    }}
+                    style={{
+                      flex: 1,
+                      height: 44,
+                      borderRadius: 10,
+                      background: '#9333EA',
+                      border: 'none',
+                      color: 'white',
+                      fontSize: 12,
+                      fontWeight: 500,
+                      cursor: 'pointer',
+                      fontFamily: 'inherit',
+                    }}
+                  >
+                    Done
+                  </button>
+                )}
               </div>
             </>
           )}

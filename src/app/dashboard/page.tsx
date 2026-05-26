@@ -1,6 +1,14 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ComponentType,
+  type CSSProperties,
+} from 'react'
 import { useRouter } from 'next/navigation'
 import {
   BlazeCharacterLarge,
@@ -125,6 +133,43 @@ function openOracle(prefill = '') {
   )
 }
 
+const quickAddInputStyle: CSSProperties = {
+  width: '100%',
+  background: '#1A0D3A',
+  border: '0.5px solid #3D2070',
+  borderRadius: 8,
+  padding: '7px 10px',
+  color: '#E8E0F0',
+  fontSize: 12,
+  outline: 'none',
+  fontFamily: 'inherit',
+  boxSizing: 'border-box',
+}
+
+const primaryButtonStyle: CSSProperties = {
+  flex: 1,
+  background: '#4A2080',
+  border: '0.5px solid #7C3AED',
+  borderRadius: 8,
+  color: '#C084FC',
+  fontSize: 11,
+  fontWeight: 500,
+  padding: '7px 0',
+  cursor: 'pointer',
+  fontFamily: 'inherit',
+}
+
+const ghostButtonStyle: CSSProperties = {
+  background: 'transparent',
+  border: '0.5px solid #2D1B55',
+  borderRadius: 8,
+  color: '#5A4A7A',
+  fontSize: 11,
+  padding: '7px 12px',
+  cursor: 'pointer',
+  fontFamily: 'inherit',
+}
+
 export default function DashboardPage() {
   const router = useRouter()
   const userIdRef = useRef(getUserId())
@@ -141,6 +186,33 @@ export default function DashboardPage() {
   const [levelUpToast, setLevelUpToast] = useState<LevelUpToast | null>(null)
   const [completingTaskId, setCompletingTaskId] = useState<string | null>(null)
   const [verdictKey, setVerdictKey] = useState(0)
+  const [showQuickAdd, setShowQuickAdd] = useState(false)
+  const [quickAddTitle, setQuickAddTitle] = useState('')
+  const [quickAddDate, setQuickAddDate] = useState(() =>
+    new Date().toISOString().split('T')[0]
+  )
+  const [quickAddTime, setQuickAddTime] = useState('')
+  const [quickAddDuration, setQuickAddDuration] = useState(60)
+  const [quickAddError, setQuickAddError] = useState('')
+  const [quickAddLoading, setQuickAddLoading] = useState(false)
+
+  const refreshCalendarEvents = useCallback(async () => {
+    const uid = userIdRef.current
+    try {
+      await fetch('/api/calendar/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: uid }),
+      })
+      const r = await fetch(
+        `/api/calendar/next?userId=${encodeURIComponent(uid)}&limit=10`
+      )
+      const d = (await r.json()) as { events?: CalendarEventRow[] }
+      if (d.events) setEvents(d.events)
+    } catch {
+      /* calendar optional */
+    }
+  }, [])
 
   const loadDashboard = useCallback(async () => {
     const uid = userIdRef.current
@@ -207,6 +279,51 @@ export default function DashboardPage() {
     window.addEventListener('protagonist:oracle-closed', onOracleClose)
     return () => window.removeEventListener('protagonist:oracle-closed', onOracleClose)
   }, [loadDashboard])
+
+  useEffect(() => {
+    function onCalendarUpdated() {
+      void refreshCalendarEvents()
+    }
+    window.addEventListener('protagonist:calendar-updated', onCalendarUpdated)
+    return () =>
+      window.removeEventListener('protagonist:calendar-updated', onCalendarUpdated)
+  }, [refreshCalendarEvents])
+
+  async function handleQuickAddSubmit() {
+    if (!quickAddTitle.trim()) {
+      setQuickAddError('Event title is required')
+      return
+    }
+    setQuickAddLoading(true)
+    setQuickAddError('')
+
+    const res = await fetch('/api/calendar/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId: userIdRef.current,
+        title: quickAddTitle.trim(),
+        date: quickAddDate,
+        startTime: quickAddTime || undefined,
+        durationMinutes: quickAddDuration,
+      }),
+    })
+
+    if (res.status === 403) {
+      setQuickAddError(
+        'Google Calendar needs updated permissions. Reconnect in Settings.'
+      )
+    } else if (!res.ok) {
+      setQuickAddError("Couldn't add event — try again.")
+    } else {
+      setQuickAddTitle('')
+      setQuickAddTime('')
+      setQuickAddDuration(60)
+      setShowQuickAdd(false)
+      void refreshCalendarEvents()
+    }
+    setQuickAddLoading(false)
+  }
 
   useEffect(() => {
     if (vitality?.hp == null) return
@@ -615,10 +732,116 @@ export default function DashboardPage() {
           }}
         >
           <span style={{ fontSize: 13, fontWeight: 500, color: '#E8E0F0' }}>Today</span>
-          <span style={{ fontSize: 11, color: '#5A4A7A' }}>
-            {new Date().toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric' })}
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 11, color: '#5A4A7A' }}>
+              {new Date().toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric' })}
+            </span>
+            <button
+              type="button"
+              onClick={() => setShowQuickAdd((v) => !v)}
+              style={{
+                width: 24,
+                height: 24,
+                borderRadius: '50%',
+                background: '#1A0D40',
+                border: '0.5px solid #4A2080',
+                color: '#C084FC',
+                fontSize: 16,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                lineHeight: 1,
+                padding: 0,
+                fontFamily: 'inherit',
+              }}
+              aria-label="Add calendar event"
+            >
+              +
+            </button>
+          </div>
         </div>
+
+        {showQuickAdd && (
+          <div
+            style={{
+              background: '#140C28',
+              border: '0.5px solid #3D2070',
+              borderRadius: 12,
+              padding: '12px 14px',
+              marginBottom: 8,
+            }}
+          >
+            <div
+              style={{
+                fontSize: 11,
+                color: '#9370CC',
+                marginBottom: 10,
+                fontWeight: 500,
+              }}
+            >
+              📅 New Calendar Event
+            </div>
+            <input
+              placeholder="Event title"
+              value={quickAddTitle}
+              onChange={(e) => setQuickAddTitle(e.target.value)}
+              style={quickAddInputStyle}
+            />
+            <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+              <input
+                type="date"
+                value={quickAddDate}
+                onChange={(e) => setQuickAddDate(e.target.value)}
+                style={{ ...quickAddInputStyle, flex: 1 }}
+              />
+              <input
+                type="time"
+                value={quickAddTime}
+                onChange={(e) => setQuickAddTime(e.target.value)}
+                style={{ ...quickAddInputStyle, flex: 1 }}
+              />
+              <select
+                value={quickAddDuration}
+                onChange={(e) => setQuickAddDuration(Number(e.target.value))}
+                style={{ ...quickAddInputStyle, flex: 1 }}
+              >
+                <option value={30}>30 min</option>
+                <option value={60}>1 hr</option>
+                <option value={90}>90 min</option>
+                <option value={120}>2 hr</option>
+              </select>
+            </div>
+            <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+              <button
+                type="button"
+                onClick={() => void handleQuickAddSubmit()}
+                disabled={quickAddLoading}
+                style={{
+                  ...primaryButtonStyle,
+                  opacity: quickAddLoading ? 0.6 : 1,
+                }}
+              >
+                {quickAddLoading ? 'Adding...' : 'Add to Calendar'}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowQuickAdd(false)
+                  setQuickAddError('')
+                }}
+                style={ghostButtonStyle}
+              >
+                Cancel
+              </button>
+            </div>
+            {quickAddError && (
+              <div style={{ fontSize: 10, color: '#ef4444', marginTop: 6 }}>
+                {quickAddError}
+              </div>
+            )}
+          </div>
+        )}
 
         <div
           style={{

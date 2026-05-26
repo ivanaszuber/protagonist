@@ -4,7 +4,12 @@ const GOOGLE_AUTH = 'https://accounts.google.com/o/oauth2'
 const CALENDAR_BASE = 'https://www.googleapis.com/calendar/v3'
 
 const SCOPES =
-  'https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/userinfo.email'
+  'https://www.googleapis.com/auth/calendar.events ' +
+  'https://www.googleapis.com/auth/calendar.readonly ' +
+  'https://www.googleapis.com/auth/gmail.readonly ' +
+  'https://www.googleapis.com/auth/userinfo.email'
+
+const CALENDAR_TIMEZONE = 'Europe/London'
 
 export interface GoogleTokens {
   access_token: string
@@ -200,6 +205,114 @@ export async function fetchCalendarEvents(
     if (!b.start_time) return 1
     return new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
   })
+}
+
+export interface CreateEventInput {
+  title: string
+  date: string
+  startTime: string
+  durationMinutes: number
+  description?: string
+  location?: string
+}
+
+export interface CreateEventResult {
+  success: boolean
+  eventId?: string
+  htmlLink?: string
+  error?: 'insufficient_scope' | 'not_connected' | 'api_error'
+  errorMessage?: string
+}
+
+function formatLocalDateTime(date: string, time: string): string {
+  const [h, m] = time.split(':').map(Number)
+  return `${date}T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00`
+}
+
+function addMinutesToLocalDateTime(
+  date: string,
+  time: string,
+  minutes: number
+): { date: string; time: string } {
+  const [h, m] = time.split(':').map(Number)
+  const total = h * 60 + m + minutes
+  const dayOffset = Math.floor(total / (24 * 60))
+  const minsInDay = ((total % (24 * 60)) + 24 * 60) % (24 * 60)
+  const endH = Math.floor(minsInDay / 60)
+  const endM = minsInDay % 60
+  const d = new Date(`${date}T12:00:00`)
+  d.setDate(d.getDate() + dayOffset)
+  const endDate = d.toISOString().split('T')[0]
+  return {
+    date: endDate,
+    time: `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`,
+  }
+}
+
+export async function createCalendarEvent(
+  accessToken: string,
+  input: CreateEventInput
+): Promise<CreateEventResult> {
+  const isAllDay = !input.startTime || input.durationMinutes === 0
+
+  let body: Record<string, unknown>
+
+  if (isAllDay) {
+    body = {
+      summary: input.title,
+      description: input.description ?? undefined,
+      location: input.location ?? undefined,
+      start: { date: input.date },
+      end: { date: input.date },
+    }
+  } else {
+    const startIso = formatLocalDateTime(input.date, input.startTime)
+    const endParts = addMinutesToLocalDateTime(
+      input.date,
+      input.startTime,
+      input.durationMinutes
+    )
+    const endIso = formatLocalDateTime(endParts.date, endParts.time)
+
+    body = {
+      summary: input.title,
+      description: input.description ?? undefined,
+      location: input.location ?? undefined,
+      start: { dateTime: startIso, timeZone: CALENDAR_TIMEZONE },
+      end: { dateTime: endIso, timeZone: CALENDAR_TIMEZONE },
+    }
+  }
+
+  const res = await fetch(`${CALENDAR_BASE}/calendars/primary/events`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  })
+
+  if (res.status === 403) {
+    const data = (await res.json().catch(() => ({}))) as {
+      error?: { message?: string }
+    }
+    const msg = data.error?.message ?? ''
+    if (msg.toLowerCase().includes('insufficient')) {
+      return { success: false, error: 'insufficient_scope' }
+    }
+  }
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => '')
+    return { success: false, error: 'api_error', errorMessage: text }
+  }
+
+  const created = (await res.json()) as { id?: string; htmlLink?: string }
+  return {
+    success: true,
+    eventId: created.id,
+    htmlLink: created.htmlLink,
+  }
 }
 
 export function buildCalendarContext(events: CalendarEvent[], date: string): string {

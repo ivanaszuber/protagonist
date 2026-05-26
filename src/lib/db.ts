@@ -388,6 +388,18 @@ export async function getGoogleTokens(userId: string) {
   return data
 }
 
+/** Alias for calendar write endpoints */
+export async function getGoogleTokensForUser(userId: string) {
+  return getGoogleTokens(userId)
+}
+
+export async function refreshAndSaveGoogleTokens(userId: string, refreshToken: string) {
+  const { refreshGoogleTokens } = await import('@/lib/google')
+  const tokens = await refreshGoogleTokens(refreshToken)
+  await saveGoogleTokens(userId, tokens)
+  return tokens
+}
+
 export async function deleteGoogleTokens(userId: string) {
   if (!isSupabaseConfigured()) return
   await supabase.from('google_tokens').delete().eq('user_id', userId)
