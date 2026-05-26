@@ -15,6 +15,34 @@ type SheetState =
   | 'calendar-confirm'
   | 'calendar-done'
   | 'chat'
+  | 'checkin-loading'
+  | 'checkin-listening'
+  | 'checkin-thinking'
+  | 'checkin-done'
+
+interface MorningContext {
+  readiness: number | null
+  sleep: number | null
+  activity: number | null
+  task_count: number
+  event_count: number
+  already_checked_in: boolean
+}
+
+interface MorningCheckinResult {
+  calendar_matches: string[]
+  new_tasks: Array<{
+    id?: string
+    title: string
+    dimension: string
+    due_date: string
+    xp_reward: number
+  }>
+  focus_list: Array<{ text: string; dimension: string | null }>
+  suggestions: Array<{ text: string; dimension: string }>
+  oracle_message: string
+  mood_signal: string
+}
 
 interface CalendarEventInput {
   title: string
@@ -94,7 +122,10 @@ export function OracleSheet() {
   const [calendarCreating, setCalendarCreating] = useState(false)
   const [calendarInsufficientScope, setCalendarInsufficientScope] = useState(false)
   const [calendarDoneTitle, setCalendarDoneTitle] = useState('')
+  const [morningContext, setMorningContext] = useState<MorningContext | null>(null)
+  const [checkinResult, setCheckinResult] = useState<MorningCheckinResult | null>(null)
   const recognitionRef = useRef<SpeechRecognition | null>(null)
+  const checkinModeRef = useRef(false)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
   const hideFab = pathname === '/oracle'
@@ -107,24 +138,52 @@ export function OracleSheet() {
     prevStateRef.current = state
   }, [state])
 
+  const loadMorningContext = useCallback(async () => {
+    try {
+      const res = await fetch(
+        `/api/oracle/morning-context?userId=${encodeURIComponent(userId)}`
+      )
+      const data = (await res.json()) as MorningContext
+      setMorningContext(data)
+    } catch {
+      setMorningContext(null)
+    }
+    setState('checkin-listening')
+    setTimeout(() => startVoiceRef.current?.(), 200)
+  }, [userId])
+
+  const startVoiceRef = useRef<(() => void) | null>(null)
+
   useEffect(() => {
     const handler = (e: Event) => {
-      const detail = (e as CustomEvent<{ prefill?: string }>).detail
+      const detail = (e as CustomEvent<{ prefill?: string; context?: string }>).detail
+      setCheckinResult(null)
+      setMorningContext(null)
       setInputText(detail?.prefill ?? '')
-      setState('idle')
-      setTimeout(() => inputRef.current?.focus(), 100)
+      if (detail?.context === 'morning_checkin') {
+        checkinModeRef.current = true
+        setState('checkin-loading')
+        void loadMorningContext()
+      } else {
+        checkinModeRef.current = false
+        setState('idle')
+        setTimeout(() => inputRef.current?.focus(), 100)
+      }
     }
     window.addEventListener('protagonist:open-oracle', handler)
     return () => window.removeEventListener('protagonist:open-oracle', handler)
-  }, [])
+  }, [loadMorningContext])
 
   const close = useCallback(() => {
+    checkinModeRef.current = false
     setState('closed')
     setInputText('')
     setResult(null)
     setChatMessages([])
     setCalendarInsufficientScope(false)
     setCalendarDoneTitle('')
+    setMorningContext(null)
+    setCheckinResult(null)
     if (recognitionRef.current) {
       recognitionRef.current.stop()
       recognitionRef.current = null
@@ -178,15 +237,14 @@ export function OracleSheet() {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition
     if (!SR) return
     const rec = new SR()
-    rec.continuous = true       // keep listening until user taps stop
-    rec.interimResults = true   // accumulate transcript live
+    rec.continuous = true
+    rec.interimResults = true
     rec.lang = 'en-GB'
     recognitionRef.current = rec
-    setState('recording')
+    setState(checkinModeRef.current ? 'checkin-listening' : 'recording')
     setInputText('')
 
     rec.onresult = (e: SpeechRecognitionEvent) => {
-      // Concatenate all results (final + interim) to build the full transcript
       let transcript = ''
       for (let i = 0; i < e.results.length; i++) {
         transcript += e.results[i][0].transcript
@@ -195,22 +253,20 @@ export function OracleSheet() {
     }
 
     rec.onerror = (e: SpeechRecognitionErrorEvent) => {
-      // 'aborted' fires when we call rec.stop() ourselves — not a real error
-      if (e.error !== 'aborted') setState('idle')
+      if (e.error !== 'aborted') {
+        setState(checkinModeRef.current ? 'checkin-listening' : 'idle')
+      }
     }
 
     rec.onend = () => {
-      // Auto-restart if the browser cut us off mid-recording (e.g. timeout)
-      // Only restart if we're still supposed to be recording
       setState((s) => {
-        if (s === 'recording') {
+        if (s === 'recording' || s === 'checkin-listening') {
           try {
             rec.start()
           } catch {
-            // rec already stopped/replaced — stay idle
-            return 'idle'
+            return checkinModeRef.current ? 'checkin-listening' : 'idle'
           }
-          return 'recording'
+          return checkinModeRef.current ? 'checkin-listening' : 'recording'
         }
         return s
       })
@@ -219,12 +275,40 @@ export function OracleSheet() {
     rec.start()
   }, [])
 
+  startVoiceRef.current = startVoice
+
   const stopVoice = useCallback(() => {
-    // Set state to idle FIRST so onend doesn't restart the recognition
-    setState('idle')
+    setState(checkinModeRef.current ? 'checkin-listening' : 'idle')
     recognitionRef.current?.stop()
     recognitionRef.current = null
   }, [])
+
+  const handleCheckinSubmit = useCallback(async () => {
+    const text = inputText.trim()
+    if (!text) return
+
+    stopVoice()
+    setState('checkin-thinking')
+
+    try {
+      const res = await fetch('/api/oracle/morning-checkin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, transcript: text }),
+      })
+      if (!res.ok) {
+        setState('checkin-listening')
+        return
+      }
+      const data = (await res.json()) as MorningCheckinResult
+      setCheckinResult(data)
+      setState('checkin-done')
+      window.dispatchEvent(new CustomEvent('protagonist:oracle-closed'))
+      window.dispatchEvent(new CustomEvent('protagonist:task-added'))
+    } catch {
+      setState('checkin-listening')
+    }
+  }, [inputText, userId, stopVoice])
 
   const sendChatToArc = useCallback(
     async (text: string) => {
@@ -402,20 +486,31 @@ export function OracleSheet() {
     )
   }
 
+  const isCheckinListening = state === 'checkin-listening'
+  const isMicActive = state === 'recording' || isCheckinListening
+
   const subtitle =
-    state === 'recording'
-      ? 'tap stop when done'
-      : state === 'thinking'
-        ? 'reading your intent...'
-        : state === 'task-done'
-          ? `saved · ${result?.task?.dimension ? dimensionLabel(result.task.dimension) : ''}`
-          : state === 'note-done'
-            ? 'reflecting on your note...'
-            : state === 'calendar-confirm'
-              ? 'confirm calendar event'
-              : state === 'calendar-done'
-                ? 'calendar updated'
-                : 'speak, type, or drop an image'
+    isCheckinListening
+      ? "Tell me about your day — I'm listening"
+      : state === 'recording'
+        ? 'tap stop when done'
+        : state === 'thinking'
+          ? 'reading your intent...'
+          : state === 'checkin-loading'
+            ? 'loading your morning...'
+            : state === 'checkin-thinking'
+              ? 'cross-referencing calendar · extracting tasks'
+              : state === 'checkin-done'
+                ? 'morning briefing ready'
+                : state === 'task-done'
+                  ? `saved · ${result?.task?.dimension ? dimensionLabel(result.task.dimension) : ''}`
+                  : state === 'note-done'
+                    ? 'reflecting on your note...'
+                    : state === 'calendar-confirm'
+                      ? 'confirm calendar event'
+                      : state === 'calendar-done'
+                        ? 'calendar updated'
+                        : 'speak, type, or drop an image'
 
   return (
     <>
@@ -473,35 +568,41 @@ export function OracleSheet() {
                 height: 30,
                 borderRadius: '50%',
                 background: '#200A45',
-                border: `1.5px solid ${state === 'recording' ? '#E879F9' : '#9333EA'}`,
+                border: `1.5px solid ${isMicActive ? '#E879F9' : '#9333EA'}`,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
               }}
             >
-              <OracleEye size={16} pulse={state === 'recording'} />
+              <OracleEye size={16} pulse={isMicActive} />
             </div>
             <div>
               <div style={{ fontSize: 13, fontWeight: 500, color: '#E8E0F0' }}>
-                {state === 'recording'
-                  ? 'Listening...'
-                  : state === 'task-done'
-                    ? 'Task added'
-                    : state === 'calendar-confirm'
-                      ? 'Calendar event'
-                      : state === 'calendar-done'
-                        ? calendarInsufficientScope
-                          ? 'Reconnect needed'
-                          : 'Event added'
-                        : 'Oracle'}
+                {isCheckinListening
+                  ? 'Morning check-in'
+                  : state === 'recording'
+                    ? 'Listening...'
+                    : state === 'checkin-thinking'
+                      ? 'Analysing your day'
+                      : state === 'checkin-done'
+                        ? 'Check-in complete'
+                        : state === 'task-done'
+                          ? 'Task added'
+                          : state === 'calendar-confirm'
+                            ? 'Calendar event'
+                            : state === 'calendar-done'
+                              ? calendarInsufficientScope
+                                ? 'Reconnect needed'
+                                : 'Event added'
+                              : 'Oracle'}
               </div>
               <div
                 style={{
                   fontSize: 10,
                   color:
-                    state === 'recording'
+                    isMicActive
                       ? '#9333EA'
-                      : state === 'thinking'
+                      : state === 'thinking' || state === 'checkin-thinking'
                         ? '#5A4A7A'
                         : state === 'task-done'
                           ? '#34d399'
@@ -544,6 +645,136 @@ export function OracleSheet() {
         </div>
 
         <div style={{ padding: '0 14px' }}>
+          {state === 'checkin-loading' && (
+            <div
+              style={{
+                padding: '20px 14px',
+                textAlign: 'center',
+                color: '#5A4A7A',
+                fontSize: 12,
+                marginBottom: 14,
+              }}
+            >
+              Loading your morning context...
+            </div>
+          )}
+
+          {state === 'checkin-thinking' && (
+            <div style={{ padding: '20px 14px', textAlign: 'center', marginBottom: 14 }}>
+              <div style={{ fontSize: 13, color: '#E8E0F0', marginBottom: 6 }}>
+                Analysing your day...
+              </div>
+              <div style={{ fontSize: 11, color: '#5A4A7A' }}>
+                cross-referencing calendar · extracting tasks
+              </div>
+            </div>
+          )}
+
+          {state === 'checkin-listening' && (
+            <>
+              {morningContext && (
+                <div
+                  style={{
+                    background: '#0D0820',
+                    border: '0.5px solid #2D1B55',
+                    borderRadius: 10,
+                    padding: '10px 12px',
+                    marginBottom: 10,
+                    fontSize: 11,
+                    color: '#5A4A7A',
+                    lineHeight: 1.6,
+                  }}
+                >
+                  <div style={{ color: '#E8E0F0', fontWeight: 500, marginBottom: 4 }}>
+                    Good morning ☀
+                  </div>
+                  <div>
+                    Readiness {morningContext.readiness ?? '--'} · Sleep{' '}
+                    {morningContext.sleep ?? '--'}
+                    {morningContext.activity != null
+                      ? ` · Move ${morningContext.activity}`
+                      : ' · Move —'}
+                  </div>
+                  <div>
+                    {morningContext.task_count} tasks · {morningContext.event_count}{' '}
+                    calendar events today
+                  </div>
+                </div>
+              )}
+              <div
+                style={{
+                  background: '#0D0820',
+                  borderRadius: 12,
+                  border: '0.5px solid #9333EA',
+                  padding: '12px',
+                  marginBottom: 10,
+                }}
+              >
+                <textarea
+                  ref={inputRef}
+                  value={inputText}
+                  onChange={(e) => setInputText(e.target.value)}
+                  placeholder="What's on your mind..."
+                  rows={3}
+                  style={{
+                    width: '100%',
+                    background: 'transparent',
+                    border: 'none',
+                    outline: 'none',
+                    resize: 'none',
+                    fontSize: 13,
+                    color: inputText ? '#C0B0E0' : '#3D3358',
+                    fontFamily: 'inherit',
+                    lineHeight: 1.5,
+                  }}
+                />
+              </div>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+                <button
+                  type="button"
+                  onClick={stopVoice}
+                  style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: '50%',
+                    background: '#9333EA',
+                    border: '0.5px solid #9333EA',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    flexShrink: 0,
+                    color: 'white',
+                    fontSize: 10,
+                  }}
+                  aria-label="Stop recording"
+                >
+                  Stop
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleCheckinSubmit()}
+                  disabled={!inputText.trim()}
+                  style={{
+                    flex: 1,
+                    height: 44,
+                    borderRadius: 10,
+                    background: inputText.trim() ? '#9333EA' : '#1E0D40',
+                    border: 'none',
+                    color: 'white',
+                    fontSize: 13,
+                    fontWeight: 500,
+                    cursor: inputText.trim() ? 'pointer' : 'default',
+                    opacity: inputText.trim() ? 1 : 0.6,
+                    fontFamily: 'inherit',
+                  }}
+                >
+                  Done — analyse my day
+                </button>
+              </div>
+            </>
+          )}
+
           {(state === 'idle' || state === 'recording' || state === 'thinking') && (
             <>
               <div
@@ -959,6 +1190,171 @@ export function OracleSheet() {
                     Done
                   </button>
                 )}
+              </div>
+            </>
+          )}
+
+          {state === 'checkin-done' && checkinResult && (
+            <>
+              <div style={{ marginBottom: 10 }}>
+                <div
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 500,
+                    color: '#E8E0F0',
+                    marginBottom: 12,
+                  }}
+                >
+                  ☀ Morning check-in complete
+                </div>
+
+                {checkinResult.calendar_matches.length > 0 && (
+                  <div style={{ marginBottom: 10 }}>
+                    <div style={{ fontSize: 10, color: '#5A4A7A', marginBottom: 6 }}>
+                      📅 Already on your schedule
+                    </div>
+                    {checkinResult.calendar_matches.map((match, i) => (
+                      <div
+                        key={i}
+                        style={{ fontSize: 12, color: '#7A6A9A', padding: '3px 0' }}
+                      >
+                        ✓ {match}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {checkinResult.new_tasks.length > 0 && (
+                  <div style={{ marginBottom: 10 }}>
+                    <div style={{ fontSize: 10, color: '#5A4A7A', marginBottom: 6 }}>
+                      ✨ Added {checkinResult.new_tasks.length} task
+                      {checkinResult.new_tasks.length > 1 ? 's' : ''}
+                    </div>
+                    {checkinResult.new_tasks.map((task, i) => {
+                      const dimColor =
+                        CHARACTERS[task.dimension as Dimension]?.color ?? '#9333EA'
+                      return (
+                        <div
+                          key={task.id ?? i}
+                          style={{ fontSize: 12, color: '#C0B0E0', padding: '3px 0' }}
+                        >
+                          {task.title}
+                          <span
+                            style={{
+                              marginLeft: 6,
+                              fontSize: 9,
+                              color: dimColor,
+                              background: `${dimColor}18`,
+                              border: `0.5px solid ${dimColor}`,
+                              borderRadius: 20,
+                              padding: '1px 6px',
+                            }}
+                          >
+                            {task.dimension}
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+
+                {checkinResult.focus_list.length > 0 && (
+                  <div style={{ marginBottom: 10 }}>
+                    <div style={{ fontSize: 10, color: '#5A4A7A', marginBottom: 6 }}>
+                      ⚔ Today&apos;s focus
+                    </div>
+                    {checkinResult.focus_list.map((item, i) => (
+                      <div
+                        key={i}
+                        style={{ fontSize: 12, color: '#E8E0F0', padding: '3px 0' }}
+                      >
+                        <span style={{ color: '#5A4A7A', marginRight: 6 }}>{i + 1}.</span>
+                        {item.text}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {checkinResult.suggestions.length > 0 && (
+                  <div style={{ marginBottom: 10 }}>
+                    <div style={{ fontSize: 10, color: '#5A4A7A', marginBottom: 6 }}>
+                      💡 Suggestions
+                    </div>
+                    {checkinResult.suggestions.map((item, i) => (
+                      <div
+                        key={i}
+                        style={{ fontSize: 11, color: '#7A6A9A', padding: '2px 0' }}
+                      >
+                        · {item.text}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div
+                  style={{
+                    background: '#1A0D35',
+                    border: '0.5px solid #2D1B55',
+                    borderLeft: '3px solid #9333EA',
+                    padding: '10px 12px',
+                    borderRadius: '0 10px 10px 10px',
+                  }}
+                >
+                  <div style={{ fontSize: 10, color: '#9333EA', marginBottom: 4 }}>Oracle</div>
+                  <div
+                    style={{
+                      fontSize: 12,
+                      color: '#A090C0',
+                      fontStyle: 'italic',
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    {checkinResult.oracle_message}
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    checkinModeRef.current = false
+                    setCheckinResult(null)
+                    setState('idle')
+                    setInputText('')
+                  }}
+                  style={{
+                    flex: 1,
+                    height: 44,
+                    borderRadius: 10,
+                    background: '#1E0D40',
+                    border: '0.5px solid #2D1B55',
+                    color: '#7A5FA0',
+                    fontSize: 12,
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                  }}
+                >
+                  Add something
+                </button>
+                <button
+                  type="button"
+                  onClick={close}
+                  style={{
+                    flex: 2,
+                    height: 44,
+                    borderRadius: 10,
+                    background: '#9333EA',
+                    border: 'none',
+                    color: 'white',
+                    fontSize: 12,
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                  }}
+                >
+                  Go build ›
+                </button>
               </div>
             </>
           )}

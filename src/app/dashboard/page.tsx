@@ -25,6 +25,7 @@ import { formatCyclePhase, getHpTier, getOracleVerdict } from '@/lib/oura'
 import { DIMENSION_TO_SLUG } from '@/lib/tierName'
 import { getLevel } from '@/lib/xp'
 import { getUserId } from '@/lib/user'
+import { openOracle } from '@/lib/oracle-events'
 import { TopNav } from '@/components/TopNav'
 
 interface VitalityData {
@@ -195,12 +196,6 @@ function formatTimeFromIso(iso: string): string {
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return ''
   return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
-}
-
-function openOracle(prefill = '') {
-  window.dispatchEvent(
-    new CustomEvent('protagonist:open-oracle', { detail: { prefill } })
-  )
 }
 
 const quickAddInputStyle: CSSProperties = {
@@ -738,7 +733,7 @@ export default function DashboardPage() {
       ) : (
         <button
           type="button"
-          onClick={() => openOracle('Good morning')}
+          onClick={() => openOracle('Good morning', 'morning_checkin')}
           style={{
             width: '100%',
             padding: '12px 14px',

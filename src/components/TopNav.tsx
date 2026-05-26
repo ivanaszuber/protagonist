@@ -13,10 +13,30 @@ interface MenuDrawerProps {
   onClose: () => void
 }
 
+const showDevTools = process.env.NEXT_PUBLIC_SHOW_DEV_TOOLS === 'true'
+
 function MenuDrawer({ open, onClose }: MenuDrawerProps) {
   const router = useRouter()
   const userId = getUserId()
   const [ouraConnected, setOuraConnected] = useState<boolean | null>(null)
+  const [devResetState, setDevResetState] = useState<'idle' | 'loading' | 'done'>('idle')
+
+  async function handleDevReset() {
+    if (devResetState === 'loading') return
+    setDevResetState('loading')
+    try {
+      await fetch('/api/dev/reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId }),
+      })
+      setDevResetState('done')
+      onClose()
+      window.location.reload()
+    } catch {
+      setDevResetState('idle')
+    }
+  }
 
   useEffect(() => {
     if (!open) return
@@ -161,6 +181,36 @@ function MenuDrawer({ open, onClose }: MenuDrawerProps) {
             {row.right}
           </button>
         ))}
+        {showDevTools && (
+          <button
+            key="dev-reset"
+            type="button"
+            onClick={() => void handleDevReset()}
+            style={{
+              width: '100%',
+              minHeight: 48,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              padding: '0 20px',
+              background: 'transparent',
+              border: 'none',
+              borderTop: '0.5px solid #3B0010',
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              textAlign: 'left',
+            }}
+          >
+            <span style={{ fontSize: 16, width: 24, textAlign: 'center' }}>🗑</span>
+            <span style={{ flex: 1, fontSize: 14, color: '#ef4444' }}>Dev: Reset all data</span>
+            {devResetState === 'loading' && (
+              <span style={{ fontSize: 10, color: '#5A4A7A' }}>Resetting...</span>
+            )}
+            {devResetState === 'done' && (
+              <span style={{ fontSize: 10, color: '#34d399' }}>Done ✓</span>
+            )}
+          </button>
+        )}
       </div>
     </>
   )
