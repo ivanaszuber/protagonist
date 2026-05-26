@@ -156,18 +156,36 @@ export async function getBossKillStats(
 ): Promise<{ slain: number; escaped: number }> {
   if (!isQuestDbConfigured()) return { slain: 0, escaped: 0 }
 
-  const { data } = await supabase
-    .from('boss_kills')
-    .select('outcome')
-    .eq('user_id', userId)
-    .eq('dimension', dimension)
+  const [killsRes, battlesRes] = await Promise.all([
+    supabase
+      .from('boss_kills')
+      .select('outcome, boss_battle_id')
+      .eq('user_id', userId)
+      .eq('dimension', dimension),
+    // Fallback: count slain boss_battles not yet in boss_kills
+    supabase
+      .from('boss_battles')
+      .select('id, status')
+      .eq('user_id', userId)
+      .eq('dimension', dimension)
+      .eq('status', 'slain'),
+  ])
 
+  const killRows = (killsRes.data ?? []) as { outcome: string; boss_battle_id?: string | null }[]
   let slain = 0
   let escaped = 0
-  for (const row of data ?? []) {
+  const killBossIds = new Set<string>()
+  for (const row of killRows) {
     if (row.outcome === 'slain') slain++
     if (row.outcome === 'escaped') escaped++
+    if (row.boss_battle_id) killBossIds.add(row.boss_battle_id)
   }
+
+  // Add slain battles that have no boss_kills record
+  for (const b of battlesRes.data ?? []) {
+    if (!killBossIds.has(b.id as string)) slain++
+  }
+
   return { slain, escaped }
 }
 
@@ -177,14 +195,53 @@ export async function getBossKills(
 ): Promise<BossKillRow[]> {
   if (!isQuestDbConfigured()) return []
 
-  const { data } = await supabase
-    .from('boss_kills')
-    .select('*')
-    .eq('user_id', userId)
-    .eq('dimension', dimension)
-    .order('killed_at', { ascending: false })
+  const [killsRes, battlesRes] = await Promise.all([
+    supabase
+      .from('boss_kills')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('dimension', dimension)
+      .order('killed_at', { ascending: false }),
+    // Fallback: include slain boss_battles that have no boss_kills entry
+    supabase
+      .from('boss_battles')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('dimension', dimension)
+      .eq('status', 'slain')
+      .order('slain_at', { ascending: false }),
+  ])
 
-  return (data ?? []) as BossKillRow[]
+  const kills = (killsRes.data ?? []) as (BossKillRow & { boss_battle_id?: string })[]
+  const killBossIds = new Set(kills.map((k) => k.boss_battle_id).filter(Boolean))
+
+  // Synthesize BossKillRow entries for slain battles that aren't in boss_kills yet
+  for (const b of battlesRes.data ?? []) {
+    if (killBossIds.has(b.id as string)) continue
+    const battle = b as BossBattle
+    const slainAt = battle.slain_at ?? battle.created_at
+    const daysTaken = battle.slain_at
+      ? Math.max(1, Math.ceil((new Date(battle.slain_at).getTime() - new Date(battle.created_at).getTime()) / 86400000))
+      : null
+    kills.push({
+      id: battle.id,
+      boss_name: battle.name,
+      quest_name: null,
+      outcome: 'slain',
+      hp_total: battle.hp_total,
+      tasks_completed: battle.hp_total - battle.hp_remaining,
+      days_taken: daysTaken,
+      xp_awarded: battle.reward_xp,
+      killed_at: slainAt,
+    } as BossKillRow)
+  }
+
+  // Sort by killed_at descending
+  kills.sort(
+    (a, b) => new Date(b.killed_at).getTime() - new Date(a.killed_at).getTime()
+  )
+
+  return kills as BossKillRow[]
 }
 
 export async function decrementBossHp(

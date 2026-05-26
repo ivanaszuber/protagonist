@@ -123,21 +123,37 @@ export function BossCard({
       })
     }, 600)
 
+    // Fire victory immediately (optimistic) — don't wait for the API response.
+    // This ensures the animation always plays even if the network call fails
+    // or the task had no boss_battle_id (old data).
+    if (isLastTask) {
+      setVictory({ name: localBoss.name, rewardXp: localBoss.reward_xp })
+    }
+
+    let apiResult: { slain?: boolean; reward_xp?: number; hp_remaining?: number } = {}
     try {
-      const result = await onTaskComplete(task.id, task.xp_reward)
+      apiResult = (await onTaskComplete(task.id, task.xp_reward)) ?? {}
+    } catch {
+      // non-critical — victory already shown optimistically above
+    }
+
+    try {
       // Sync hp_remaining from server response
-      if (result?.hp_remaining !== undefined) {
+      if (apiResult.hp_remaining !== undefined) {
         setLocalBoss((prev) =>
-          prev ? { ...prev, hp_remaining: result.hp_remaining! } : prev
+          prev ? { ...prev, hp_remaining: apiResult.hp_remaining! } : prev
         )
       }
-      // Trigger victory if server confirmed slain OR if this was the last task
-      // (handles cases where boss_battle_id was missing on old tasks)
-      if ((result?.slain || isLastTask) && localBoss) {
+      // If this wasn't the last task but the server confirms the boss was slain, show victory
+      if (!isLastTask && apiResult.slain && localBoss) {
         setVictory({
           name: localBoss.name,
-          rewardXp: result?.reward_xp ?? localBoss.reward_xp,
+          rewardXp: apiResult.reward_xp ?? localBoss.reward_xp,
         })
+      }
+      // Update XP reward if server returns a different value than the optimistic one
+      if (isLastTask && apiResult.reward_xp) {
+        setVictory({ name: localBoss.name, rewardXp: apiResult.reward_xp })
       }
     } finally {
       setCompletingId(null)
