@@ -128,9 +128,9 @@ Oracle prompt update: include milestone context more prominently so generated ta
 2. ✅ Update `/api/bosses/generate` to assign `milestone_id` per task + 7-day deadline
 3. Update `QuestData` type + `/api/quests/character/[dimension]` to include per-milestone task counts
 4. Update BossCard UI to show "In service of: [Milestone]" tag per task
-5. Update MilestonesSection to show task-based progress bar per milestone
+5. ✅ Update MilestonesSection: click-to-expand with Edit / Focus / Unfocus / Delete; `is_focused` flag; non-focused milestones dimmed when focus is set
 6. Update QuestCard (LegendCard) to show overall quest progress
-7. Add focus-milestone picker to Oracle challenge-creation flow
+7. ✅ Focus-milestone auto-detection in generate route (no picker needed — set focus on character page)
 
 ---
 

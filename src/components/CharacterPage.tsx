@@ -290,7 +290,11 @@ export function CharacterPage({ dimension }: CharacterPageProps) {
   const level = getLevel(xp)
   const xpInLevel = xp % 500
   const tierLabel = getTierName(level, characterSlug)
-  const activeMilestone = quest?.milestones.find((m) => !m.completed) ?? null
+  // Prefer focused milestone for BossCard context; fall back to first incomplete
+  const activeMilestone =
+    quest?.milestones.find((m) => !m.completed && m.is_focused) ??
+    quest?.milestones.find((m) => !m.completed) ??
+    null
 
   const pageShellStyle: CSSProperties = {
     minHeight: '100dvh',
@@ -536,6 +540,31 @@ export function CharacterPage({ dimension }: CharacterPageProps) {
               )
             }
             onDelete={(id) => void deleteMilestone(id)}
+            onUpdate={(id, changes) =>
+              setQuest((prev) =>
+                prev
+                  ? {
+                      ...prev,
+                      milestones: prev.milestones.map((m) =>
+                        m.id === id ? { ...m, ...changes } : m
+                      ),
+                    }
+                  : prev
+              )
+            }
+            onFocus={(focusedId) =>
+              setQuest((prev) =>
+                prev
+                  ? {
+                      ...prev,
+                      milestones: prev.milestones.map((m) => ({
+                        ...m,
+                        is_focused: m.id === focusedId,
+                      })),
+                    }
+                  : prev
+              )
+            }
           />
         )}
 

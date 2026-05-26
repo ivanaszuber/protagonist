@@ -31,6 +31,7 @@ interface MilestoneRow {
   id: string
   title: string
   target_date: string | null
+  is_focused: boolean
 }
 
 export async function POST(request: Request) {
@@ -80,16 +81,22 @@ export async function POST(request: Request) {
   if (quest) {
     const { data } = await supabase
       .from('milestones')
-      .select('id, title, target_date')
+      .select('id, title, target_date, is_focused')
       .eq('quest_id', quest.id)
       .eq('completed', false)
+      .order('is_focused', { ascending: false })  // focused first
       .order('target_date', { ascending: true, nullsFirst: false })
     milestones = (data ?? []) as MilestoneRow[]
   }
 
-  // If a focusMilestoneId was passed, restrict to just that one
+  // Priority: explicit focusMilestoneId param → is_focused flag → all milestones
   if (focusMilestoneId) {
     milestones = milestones.filter((m) => m.id === focusMilestoneId)
+  } else {
+    const focused = milestones.find((m) => m.is_focused)
+    if (focused) {
+      milestones = [focused]
+    }
   }
 
   // Build milestone context string for the prompt
