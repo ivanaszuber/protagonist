@@ -149,6 +149,10 @@ export function CharacterPage({ dimension }: CharacterPageProps) {
   const [bossKills, setBossKills] = useState<BossKillRow[]>([])
   const [killStats, setKillStats] = useState({ slain: 0, escaped: 0 })
   const [earnedMedals, setEarnedMedals] = useState<string[]>([])
+  const [vaultSlipInfo, setVaultSlipInfo] = useState<{ isSlipDay: boolean; amount: number | null }>({
+    isSlipDay: false,
+    amount: null,
+  })
 
   async function loadBossAndMedals(uid: string) {
     const [bossRes, killsRes, medalsRes] = await Promise.allSettled([
@@ -203,10 +207,14 @@ export function CharacterPage({ dimension }: CharacterPageProps) {
     if (dimension === 'vitality') {
       fetches.push(fetch(`/api/oura/sync?userId=${encodeURIComponent(uid)}`).then((r) => r.json()))
     }
+    if (dimension === 'wealth') {
+      fetches.push(fetch(`/api/vault/settings?userId=${encodeURIComponent(uid)}`).then((r) => r.json()))
+    }
     Promise.allSettled(fetches).then((results) => {
       const questRes = results[0]
       const memoriesRes = results[1]
       const ouraRes = dimension === 'vitality' ? results[3] : null
+      const vaultRes = dimension === 'wealth' ? results[3] : null
       if (questRes.status === 'fulfilled') {
         const val = questRes.value as { quest?: QuestData | null }
         setQuest(val.quest ?? null)
@@ -218,6 +226,16 @@ export function CharacterPage({ dimension }: CharacterPageProps) {
       if (ouraRes?.status === 'fulfilled') {
         const val = ouraRes.value as { data?: OuraData }
         if (val.data) setOura(val.data)
+      }
+      if (vaultRes?.status === 'fulfilled') {
+        const val = vaultRes.value as {
+          settings?: { last_slip_at?: string | null; last_slip_amount?: number | null }
+        }
+        const slipAt = val.settings?.last_slip_at
+        const isSlipDay = slipAt
+          ? new Date(slipAt).toDateString() === new Date().toDateString()
+          : false
+        setVaultSlipInfo({ isSlipDay, amount: val.settings?.last_slip_amount ?? null })
       }
       setLoading(false)
     })
@@ -328,18 +346,49 @@ export function CharacterPage({ dimension }: CharacterPageProps) {
           <div
             style={{
               flexShrink: 0,
-              animation: 'protagonist-float 3.2s ease-in-out infinite',
-              animationDelay: floatDelay,
+              animation: vaultSlipInfo.isSlipDay
+                ? 'vault-slip-wobble 1.8s ease-in-out infinite'
+                : 'protagonist-float 3.2s ease-in-out infinite',
+              animationDelay: vaultSlipInfo.isSlipDay ? '0s' : floatDelay,
               transformOrigin: 'center bottom',
+              position: 'relative',
             }}
           >
             <HeroArt />
+            {vaultSlipInfo.isSlipDay && (
+              <>
+                <div
+                  style={{
+                    position: 'absolute',
+                    left: 20,
+                    top: 58,
+                    width: 5,
+                    height: 9,
+                    background: '#9FE1CB',
+                    borderRadius: '0 0 5px 5px',
+                    animation: 'vault-tear-fall 1.1s ease-in infinite',
+                  }}
+                />
+                <div
+                  style={{
+                    position: 'absolute',
+                    left: 40,
+                    top: 58,
+                    width: 5,
+                    height: 9,
+                    background: '#9FE1CB',
+                    borderRadius: '0 0 5px 5px',
+                    animation: 'vault-tear-fall 1.1s ease-in 0.45s infinite',
+                  }}
+                />
+              </>
+            )}
           </div>
 
           {/* Info column */}
           <div style={{ flex: 1, minWidth: 0 }}>
-            {/* Row 1: name + category badge */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+            {/* Row 1: name + category badge + optional slip badge */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
               <span style={{ fontSize: 22, fontWeight: 500, color: '#E8E0F0' }}>{char.name}</span>
               <span
                 style={{
@@ -354,6 +403,25 @@ export function CharacterPage({ dimension }: CharacterPageProps) {
               >
                 {char.categoryLabel}
               </span>
+              {vaultSlipInfo.isSlipDay && (
+                <span
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 4,
+                    background: '#2A0808',
+                    border: '0.5px solid #7A2020',
+                    borderRadius: 20,
+                    padding: '2px 10px',
+                    fontSize: 10,
+                    color: '#E05050',
+                    flexShrink: 0,
+                  }}
+                >
+                  😢 Vault is hurt
+                  {vaultSlipInfo.amount != null && ` · −£${Math.round(vaultSlipInfo.amount).toLocaleString('en-GB')}`}
+                </span>
+              )}
             </div>
 
             {/* Row 2: tier · level pill · challenges — all inline */}

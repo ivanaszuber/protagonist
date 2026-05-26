@@ -18,7 +18,18 @@ CREATE TABLE IF NOT EXISTS vault_settings (
   budget_categories JSONB NOT NULL DEFAULT '[]'::jsonb,
   shadow_gap NUMERIC NOT NULL DEFAULT 0,
   shadow_gap_updated_at TIMESTAMPTZ,
+  -- "I slipped" state (cleared automatically by date comparison, not DB update)
+  last_slip_at TIMESTAMPTZ,
+  last_slip_amount NUMERIC,
+  last_slip_category TEXT,
+  last_slip_note TEXT,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 ALTER TABLE vault_settings DISABLE ROW LEVEL SECURITY;
+
+-- Run this if the table already exists to add the slip columns:
+ALTER TABLE vault_settings ADD COLUMN IF NOT EXISTS last_slip_at TIMESTAMPTZ;
+ALTER TABLE vault_settings ADD COLUMN IF NOT EXISTS last_slip_amount NUMERIC;
+ALTER TABLE vault_settings ADD COLUMN IF NOT EXISTS last_slip_category TEXT;
+ALTER TABLE vault_settings ADD COLUMN IF NOT EXISTS last_slip_note TEXT;

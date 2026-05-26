@@ -4,6 +4,14 @@ import { useCallback, useEffect, useState } from 'react'
 import { VaultCharacterLarge } from '@/components/characters/CharacterHeroArt'
 import { coinFillColor, formatGbp } from '@/lib/vault'
 
+const SLIP_CATEGORIES = [
+  { key: 'shopping',    emoji: '🛍',  label: 'Shopping'    },
+  { key: 'restaurants', emoji: '🍽',  label: 'Restaurants' },
+  { key: 'going_out',   emoji: '🎉',  label: 'Going out'   },
+  { key: 'beauty',      emoji: '💄',  label: 'Beauty'      },
+  { key: 'other',       emoji: '❓',  label: 'Other'       },
+]
+
 interface VaultApiResponse {
   settings: {
     invested: number
@@ -15,6 +23,9 @@ interface VaultApiResponse {
     shadow_interest_rate: number
     monthly_income: number
     budget_categories: { budget: number }[]
+    last_slip_at: string | null
+    last_slip_amount: number | null
+    last_slip_category: string | null
   }
   totalNetWorth: number
   monthlySurplus: number
@@ -162,7 +173,8 @@ export function VaultNetWorthCard({ userId, accentColor }: VaultNetWorthCardProp
   const [shadowExpanded, setShadowExpanded] = useState(false)
   const [slipOpen, setSlipOpen] = useState(false)
   const [slipAmount, setSlipAmount] = useState('')
-  const [slipSad, setSlipSad] = useState(false)
+  const [slipCat, setSlipCat] = useState('shopping')
+  const [slipNote, setSlipNote] = useState('')
   const [slipSaving, setSlipSaving] = useState(false)
 
   const load = useCallback(async () => {
@@ -199,13 +211,24 @@ export function VaultNetWorthCard({ userId, accentColor }: VaultNetWorthCardProp
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userId,
-          patch: { shadow_gap: data.settings.shadow_gap + amount },
+          patch: {
+            shadow_gap: data.settings.shadow_gap + amount,
+            last_slip_at: new Date().toISOString(),
+            last_slip_amount: amount,
+            last_slip_category: slipCat,
+            last_slip_note: slipNote || null,
+          },
         }),
+      })
+      // Silently create personalised recovery task
+      void fetch('/api/oracle/create-slip-task', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, category: slipCat, amount }),
       })
       setSlipOpen(false)
       setSlipAmount('')
-      setSlipSad(true)
-      setTimeout(() => setSlipSad(false), 2000)
+      setSlipNote('')
       void load()
     } finally {
       setSlipSaving(false)
@@ -511,112 +534,238 @@ export function VaultNetWorthCard({ userId, accentColor }: VaultNetWorthCardProp
         </div>
       </div>
 
-      <div style={{ marginTop: 12 }}>
-        {slipOpen ? (
-          <div
-            style={{
-              display: 'flex',
-              gap: 8,
-              alignItems: 'center',
-              marginBottom: 8,
-            }}
-          >
-            <input
-              type="number"
-              placeholder="Amount £"
-              value={slipAmount}
-              onChange={(e) => setSlipAmount(e.target.value)}
-              style={{
-                flex: 1,
-                background: '#0D0820',
-                border: '0.5px solid #3D2070',
-                borderRadius: 8,
-                padding: '8px 10px',
-                color: '#E8E0F0',
-                fontSize: 13,
-                fontFamily: 'inherit',
-              }}
-            />
-            <button
-              type="button"
-              onClick={() => void handleSlipConfirm()}
-              disabled={slipSaving}
-              style={{
-                padding: '8px 12px',
-                background: '#7F1D1D',
-                border: '0.5px solid #ef4444',
-                borderRadius: 8,
-                color: '#fca5a5',
-                fontSize: 11,
-                cursor: 'pointer',
-                fontFamily: 'inherit',
-              }}
-            >
-              Log slip
-            </button>
-            <button
-              type="button"
-              onClick={() => setSlipOpen(false)}
-              style={{
-                padding: '8px',
-                background: 'transparent',
-                border: 'none',
-                color: '#5A4A7A',
-                fontSize: 11,
-                cursor: 'pointer',
-                fontFamily: 'inherit',
-              }}
-            >
-              Cancel
-            </button>
-          </div>
-        ) : null}
-
+      {/* "I slipped" trigger button — small, red, bottom-right */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
         <button
           type="button"
           onClick={() => setSlipOpen((v) => !v)}
           style={{
-            width: '100%',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center',
-            gap: 10,
-            padding: '10px 14px',
-            borderRadius: 12,
-            border: slipSad
-              ? '0.5px solid rgba(224,82,82,0.4)'
-              : '0.5px solid rgba(29,158,117,0.35)',
-            background: slipSad ? 'rgba(90,20,20,0.2)' : 'rgba(10,31,23,0.5)',
+            gap: 5,
+            background: '#2A0808',
+            border: '0.5px solid #8B2020',
+            borderRadius: 20,
+            padding: '5px 12px',
             cursor: 'pointer',
             fontFamily: 'inherit',
           }}
         >
-          <div
-            style={{
-              width: 36,
-              height: 36,
-              transform: slipSad ? 'scale(0.9)' : 'scale(1)',
-              opacity: slipSad ? 0.85 : 1,
-              transition: 'all 0.2s ease',
-            }}
-          >
-            {slipSad ? (
-              <svg width="36" height="40" viewBox="0 0 36 40" aria-hidden>
-                <ellipse cx="18" cy="22" rx="14" ry="16" fill="#0F6E56" />
-                <circle cx="13" cy="18" r="2" fill="white" opacity="0.15" />
-                <circle cx="23" cy="18" r="2" fill="white" opacity="0.15" />
-                <path d="M13 32 Q18 29 24 32" stroke="#012A1E" strokeWidth="1.5" fill="none" />
-              </svg>
-            ) : (
-              <div style={{ transform: 'scale(0.45)', transformOrigin: 'top left' }}>
-                <VaultCharacterLarge />
-              </div>
-            )}
-          </div>
-          <span style={{ fontSize: 12, color: slipSad ? '#fca5a5' : '#2D5A44' }}>
-            {slipSad ? 'Noted — shadow updated' : 'I slipped'}
-          </span>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden>
+            <path
+              d="M12 3C10 8 6 10 6 14C6 17.3 8.7 20 12 20C15.3 20 18 17.3 18 14C18 10 14 8 12 3Z"
+              stroke="#E05050"
+              strokeWidth="1.5"
+            />
+          </svg>
+          <span style={{ fontSize: 11, color: '#E05050', fontWeight: 500 }}>I slipped</span>
         </button>
+      </div>
+
+      {/* Inline confession form — slides down */}
+      <div
+        style={{
+          maxHeight: slipOpen ? 520 : 0,
+          overflow: 'hidden',
+          transition: 'max-height 0.35s ease',
+        }}
+      >
+        <div
+          style={{
+            marginTop: 12,
+            background: '#12101E',
+            borderRadius: 14,
+            borderLeft: '3px solid #1D9E75',
+            padding: '16px 14px 20px',
+          }}
+        >
+          {/* Sad animated robot + message */}
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, marginBottom: 18 }}>
+            <div
+              style={{
+                flexShrink: 0,
+                position: 'relative',
+                width: 72,
+                height: 88,
+                animation: 'vault-slip-wobble 1.4s ease-in-out infinite',
+                transformOrigin: 'bottom center',
+              }}
+            >
+              {/* Sad vault robot — same SVG, sad expression */}
+              <svg width="72" height="88" viewBox="0 0 42 56" fill="none" aria-hidden>
+                <circle cx="18" cy="7" r="5.5" fill="#FAC775" opacity="0.85" />
+                <circle cx="18" cy="7" r="3.5" fill="#EF9F27" />
+                <path d="M17.5 4.5V9.5M15.5 7H21" stroke="#FAC775" strokeWidth="1.2" strokeLinecap="round" />
+                <rect x="3" y="12" width="30" height="24" rx="9" fill="#1D9E75" />
+                <circle cx="13" cy="24" r="6" fill="#012A1E" />
+                <circle cx="26" cy="24" r="6" fill="#012A1E" />
+                {/* pupils down — sad look */}
+                <circle cx="11" cy="23" r="2" fill="white" opacity="0.5" />
+                <circle cx="24" cy="23" r="2" fill="white" opacity="0.5" />
+                {/* sad brows angled inward */}
+                <path d="M9 20L14 22" stroke="#9FE1CB" strokeWidth="1.2" strokeLinecap="round" />
+                <path d="M22 22L27 20" stroke="#9FE1CB" strokeWidth="1.2" strokeLinecap="round" />
+                {/* frown */}
+                <path d="M10 33Q18 29 26 33" stroke="#012A1E" strokeWidth="1.8" fill="none" strokeLinecap="round" />
+                <rect x="7" y="38" width="22" height="16" rx="5" fill="#0F6E56" />
+                <path d="M11 51L16 47L20 49L26 44" stroke="#1D9E75" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" opacity="0.75" />
+              </svg>
+              {/* Animated tears */}
+              <div
+                style={{
+                  position: 'absolute',
+                  left: 19,
+                  top: 50,
+                  width: 5,
+                  height: 9,
+                  background: '#9FE1CB',
+                  borderRadius: '0 0 5px 5px',
+                  animation: 'vault-tear-fall 1.1s ease-in infinite',
+                }}
+              />
+              <div
+                style={{
+                  position: 'absolute',
+                  left: 40,
+                  top: 50,
+                  width: 5,
+                  height: 9,
+                  background: '#9FE1CB',
+                  borderRadius: '0 0 5px 5px',
+                  animation: 'vault-tear-fall 1.1s ease-in 0.45s infinite',
+                }}
+              />
+            </div>
+            <div style={{ paddingTop: 4 }}>
+              <p style={{ fontSize: 17, fontWeight: 600, color: '#E8824A', marginBottom: 6 }}>
+                Vault is hurt 🥺
+              </p>
+              <p style={{ fontSize: 13, color: '#7A6A8A', lineHeight: 1.55 }}>
+                Shadow gap widened.<br />
+                Auto-recovers tomorrow.
+              </p>
+            </div>
+          </div>
+
+          {/* Confession form */}
+          <div style={{ background: '#1A1630', borderRadius: 14, padding: 14 }}>
+            <p
+              style={{
+                fontSize: 11,
+                fontWeight: 600,
+                color: '#6A5A8A',
+                letterSpacing: '0.1em',
+                textTransform: 'uppercase',
+                marginBottom: 12,
+              }}
+            >
+              What did you spend on?
+            </p>
+
+            {/* Category chips */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginBottom: 12 }}>
+              {SLIP_CATEGORIES.map((cat) => (
+                <button
+                  key={cat.key}
+                  type="button"
+                  onClick={() => setSlipCat(cat.key)}
+                  style={{
+                    background: slipCat === cat.key ? '#1E1A34' : '#12101E',
+                    border: `0.5px solid ${slipCat === cat.key ? '#5A40A0' : '#2A2040'}`,
+                    borderRadius: 22,
+                    padding: '7px 14px',
+                    fontSize: 13,
+                    color: slipCat === cat.key ? '#C8B8F0' : '#8A7AAA',
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                  }}
+                >
+                  {cat.emoji} {cat.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Amount */}
+            <div
+              style={{
+                background: '#12101E',
+                border: '0.5px solid #2A2040',
+                borderRadius: 12,
+                padding: '12px 16px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                marginBottom: 10,
+              }}
+            >
+              <span style={{ fontSize: 18, color: '#5A4A7A' }}>£</span>
+              <input
+                type="number"
+                placeholder="How much?"
+                value={slipAmount}
+                onChange={(e) => setSlipAmount(e.target.value)}
+                style={{
+                  flex: 1,
+                  background: 'transparent',
+                  border: 'none',
+                  outline: 'none',
+                  fontSize: 18,
+                  color: '#E8E0F0',
+                  fontFamily: 'inherit',
+                }}
+              />
+            </div>
+
+            {/* Optional note */}
+            <div
+              style={{
+                background: '#12101E',
+                border: '0.5px solid #2A2040',
+                borderRadius: 12,
+                padding: '12px 16px',
+                marginBottom: 12,
+              }}
+            >
+              <input
+                type="text"
+                placeholder="What was it? (optional)"
+                value={slipNote}
+                onChange={(e) => setSlipNote(e.target.value)}
+                style={{
+                  width: '100%',
+                  background: 'transparent',
+                  border: 'none',
+                  outline: 'none',
+                  fontSize: 13,
+                  color: '#C0B0D8',
+                  fontFamily: 'inherit',
+                }}
+              />
+            </div>
+
+            {/* Submit */}
+            <button
+              type="button"
+              onClick={() => void handleSlipConfirm()}
+              disabled={slipSaving || !slipAmount}
+              style={{
+                width: '100%',
+                background: '#2A0E0E',
+                border: '0.5px solid #7A2020',
+                borderRadius: 12,
+                padding: 16,
+                fontSize: 15,
+                fontWeight: 500,
+                color: '#E05050',
+                cursor: slipSaving || !slipAmount ? 'default' : 'pointer',
+                opacity: slipSaving || !slipAmount ? 0.6 : 1,
+                fontFamily: 'inherit',
+              }}
+            >
+              {slipSaving ? 'Logging...' : 'I know, I know... log it'}
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   )

@@ -25,6 +25,10 @@ export interface VaultSettings {
   budget_categories: BudgetCategory[]
   shadow_gap: number
   shadow_gap_updated_at: string | null
+  last_slip_at: string | null
+  last_slip_amount: number | null
+  last_slip_category: string | null
+  last_slip_note: string | null
   updated_at: string
 }
 
@@ -61,6 +65,10 @@ export function defaultVaultSettings(userId: string): VaultSettings {
     budget_categories: DEFAULT_BUDGET_CATEGORIES,
     shadow_gap: 0,
     shadow_gap_updated_at: null,
+    last_slip_at: null,
+    last_slip_amount: null,
+    last_slip_category: null,
+    last_slip_note: null,
     updated_at: now,
   }
 }
@@ -105,6 +113,10 @@ export function normalizeVaultRow(row: Record<string, unknown>, userId: string):
     budget_categories: categories,
     shadow_gap: toNumber(row.shadow_gap),
     shadow_gap_updated_at: (row.shadow_gap_updated_at as string | null) ?? null,
+    last_slip_at: (row.last_slip_at as string | null) ?? null,
+    last_slip_amount: row.last_slip_amount != null ? toNumber(row.last_slip_amount) : null,
+    last_slip_category: (row.last_slip_category as string | null) ?? null,
+    last_slip_note: (row.last_slip_note as string | null) ?? null,
     updated_at: (row.updated_at as string) ?? defaults.updated_at,
   }
 }
@@ -231,6 +243,10 @@ export async function upsertVaultSettings(
     budget_categories: merged.budget_categories,
     shadow_gap: merged.shadow_gap,
     shadow_gap_updated_at: merged.shadow_gap_updated_at,
+    last_slip_at: merged.last_slip_at,
+    last_slip_amount: merged.last_slip_amount,
+    last_slip_category: merged.last_slip_category,
+    last_slip_note: merged.last_slip_note,
     updated_at: merged.updated_at,
   }
 

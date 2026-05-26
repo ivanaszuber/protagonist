@@ -177,7 +177,7 @@ export default function VaultSettingsPage() {
         minHeight: '100vh',
         background: '#0D0820',
         color: '#E8E0F0',
-        paddingBottom: 32,
+        paddingBottom: 100,
       }}
     >
       <TopNav />

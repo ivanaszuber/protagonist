@@ -39,6 +39,11 @@ CREATE TABLE vault_settings (
   budget_categories  JSONB NOT NULL DEFAULT '[]',
   shadow_gap         NUMERIC NOT NULL DEFAULT 0,
   shadow_gap_updated_at TIMESTAMPTZ,
+  -- "I slipped" state
+  last_slip_at       TIMESTAMPTZ,          -- null = no slip today; set to NOW() on log
+  last_slip_amount   NUMERIC,              -- the amount logged
+  last_slip_category TEXT,                 -- e.g. 'shopping', 'restaurants', 'going_out'
+  last_slip_note     TEXT,                 -- optional user note
   updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 ```
@@ -390,19 +395,297 @@ Add `vault-updated` UI state — same pattern as `activity-done`:
 
 ## 7 · "I slipped" button
 
-This button lives at the bottom of `VaultNetWorthCard`. It is **not** the Oracle button — it's a quick-log for impulse spending that increases `shadow_gap`.
+### 7a · Button placement
 
-On tap:
-1. Show a small inline form: spend amount (£) + optional category
-2. On confirm: `PUT /api/vault/settings` with `{ patch: { shadow_gap: currentGap + amount } }`
-3. The robot face in the button changes to sad state (frown mouth, dimmed eyes, dark red border) for 2 seconds then resets
-4. The shadow row updates to reflect the new gap
+A small red button lives at the bottom-right of `VaultNetWorthCard`, always visible but intentionally quiet — you have to mean it to tap it:
 
-**Sad robot SVG state** (same `VaultCharacterLarge` SVG, modified):
-- Body fill: `#0F6E56` (dimmed)
-- Eye gleams: `opacity: 0.15`
-- Mouth path: flipped to frown `M13 32 Q18 29 24 32`
-- Button border: `0.5px solid rgba(224,82,82,0.4)`, bg: `rgba(90,20,20,0.2)`
+```tsx
+<div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 10 }}>
+  <button
+    onClick={() => setSlipOpen(true)}
+    style={{
+      display: 'flex', alignItems: 'center', gap: 5,
+      background: '#2A0808',
+      border: '0.5px solid #8B2020',
+      borderRadius: 20,
+      padding: '5px 12px',
+      cursor: 'pointer',
+    }}
+  >
+    {/* flame icon */}
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+      <path d="M12 3C10 8 6 10 6 14C6 17.3 8.7 20 12 20C15.3 20 18 17.3 18 14C18 10 14 8 12 3Z"
+        stroke="#E05050" strokeWidth="1.5" />
+    </svg>
+    <span style={{ fontSize: 11, color: '#E05050', fontWeight: 500 }}>I slipped</span>
+  </button>
+</div>
+```
+
+### 7b · Inline expansion
+
+When tapped, the confession form slides down **within the card** (no modal/overlay) using a `max-height` CSS transition (`0 → 480px, 0.35s ease`). The net worth card itself is unchanged above it.
+
+**Confession form layout** (matches the approved screenshot exactly):
+
+```tsx
+{slipOpen && (
+  <div style={{
+    marginTop: 14,
+    background: '#12101E',
+    borderRadius: 14,
+    borderLeft: '3px solid #1D9E75',
+    padding: '16px 14px 20px',
+    overflow: 'hidden',
+  }}>
+    {/* Robot + title row */}
+    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, marginBottom: 18 }}>
+      {/* Sad animated robot — see 7c */}
+      <SlipRobot />
+      <div>
+        <p style={{ fontSize: 17, fontWeight: 600, color: '#E8824A', marginBottom: 6 }}>
+          Vault is hurt 🥺
+        </p>
+        <p style={{ fontSize: 13, color: '#7A6A8A', lineHeight: 1.55 }}>
+          Shadow gap widened by £{slipAmount || '…'}.<br />
+          Auto-recovers tomorrow.
+        </p>
+      </div>
+    </div>
+
+    {/* Form */}
+    <div style={{ background: '#1A1630', borderRadius: 14, padding: 14 }}>
+      <p style={{ fontSize: 11, fontWeight: 600, color: '#6A5A8A', letterSpacing: '0.1em',
+                  textTransform: 'uppercase', marginBottom: 12 }}>
+        What did you spend on?
+      </p>
+      {/* Category chips */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
+        {SLIP_CATEGORIES.map(cat => (
+          <button key={cat.key} onClick={() => setSlipCat(cat.key)}
+            style={{
+              background: slipCat === cat.key ? '#1E1A34' : '#12101E',
+              border: `0.5px solid ${slipCat === cat.key ? '#5A40A0' : '#2A2040'}`,
+              borderRadius: 22, padding: '7px 14px',
+              fontSize: 13, color: slipCat === cat.key ? '#C8B8F0' : '#8A7AAA',
+              cursor: 'pointer',
+            }}>
+            {cat.emoji} {cat.label}
+          </button>
+        ))}
+      </div>
+      {/* Amount */}
+      <div style={{ background: '#12101E', border: '0.5px solid #2A2040', borderRadius: 12,
+                    padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+        <span style={{ fontSize: 18, color: '#5A4A7A' }}>£</span>
+        <input type="number" placeholder="How much?"
+          value={slipAmount} onChange={e => setSlipAmount(Number(e.target.value))}
+          style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none',
+                   fontSize: 18, color: '#E8E0F0' }} />
+      </div>
+      {/* Note */}
+      <div style={{ background: '#12101E', border: '0.5px solid #2A2040', borderRadius: 12,
+                    padding: '14px 16px', marginBottom: 12 }}>
+        <input type="text" placeholder="What was it? (optional)"
+          value={slipNote} onChange={e => setSlipNote(e.target.value)}
+          style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none',
+                   fontSize: 13, color: '#C0B0D8' }} />
+      </div>
+      {/* Submit */}
+      <button onClick={handleLogSlip}
+        style={{ width: '100%', background: '#2A0E0E', border: '0.5px solid #7A2020',
+                 borderRadius: 12, padding: 16, fontSize: 15, fontWeight: 500,
+                 color: '#E05050', cursor: 'pointer' }}>
+        I know, I know... log it
+      </button>
+    </div>
+  </div>
+)}
+```
+
+**Category definitions** (`SLIP_CATEGORIES`):
+```ts
+const SLIP_CATEGORIES = [
+  { key: 'shopping',    emoji: '🛍',  label: 'Shopping'    },
+  { key: 'restaurants', emoji: '🍽',  label: 'Restaurants' },
+  { key: 'going_out',   emoji: '🎉',  label: 'Going out'   },
+  { key: 'beauty',      emoji: '💄',  label: 'Beauty'      },
+  { key: 'other',       emoji: '❓',  label: 'Other'       },
+]
+```
+
+### 7c · Sad robot (`SlipRobot`)
+
+A small sub-component rendering `VaultCharacterLarge` in its sad state with CSS animations.
+
+**SVG modifications from normal:**
+- Body fill stays `#1D9E75` (green — same character, just sad)
+- Eye gleam circles: `cy` shifted +1.5px (looking down)
+- Brow paths added: `M9 20 L14 22` and `M22 22 L27 20` — angled inward, stroke `#9FE1CB`
+- Mouth: flipped to frown `d="M10 33Q18 29 26 33"`
+- Tear drops: two `<div>` absolutely positioned below each eye, `width: 5px, height: 9px, background: #9FE1CB, borderRadius: '0 0 5px 5px'`
+
+**CSS animations to add to `globals.css`:**
+```css
+@keyframes vault-slip-wobble {
+  0%, 100% { transform: rotate(0deg) translateX(0px); }
+  20%       { transform: rotate(-4deg) translateX(-3px); }
+  40%       { transform: rotate(3deg) translateX(2px); }
+  60%       { transform: rotate(-2deg) translateX(-1px); }
+  80%       { transform: rotate(1deg) translateX(1px); }
+}
+@keyframes vault-tear-fall {
+  0%   { transform: translateY(0px); opacity: 0.8; }
+  100% { transform: translateY(14px); opacity: 0; }
+}
+```
+
+Applied:
+- Robot SVG wrapper: `animation: vault-slip-wobble 1.4s ease-in-out infinite`
+- Left tear div: `animation: vault-tear-fall 1.1s ease-in infinite`
+- Right tear div: `animation: vault-tear-fall 1.1s ease-in 0.4s infinite`
+
+### 7d · `handleLogSlip` — what happens on "I know, I know... log it"
+
+```ts
+async function handleLogSlip() {
+  if (!slipAmount || slipAmount <= 0) return
+  setSlipOpen(false)
+
+  // 1. Update shadow_gap and record the slip
+  await fetch('/api/vault/settings', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      userId,
+      patch: {
+        shadow_gap: (settings.shadow_gap ?? 0) + slipAmount,
+        last_slip_at: new Date().toISOString(),
+        last_slip_amount: slipAmount,
+        last_slip_category: slipCat ?? 'other',
+        last_slip_note: slipNote ?? null,
+      },
+    }),
+  })
+
+  // 2. Ask Oracle to create a recovery task
+  await fetch('/api/oracle/create-slip-task', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId, category: slipCat, amount: slipAmount }),
+  })
+
+  // 3. Refresh card data
+  refetch()
+}
+```
+
+### 7e · Oracle recovery task creation
+
+**New route:** `POST /api/oracle/create-slip-task`
+
+Called silently after a slip is logged. Creates a task in the wealth dimension with a personalised title based on category.
+
+```ts
+// Category → recovery task title mapping
+const RECOVERY_TASKS: Record<string, string> = {
+  shopping:    'No impulse buys for 7 days',
+  restaurants: 'Cook at home 5 times this week',
+  going_out:   'No nights out for 5 days',
+  beauty:      'Skip non-essential beauty purchases this week',
+  other:       'Cut one non-essential spend this week',
+}
+
+// Route handler
+export async function POST(req: Request) {
+  const { userId, category, amount } = await req.json()
+  const title = RECOVERY_TASKS[category ?? 'other']
+    ?? 'Cut one non-essential spend this week'
+
+  await supabase.from('tasks').insert({
+    user_id:     userId,
+    dimension:   'wealth',
+    title,
+    description: `Recovery task after a £${amount} slip. Complete to get back on track.`,
+    completed:   false,
+    created_at:  new Date().toISOString(),
+  })
+
+  return Response.json({ ok: true })
+}
+```
+
+The created task appears normally in Vault's task list on the character page. No special flag needed — it's just a regular wealth task with a relevant title.
+
+### 7f · Sad hero state
+
+When `last_slip_at` is set and its **date is today** (compare `toDateString()`), the Vault character page enters sad state. This is checked in `CharacterPage.tsx` when `dimension === 'wealth'` and `vaultSettings` is loaded.
+
+**Hero section changes (sad state only):**
+
+```tsx
+const isSlipDay = vaultSettings?.last_slip_at
+  ? new Date(vaultSettings.last_slip_at).toDateString() === new Date().toDateString()
+  : false
+```
+
+1. **Robot wrapper** gets the bounce + wobble animation:
+```tsx
+<div style={{
+  flexShrink: 0,
+  animation: isSlipDay
+    ? 'vault-slip-wobble 1.8s ease-in-out infinite'
+    : 'protagonist-float 3.2s ease-in-out infinite',
+  transformOrigin: 'center bottom',
+  position: 'relative',
+}}>
+  <HeroArt />
+  {isSlipDay && (
+    <>
+      {/* Animated tears overlaid on robot */}
+      <div style={{
+        position: 'absolute', left: 18, top: 52,
+        width: 5, height: 9, background: '#9FE1CB',
+        borderRadius: '0 0 5px 5px',
+        animation: 'vault-tear-fall 1.1s ease-in infinite',
+      }} />
+      <div style={{
+        position: 'absolute', left: 36, top: 52,
+        width: 5, height: 9, background: '#9FE1CB',
+        borderRadius: '0 0 5px 5px',
+        animation: 'vault-tear-fall 1.1s ease-in 0.45s infinite',
+      }} />
+    </>
+  )}
+</div>
+```
+
+2. **Name row** gains a red badge when `isSlipDay`:
+```tsx
+<div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+  <span style={{ fontSize: 22, fontWeight: 500, color: '#E8E0F0' }}>{char.name}</span>
+  <span style={{ ... }}>{char.categoryLabel}</span>
+  {isSlipDay && (
+    <span style={{
+      display: 'flex', alignItems: 'center', gap: 4,
+      background: '#2A0808', border: '0.5px solid #7A2020',
+      borderRadius: 20, padding: '3px 10px',
+      fontSize: 11, color: '#E05050',
+    }}>
+      😢 Vault is hurt · −£{vaultSettings.last_slip_amount?.toLocaleString()}
+    </span>
+  )}
+</div>
+```
+
+### 7g · Auto-recovery
+
+No user action required. The sad state is entirely driven by `last_slip_at`:
+
+- If `last_slip_at` date === today → sad state active
+- If `last_slip_at` date < today (yesterday or earlier) → normal state automatically
+
+No cron job or DB update needed — the comparison happens at read time on page load. The robot returns to normal the next day simply because the date no longer matches.
 
 ---
 
@@ -410,32 +693,54 @@ On tap:
 
 | File | Change |
 |------|--------|
-| `supabase/migrations/YYYYMMDD_vault_settings.sql` | New migration — create `vault_settings` table |
+| `supabase/migrations/YYYYMMDD_vault_settings.sql` | New migration — create `vault_settings` table (including `last_slip_at`, `last_slip_amount`, `last_slip_category`, `last_slip_note`) |
 | `src/lib/supabase.ts` or `src/lib/db.ts` | Add `getVaultSettings`, `upsertVaultSettings` helpers |
 | `src/app/api/vault/settings/route.ts` | New — GET + PUT handlers |
-| `src/components/vault/VaultNetWorthCard.tsx` | New component |
-| `src/app/vault/settings/page.tsx` | New settings page |
-| `src/components/CharacterPage.tsx` | Add `VaultNetWorthCard` block + settings link |
+| `src/app/api/oracle/create-slip-task/route.ts` | New — POST handler that creates a personalised recovery task |
+| `src/components/vault/VaultNetWorthCard.tsx` | New component — includes "I slipped" button + inline expansion + `SlipRobot` sub-component |
+| `src/app/vault/settings/page.tsx` | New settings page — add `paddingBottom: 100` to prevent footer overlap |
+| `src/components/CharacterPage.tsx` | Add `VaultNetWorthCard` block + settings link + sad hero state (bouncing robot, tear drops, red badge) when `isSlipDay` |
 | `src/app/api/oracle/classify/route.ts` | Add `VAULT_UPDATE` intent + `vault_update` JSON field |
 | `src/components/OracleSheet.tsx` | Handle `VAULT_UPDATE` intent, add `vault-updated` state |
-| `src/app/globals.css` | Add 4 vault CSS keyframes |
+| `src/app/globals.css` | Add vault CSS keyframes: `vault-pulse-glow`, `vault-shimmer`, `vault-coin-drop`, `vault-float-coin`, `vault-slip-wobble`, `vault-tear-fall` |
 
 ---
 
 ## 9 · Acceptance criteria
 
-- [ ] Vault character page shows `VaultNetWorthCard` between hero section and Legend card
+**Net worth card**
+- [ ] `VaultNetWorthCard` appears between hero section and Legend card
 - [ ] Coins fill correctly based on `(invested + cash) / coin_denomination`
-- [ ] Partial coin pulses and shimmers
-- [ ] Coin drop animation plays on mount (staggered)
-- [ ] Floating £ coin animates in top-right
-- [ ] Shadow row shows amber pill when behind, teal when ahead
+- [ ] Partial coin pulses (vault-pulse-glow) and shimmers (vault-shimmer)
+- [ ] Coin drop animation plays on mount (staggered 50ms per coin)
+- [ ] Floating £ coin animates in top-right (vault-float-coin)
+- [ ] Shadow row shows amber pill when `shadow_gap > 0` (behind), teal when `shadow_gap < 0` (ahead)
 - [ ] Shadow row expands with breakdown + 5yr compound figure on tap
-- [ ] "I slipped" button triggers sad robot state + inline amount entry + updates `shadow_gap`
+
+**"I slipped" button**
+- [ ] Small red button ("I slipped") appears at bottom-right of `VaultNetWorthCard`
+- [ ] Tapping it slides down the confession form inline (no modal) within the card
+- [ ] The sad robot animates: wobbles left-right (vault-slip-wobble), tears fall (vault-tear-fall)
+- [ ] Category chips (Shopping / Restaurants / Going out / Beauty / Other) are selectable
+- [ ] Submitting updates `shadow_gap += slipAmount` and saves `last_slip_at`, `last_slip_category`, `last_slip_amount`, `last_slip_note`
+- [ ] A personalised recovery task is created in the wealth dimension via `POST /api/oracle/create-slip-task`
+- [ ] Recovery task title matches the category (e.g. shopping → "No impulse buys for 7 days")
+
+**Sad hero state**
+- [ ] On slip day (`last_slip_at` date === today), the Vault hero robot bounces with vault-slip-wobble animation
+- [ ] Two animated teal teardrops overlay the hero robot (vault-tear-fall)
+- [ ] A red "😢 Vault is hurt · −£X" badge appears next to the character name
+- [ ] The next day (after midnight), the hero automatically returns to normal state — no user action required
+- [ ] Normal float animation (protagonist-float) resumes on recovery
+
+**Settings page**
 - [ ] `/vault/settings` page loads with current values from DB
-- [ ] All settings fields save correctly on button tap
-- [ ] Monthly surplus and FIRE trajectory compute correctly from form values
+- [ ] All settings fields save correctly via PUT
+- [ ] Monthly surplus and FIRE trajectory compute correctly
+- [ ] Save button is not hidden behind footer nav (`paddingBottom: 100`)
+
+**Oracle vault update**
 - [ ] Oracle recognises "my Revolut savings is now £X" → updates `cash` in vault_settings
 - [ ] Oracle recognises "I invested another £X" → updates `invested_delta`
 - [ ] `vault-updated` Oracle state shows new total net worth
-- [ ] `VaultNetWorthCard` re-fetches after Oracle update (emit a custom event or use router refresh)
+- [ ] `VaultNetWorthCard` re-fetches after Oracle update
