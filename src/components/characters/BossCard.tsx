@@ -100,6 +100,10 @@ export function BossCard({
     if (task.completed || !localBoss || completingId) return
     setCompletingId(task.id)
 
+    // Check before optimistic update: is this the last uncompleted task?
+    const remainingBeforeClick = localTasks.filter((t) => !t.completed).length
+    const isLastTask = remainingBeforeClick === 1
+
     // Optimistic UI
     const damage = task.hp_damage ?? 1
     setLocalTasks((prev) =>
@@ -127,10 +131,12 @@ export function BossCard({
           prev ? { ...prev, hp_remaining: result.hp_remaining! } : prev
         )
       }
-      if (result?.slain && localBoss) {
+      // Trigger victory if server confirmed slain OR if this was the last task
+      // (handles cases where boss_battle_id was missing on old tasks)
+      if ((result?.slain || isLastTask) && localBoss) {
         setVictory({
           name: localBoss.name,
-          rewardXp: result.reward_xp ?? localBoss.reward_xp,
+          rewardXp: result?.reward_xp ?? localBoss.reward_xp,
         })
       }
     } finally {
@@ -282,7 +288,7 @@ export function BossCard({
 
         {/* Header */}
         <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
-          <BossSvg size={52} />
+          <BossSvg size={52} color={accentColor} />
           <div>
             <p style={{ fontSize: 14, fontWeight: 600, color: '#F0ECFF', margin: '0 0 4px' }}>
               {localBoss.name}
@@ -318,14 +324,40 @@ export function BossCard({
         {/* Victory block (Option 1 — in-place) */}
         {victory ? (
           <div style={{ animation: 'victory-appear 0.35s ease-out both' }}>
-            <div style={{ textAlign: 'center', padding: '16px 8px 8px' }}>
+            <div style={{ textAlign: 'center', padding: '16px 8px 8px', position: 'relative' }}>
+              {/* Sparkle particles */}
+              {[
+                { rise: '-48px', drift: '-22px', delay: '0.1s', color: accentColor },
+                { rise: '-52px', drift: '18px',  delay: '0.2s', color: '#34d399' },
+                { rise: '-38px', drift: '-38px', delay: '0.35s', color: accentColor },
+                { rise: '-44px', drift: '34px',  delay: '0.15s', color: '#a78bfa' },
+                { rise: '-56px', drift: '0px',   delay: '0.25s', color: '#34d399' },
+                { rise: '-36px', drift: '-10px', delay: '0.4s',  color: accentColor },
+              ].map((p, i) => (
+                <div
+                  key={i}
+                  style={{
+                    position: 'absolute',
+                    top: 28,
+                    left: '50%',
+                    width: 6,
+                    height: 6,
+                    borderRadius: '50%',
+                    background: p.color,
+                    '--rise': p.rise,
+                    '--drift': p.drift,
+                    animation: `sparkle-rise 0.9s ${p.delay} ease-out both`,
+                  } as React.CSSProperties}
+                />
+              ))}
               <div
                 style={{
-                  fontSize: 28,
+                  fontSize: 30,
                   color: '#34d399',
                   fontWeight: 500,
                   marginBottom: 6,
-                  animation: 'xp-pop 0.4s 0.1s ease-out both',
+                  display: 'inline-block',
+                  animation: 'xp-pop 0.4s 0.1s ease-out both, victory-star-pulse 1.5s 0.5s ease-in-out 3',
                 }}
               >
                 ★
@@ -406,9 +438,9 @@ export function BossCard({
                       alignItems: 'center',
                       gap: 8,
                       padding: '8px 10px',
-                      background: '#140808',
+                      background: '#120D28',
                       borderRadius: 8,
-                      border: '0.5px solid #2A1010',
+                      border: '0.5px solid #1E1040',
                       cursor: task.completed ? 'default' : 'pointer',
                       opacity: task.completed ? 0.45 : 1,
                       animation: task.completed && isGlowing ? 'task-row-settle 0.4s 0.3s ease-out both' : 'none',

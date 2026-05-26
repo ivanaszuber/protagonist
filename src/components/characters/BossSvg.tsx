@@ -1,11 +1,20 @@
-export function BossSvg({ size = 56 }: { size?: number }) {
+export function BossSvg({ size = 52, color = '#818CF8' }: { size?: number; color?: string }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 64 64" fill="none" aria-hidden>
-      <ellipse cx="32" cy="38" rx="22" ry="18" fill="#2A0808" />
-      <path d="M18 28C22 18 28 14 32 14C36 14 42 18 46 28" fill="#1A0505" />
-      <circle cx="24" cy="32" r="3" fill="#ef4444" style={{ filter: 'drop-shadow(0 0 4px #ef4444)' }} />
-      <circle cx="40" cy="32" r="3" fill="#ef4444" style={{ filter: 'drop-shadow(0 0 4px #ef4444)' }} />
-      <path d="M26 42C28 46 36 46 38 42" stroke="#6B1A1A" strokeWidth="2" strokeLinecap="round" />
+    <svg width={size} height={size} viewBox="0 0 52 52" fill="none" aria-hidden>
+      {/* Shield */}
+      <path
+        d="M26 5L9 13V27C9 37.5 17 44.5 26 47C35 44.5 43 37.5 43 27V13L26 5Z"
+        fill="#1A0D3A"
+        stroke={color}
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+      {/* Star */}
+      <path
+        d="M26 17L28.2 23H35L29.4 27L31.6 33L26 29L20.4 33L22.6 27L17 23H23.8L26 17Z"
+        fill={color}
+        opacity="0.9"
+      />
     </svg>
   )
 }

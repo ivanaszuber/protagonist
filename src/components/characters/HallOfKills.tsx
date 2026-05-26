@@ -12,8 +12,6 @@ function formatMonth(dateStr: string): string {
 }
 
 export function HallOfKills({ kills, stats }: HallOfKillsProps) {
-  if (kills.length === 0) return null
-
   return (
     <section style={{ marginBottom: 20 }}>
       <div
@@ -27,10 +25,18 @@ export function HallOfKills({ kills, stats }: HallOfKillsProps) {
         <span style={{ fontSize: 11, fontWeight: 600, color: '#9B8EC4', letterSpacing: '0.06em' }}>
           Hall of Victories
         </span>
-        <span style={{ fontSize: 10, color: '#6B5E8C' }}>
-          {stats.slain} conquered · {stats.escaped} abandoned
-        </span>
+        {kills.length > 0 && (
+          <span style={{ fontSize: 10, color: '#6B5E8C' }}>
+            {stats.slain} conquered · {stats.escaped} abandoned
+          </span>
+        )}
       </div>
+
+      {kills.length === 0 && (
+        <p style={{ fontSize: 11, color: '#3D3358', margin: 0 }}>
+          Complete your first challenge to begin your Hall of Victories.
+        </p>
+      )}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {kills.map((kill) => {
           const slain = kill.outcome === 'slain'

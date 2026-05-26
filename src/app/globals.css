@@ -133,3 +133,16 @@ body::-webkit-scrollbar {
   0%   { opacity: 1; }
   100% { opacity: 0.45; }
 }
+
+/* Sparkle particles for victory state */
+@keyframes sparkle-rise {
+  0%   { opacity: 0; transform: translateY(0) scale(0.4); }
+  25%  { opacity: 1; transform: translateY(-12px) scale(1); }
+  100% { opacity: 0; transform: translateY(var(--rise, -40px)) translateX(var(--drift, 0px)) scale(0.6); }
+}
+
+@keyframes victory-star-pulse {
+  0%, 100% { transform: scale(1) rotate(0deg); }
+  33%       { transform: scale(1.25) rotate(15deg); }
+  66%       { transform: scale(1.1) rotate(-10deg); }
+}

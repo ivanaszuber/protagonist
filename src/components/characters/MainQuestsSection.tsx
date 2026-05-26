@@ -138,7 +138,7 @@ export function MainQuestsSection({
                       {days > 0 ? `${days}d left` : days === 0 ? 'Due today' : `${Math.abs(days)}d overdue`}
                     </p>
                   )}
-                  {isActive && m.task_total > 0 && (
+                  {isActive && m.progress_percent > 0 && (
                     <>
                       <div
                         style={{

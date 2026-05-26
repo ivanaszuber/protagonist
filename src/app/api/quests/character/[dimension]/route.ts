@@ -75,14 +75,19 @@ export async function GET(
     taskStatsByMilestone.set(mid, cur)
   }
 
-  const enrichedMilestones = (milestones ?? []).map((m) => {
+  const bossStats = await getBossKillStats(userId, dimension)
+
+  const enrichedMilestones = (milestones ?? []).map((m, idx) => {
     const stats = taskStatsByMilestone.get(m.id) ?? { total: 0, done: 0 }
-    const progress =
+    let progress =
       stats.total > 0 ? Math.round((stats.done / stats.total) * 100) : 0
+    // If this milestone has no direct tasks, infer progress from boss kills
+    // (each completed challenge counts as ~33%, so 3 conquests = 100%)
+    if (stats.total === 0 && idx === 0) {
+      progress = Math.min(bossStats.slain * 33, 100)
+    }
     return { ...m, progress_percent: progress, task_total: stats.total }
   })
-
-  const bossStats = await getBossKillStats(userId, dimension)
   const streak_days = await computeDimensionStreak(userId, dimension)
 
   const thirtyDaysAgo = new Date()
