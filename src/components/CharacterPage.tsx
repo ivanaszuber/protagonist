@@ -81,6 +81,14 @@ const FLOAT_DELAYS: Record<Dimension, string> = {
   family: '1.5s',
 }
 
+function hexToRgba(hex: string, alpha: number): string {
+  const h = hex.replace('#', '')
+  const r = parseInt(h.substring(0, 2), 16)
+  const g = parseInt(h.substring(2, 4), 16)
+  const b = parseInt(h.substring(4, 6), 16)
+  return `rgba(${r},${g},${b},${alpha})`
+}
+
 function daysUntil(dateStr: string | null): number {
   if (!dateStr) return 0
   return Math.ceil((new Date(dateStr).getTime() - Date.now()) / 86400000)
@@ -141,6 +149,7 @@ export function CharacterPage({ dimension }: CharacterPageProps) {
   const [newTaskTitle, setNewTaskTitle] = useState('')
   const [newTaskXp, setNewTaskXp] = useState(50)
   const [completingId, setCompletingId] = useState<string | null>(null)
+  const [justCompletedIds, setJustCompletedIds] = useState<Set<string>>(new Set())
   const [xpToast, setXpToast] = useState<XpToast | null>(null)
   const [levelUpToast, setLevelUpToast] = useState<LevelUpToast | null>(null)
   const [oracleMemories, setOracleMemories] = useState<string[]>([])
@@ -235,7 +244,7 @@ export function CharacterPage({ dimension }: CharacterPageProps) {
       xp_earned?: number
       leveled_up?: boolean
       new_level?: number
-      boss?: { slain: boolean; reward_xp?: number }
+      boss?: { slain: boolean; reward_xp?: number; hp_remaining?: number }
     }
     if (res.ok) {
       const earned = data.xp_earned ?? xpReward
@@ -246,6 +255,7 @@ export function CharacterPage({ dimension }: CharacterPageProps) {
       return {
         slain: data.boss?.slain,
         reward_xp: data.boss?.reward_xp,
+        hp_remaining: data.boss?.hp_remaining,
       }
     }
     return {}
@@ -292,6 +302,14 @@ export function CharacterPage({ dimension }: CharacterPageProps) {
           }
         })
         showXpFeedback({ dimension }, data, setXpToast, setLevelUpToast)
+        setJustCompletedIds((prev) => new Set(prev).add(taskId))
+        setTimeout(() => {
+          setJustCompletedIds((prev) => {
+            const next = new Set(prev)
+            next.delete(taskId)
+            return next
+          })
+        }, 700)
       }
     } finally {
       setCompletingId(null)
@@ -778,7 +796,12 @@ export function CharacterPage({ dimension }: CharacterPageProps) {
                       border: `1.5px solid ${task.completed ? '#34d399' : accentColor}`,
                       background: task.completed ? '#34d399' : 'transparent',
                       cursor: task.completed ? 'default' : 'pointer',
-                    }}
+                      '--glow-color': hexToRgba(accentColor, 0.65),
+                      '--glow-color-fade': hexToRgba(accentColor, 0),
+                      animation: justCompletedIds.has(task.id)
+                        ? 'task-check-glow 0.55s ease-out'
+                        : 'none',
+                    } as React.CSSProperties}
                   />
                   <span
                     role="button"

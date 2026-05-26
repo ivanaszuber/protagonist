@@ -1,5 +1,6 @@
 import { addQuestDimensionXp, getQuestDimensionXp, isQuestDbConfigured } from '@/lib/quest-db'
 import { supabase } from '@/lib/supabase'
+import { saveDimensionMemory } from '@/lib/db'
 
 export const XP_ESCAPE_PENALTY = 50
 
@@ -272,6 +273,12 @@ export async function slayBoss(
   })
 
   void totalXp
+
+  // Passive memory: Oracle and Witness learn about challenge conquest
+  const today = new Date().toISOString().split('T')[0]
+  const questContext = quest?.vision ? ` (quest: ${quest.vision})` : ''
+  const memory = `[${today}] Conquered challenge "${b.name}"${questContext} — completed all ${b.hp_total} tasks in ${daysTaken} day${daysTaken === 1 ? '' : 's'}, earning ${b.reward_xp} XP.`
+  void saveDimensionMemory(b.dimension, memory, 'challenge_conquest', 8, userId)
 
   return {
     rewardXp: b.reward_xp,

@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { BossSvg } from '@/components/characters/BossSvg'
 import { getUserId } from '@/lib/user'
+import { CHARACTERS } from '@/lib/character'
 import type { BossBattle, BossTask } from '@/lib/bosses'
 
 interface BossCardProps {
@@ -16,6 +17,7 @@ interface BossCardProps {
   onTaskComplete: (taskId: string, xpReward: number) => Promise<{
     slain?: boolean
     reward_xp?: number
+    hp_remaining?: number
   } | void>
   onBossSlain: () => Promise<void>
 }
@@ -24,18 +26,25 @@ function daysUntil(dateStr: string): number {
   return Math.ceil((new Date(dateStr).getTime() - Date.now()) / 86400000)
 }
 
-function progressFillColor(completed: number, total: number): string {
-  const pct = total > 0 ? completed / total : 0
-  if (pct >= 0.8) return '#34d399'
-  if (pct >= 0.5) return '#818cf8'
-  return '#9B8EC4'
-}
-
 function formatDeadline(dateStr: string): string {
   return new Date(dateStr + 'T12:00:00').toLocaleDateString('en-GB', {
     month: 'short',
     day: 'numeric',
   })
+}
+
+function hexToRgba(hex: string, alpha: number): string {
+  const r = parseInt(hex.slice(1, 3), 16)
+  const g = parseInt(hex.slice(3, 5), 16)
+  const b = parseInt(hex.slice(5, 7), 16)
+  return `rgba(${r},${g},${b},${alpha})`
+}
+
+function progressFillColor(completed: number, total: number): string {
+  const pct = total > 0 ? completed / total : 0
+  if (pct >= 0.8) return '#34d399'
+  if (pct >= 0.5) return '#818cf8'
+  return '#9B8EC4'
 }
 
 export function BossCard({
@@ -49,12 +58,17 @@ export function BossCard({
   onTaskComplete,
   onBossSlain,
 }: BossCardProps) {
+  const accentColor = (CHARACTERS[dimension as keyof typeof CHARACTERS]?.color) ?? '#9B8EC4'
+
   const [localBoss, setLocalBoss] = useState(boss)
   const [localTasks, setLocalTasks] = useState(tasks)
   const [completingId, setCompletingId] = useState<string | null>(null)
+  const [justCompleted, setJustCompleted] = useState<Set<string>>(new Set())
   const [victory, setVictory] = useState<{ name: string; rewardXp: number } | null>(null)
+  const [xpDisplay, setXpDisplay] = useState(0)
   const [generating, setGenerating] = useState(false)
   const [generateError, setGenerateError] = useState<string | null>(null)
+  const xpAnimRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
     setLocalBoss(boss)
@@ -62,34 +76,56 @@ export function BossCard({
     setVictory(null)
   }, [boss, tasks])
 
+  // XP count-up when victory triggers
+  useEffect(() => {
+    if (!victory) { setXpDisplay(0); return }
+    const target = victory.rewardXp
+    const steps = 30
+    let step = 0
+    xpAnimRef.current = setInterval(() => {
+      step++
+      setXpDisplay(Math.round((step / steps) * target))
+      if (step >= steps) clearInterval(xpAnimRef.current!)
+    }, 30)
+    return () => { if (xpAnimRef.current) clearInterval(xpAnimRef.current) }
+  }, [victory])
+
   async function handleTaskClick(task: BossTask) {
     if (task.completed || !localBoss || completingId) return
     setCompletingId(task.id)
 
-    const damage = task.hp_damage
+    // Optimistic UI
+    const damage = task.hp_damage ?? 1
     setLocalTasks((prev) =>
       prev.map((t) => (t.id === task.id ? { ...t, completed: true } : t))
     )
     setLocalBoss((prev) =>
-      prev
-        ? {
-            ...prev,
-            hp_remaining: Math.max(0, prev.hp_remaining - damage),
-          }
-        : prev
+      prev ? { ...prev, hp_remaining: Math.max(0, prev.hp_remaining - damage) } : prev
     )
+
+    // Glow animation
+    setJustCompleted((prev) => new Set(prev).add(task.id))
+    setTimeout(() => {
+      setJustCompleted((prev) => {
+        const next = new Set(prev)
+        next.delete(task.id)
+        return next
+      })
+    }, 600)
 
     try {
       const result = await onTaskComplete(task.id, task.xp_reward)
+      // Sync hp_remaining from server response
+      if (result?.hp_remaining !== undefined) {
+        setLocalBoss((prev) =>
+          prev ? { ...prev, hp_remaining: result.hp_remaining! } : prev
+        )
+      }
       if (result?.slain && localBoss) {
         setVictory({
           name: localBoss.name,
           rewardXp: result.reward_xp ?? localBoss.reward_xp,
         })
-        setTimeout(() => {
-          setVictory(null)
-          void onBossSlain()
-        }, 2000)
       }
     } finally {
       setCompletingId(null)
@@ -108,7 +144,7 @@ export function BossCard({
         body: JSON.stringify({
           userId: uid,
           dimension,
-          userMessage: `Generate a boss battle for ${characterName}. Main quest: ${mainQuestTitle ?? 'not set yet'}.`,
+          userMessage: `Generate a challenge for ${characterName}. Main quest: ${mainQuestTitle ?? 'not set yet'}.`,
         }),
       })
       const data = await res.json() as { boss?: { name: string }; error?: string }
@@ -136,7 +172,7 @@ export function BossCard({
         body: JSON.stringify({
           userId: uid,
           dimension,
-          userMessage: `Hunt the escaped boss "${name}". Same boss name, new 30-day deadline, fresh attack tasks.`,
+          userMessage: `Retry the challenge "${name}". Same challenge name, new 30-day deadline, fresh tasks.`,
         }),
       })
       const data = await res.json() as { boss?: { name: string }; error?: string }
@@ -160,45 +196,12 @@ export function BossCard({
     </div>
   )
 
-  if (victory) {
-    return (
-      <section style={{ marginBottom: 20 }}>
-        {sectionLabel}
-        <div
-          style={{
-            background: '#0D1A12',
-            border: '0.5px solid #34d399',
-            borderRadius: 14,
-            padding: 20,
-            textAlign: 'center',
-          }}
-        >
-          <p style={{ fontSize: 14, fontWeight: 600, color: '#34d399', margin: '0 0 8px' }}>
-            Challenge Conquered!
-          </p>
-          <p style={{ fontSize: 12, color: '#E8E0F0', margin: '0 0 12px' }}>
-            {victory.name} — complete.
-          </p>
-          <p style={{ fontSize: 11, color: '#fbbf24', margin: 0 }}>
-            +{victory.rewardXp} XP · Added to your victories
-          </p>
-        </div>
-      </section>
-    )
-  }
-
+  // ── Escaped state ──────────────────────────────────────────
   if (escapedBoss && !localBoss) {
     return (
       <section style={{ marginBottom: 20 }}>
         {sectionLabel}
-        <div
-          style={{
-            background: '#1A0A08',
-            border: '0.5px solid #6B1A1A',
-            borderRadius: 14,
-            padding: 16,
-          }}
-        >
+        <div style={{ background: '#1A0A08', border: '0.5px solid #6B1A1A', borderRadius: 14, padding: 16 }}>
           <p style={{ fontSize: 13, fontWeight: 500, color: '#ef4444', margin: '0 0 6px' }}>
             {escapedBoss.name} — ABANDONED
           </p>
@@ -209,16 +212,9 @@ export function BossCard({
             type="button"
             onClick={() => handleHuntEscaped(escapedBoss.name)}
             style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-              background: '#2A0808',
-              border: '0.5px solid #6B1A1A',
-              borderRadius: 8,
-              padding: '8px 12px',
-              fontSize: 11,
-              color: '#ef4444',
-              cursor: 'pointer',
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              background: '#2A0808', border: '0.5px solid #6B1A1A', borderRadius: 8,
+              padding: '8px 12px', fontSize: 11, color: '#ef4444', cursor: 'pointer',
             }}
           >
             Retry this challenge ↗
@@ -228,18 +224,12 @@ export function BossCard({
     )
   }
 
+  // ── No active challenge ────────────────────────────────────
   if (!localBoss) {
     return (
       <section style={{ marginBottom: 20 }}>
         {sectionLabel}
-        <div
-          style={{
-            background: '#140C28',
-            border: '0.5px solid #2D1B55',
-            borderRadius: 14,
-            padding: 16,
-          }}
-        >
+        <div style={{ background: '#140C28', border: '0.5px solid #2D1B55', borderRadius: 14, padding: 16 }}>
           {generating ? (
             <p style={{ fontSize: 12, color: '#7A5FA0', margin: 0, fontStyle: 'italic' }}>
               Creating your challenge...
@@ -250,24 +240,15 @@ export function BossCard({
                 No active challenge. Start your next one.
               </p>
               {generateError && (
-                <p style={{ fontSize: 11, color: '#ef4444', margin: '0 0 8px' }}>
-                  {generateError}
-                </p>
+                <p style={{ fontSize: 11, color: '#ef4444', margin: '0 0 8px' }}>{generateError}</p>
               )}
               <button
                 type="button"
                 onClick={() => void handleStartBoss()}
                 style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  background: '#1E0D40',
-                  border: '0.5px solid #4A2080',
-                  borderRadius: 8,
-                  padding: '8px 12px',
-                  fontSize: 11,
-                  color: '#A78BFA',
-                  cursor: 'pointer',
+                  display: 'inline-flex', alignItems: 'center', gap: 6,
+                  background: '#1E0D40', border: '0.5px solid #4A2080', borderRadius: 8,
+                  padding: '8px 12px', fontSize: 11, color: '#A78BFA', cursor: 'pointer',
                 }}
               >
                 Start a new Challenge
@@ -279,26 +260,21 @@ export function BossCard({
     )
   }
 
-  const hpPct =
-    localBoss.hp_total > 0
-      ? Math.round((localBoss.hp_remaining / localBoss.hp_total) * 100)
-      : 0
-  const tasksLeft = localBoss.hp_remaining
-  const tasksDone = localBoss.hp_total - localBoss.hp_remaining
+  // ── Active challenge card ──────────────────────────────────
+  const completedTasks = localTasks.filter((t) => t.completed)
+  const tasksDone = completedTasks.length
+  const totalTasks = localTasks.length
+  const progressPct = totalTasks > 0 ? Math.round((tasksDone / totalTasks) * 100) : 0
+  const tasksLeft = totalTasks - tasksDone
   const days = daysUntil(localBoss.deadline)
-  const fill = progressFillColor(tasksDone, localBoss.hp_total)
+  const fill = progressFillColor(tasksDone, totalTasks)
 
   return (
     <section style={{ marginBottom: 20 }}>
       {sectionLabel}
-      <div
-        style={{
-          background: '#0E0E1A',
-          border: '0.5px solid #2D1B55',
-          borderRadius: 14,
-          padding: 16,
-        }}
-      >
+      <div style={{ background: '#0E0E1A', border: '0.5px solid #2D1B55', borderRadius: 14, padding: 16 }}>
+
+        {/* Header */}
         <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
           <BossSvg size={52} />
           <div>
@@ -311,33 +287,17 @@ export function BossCard({
           </div>
         </div>
 
+        {/* Progress bar */}
         <div style={{ marginBottom: 6 }}>
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              fontSize: 9,
-              color: '#7A5FA0',
-              marginBottom: 4,
-            }}
-          >
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: '#7A5FA0', marginBottom: 4 }}>
             <span>Progress</span>
-            <span>
-              {localBoss.hp_total - localBoss.hp_remaining}/{localBoss.hp_total} tasks done
-            </span>
+            <span>{tasksDone} / {totalTasks} tasks done</span>
           </div>
-          <div
-            style={{
-              height: 8,
-              background: '#1E1040',
-              borderRadius: 4,
-              overflow: 'hidden',
-            }}
-          >
+          <div style={{ height: 8, background: '#1E1040', borderRadius: 4, overflow: 'hidden' }}>
             <div
               style={{
                 height: '100%',
-                width: `${100 - hpPct}%`,
+                width: `${progressPct}%`,
                 background: fill,
                 borderRadius: 4,
                 transition: 'width 0.5s ease, background 0.3s ease',
@@ -349,70 +309,150 @@ export function BossCard({
           {tasksLeft} task{tasksLeft === 1 ? '' : 's'} remaining · reward: +{localBoss.reward_xp} XP
         </p>
 
-        <p
-          style={{
-            fontSize: 9,
-            fontWeight: 600,
-            letterSpacing: '0.1em',
-            color: '#4A2878',
-            margin: '0 0 8px',
-          }}
-        >
-          CHALLENGE TASKS
-        </p>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {localTasks.map((task) => (
-            <div
-              key={task.id}
-              role="button"
-              tabIndex={0}
-              onClick={() => void handleTaskClick(task)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') void handleTaskClick(task)
-              }}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                padding: '8px 10px',
-                background: '#140808',
-                borderRadius: 8,
-                border: '0.5px solid #2A1010',
-                cursor: task.completed ? 'default' : 'pointer',
-                opacity: task.completed ? 0.5 : 1,
-              }}
-            >
+        {/* Victory block (Option 1 — in-place) */}
+        {victory ? (
+          <div style={{ animation: 'victory-appear 0.35s ease-out both' }}>
+            <div style={{ textAlign: 'center', padding: '16px 8px 8px' }}>
               <div
                 style={{
-                  width: 16,
-                  height: 16,
-                  borderRadius: '50%',
-                  flexShrink: 0,
-                  border: `1.5px solid ${task.completed ? '#34d399' : '#ef4444'}`,
-                  background: task.completed ? '#34d399' : 'transparent',
-                }}
-              />
-              <span
-                style={{
-                  flex: 1,
-                  fontSize: 11,
-                  color: task.completed ? '#5A4A7A' : '#E8E0F0',
-                  textDecoration: task.completed ? 'line-through' : 'none',
+                  fontSize: 28,
+                  color: '#34d399',
+                  fontWeight: 500,
+                  marginBottom: 6,
+                  animation: 'xp-pop 0.4s 0.1s ease-out both',
                 }}
               >
-                {task.title}
-              </span>
-              {!task.completed && (
-                <span style={{ fontSize: 10, color: '#6B5E8C', flexShrink: 0 }}>
-                  +{task.xp_reward} XP
-                </span>
-              )}
-              {completingId === task.id && (
-                <span style={{ fontSize: 9, color: '#7A5FA0' }}>...</span>
-              )}
+                ★
+              </div>
+              <p style={{ fontSize: 14, fontWeight: 600, color: '#34d399', margin: '0 0 4px' }}>
+                Challenge Conquered
+              </p>
+              <p style={{ fontSize: 12, color: '#9B8EC4', margin: '0 0 10px' }}>
+                {victory.name}
+              </p>
+              <p
+                style={{
+                  fontSize: 22,
+                  fontWeight: 500,
+                  color: accentColor,
+                  margin: '0 0 4px',
+                  animation: 'xp-pop 0.4s 0.25s ease-out both',
+                }}
+              >
+                +{xpDisplay} XP
+              </p>
+              <p style={{ fontSize: 10, color: '#5A4A7A', margin: '0 0 14px' }}>
+                Added to Hall of Victories
+              </p>
+              <button
+                type="button"
+                onClick={() => void onBossSlain()}
+                style={{
+                  padding: '8px 18px',
+                  background: '#1E0D40',
+                  border: '0.5px solid #4A2080',
+                  borderRadius: 20,
+                  color: '#A78BFA',
+                  fontSize: 11,
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  animation: 'victory-appear 0.3s 0.6s ease-out both',
+                  opacity: 0,
+                }}
+              >
+                Ready for your next challenge? ↗
+              </button>
             </div>
-          ))}
-        </div>
+          </div>
+        ) : (
+          /* Task list */
+          <>
+            <p style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.1em', color: '#4A2878', margin: '0 0 8px' }}>
+              CHALLENGE TASKS
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {localTasks.map((task) => {
+                const isGlowing = justCompleted.has(task.id)
+                const glowColor = hexToRgba(accentColor, 0.65)
+                const glowFade = hexToRgba(accentColor, 0)
+                return (
+                  <div
+                    key={task.id}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => void handleTaskClick(task)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') void handleTaskClick(task)
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      padding: '8px 10px',
+                      background: '#140808',
+                      borderRadius: 8,
+                      border: '0.5px solid #2A1010',
+                      cursor: task.completed ? 'default' : 'pointer',
+                      opacity: task.completed ? 0.45 : 1,
+                      animation: task.completed && isGlowing ? 'task-row-settle 0.4s 0.3s ease-out both' : 'none',
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: 16,
+                        height: 16,
+                        borderRadius: '50%',
+                        flexShrink: 0,
+                        border: `1.5px solid ${task.completed ? accentColor : '#4A2878'}`,
+                        background: task.completed ? accentColor : 'transparent',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        // CSS custom properties for glow keyframe
+                        '--glow-color': glowColor,
+                        '--glow-color-fade': glowFade,
+                        animation: isGlowing ? 'task-check-glow 0.55s ease-out' : 'none',
+                      } as React.CSSProperties}
+                    >
+                      {task.completed && (
+                        <svg width="8" height="8" viewBox="0 0 10 10" fill="none">
+                          <path d="M2 5l2 2.5L8 3" stroke="white" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      )}
+                      {completingId === task.id && !task.completed && (
+                        <div
+                          style={{
+                            width: 7,
+                            height: 7,
+                            borderRadius: '50%',
+                            border: `1.5px solid ${accentColor}`,
+                            borderTopColor: 'transparent',
+                            animation: 'spin 0.6s linear infinite',
+                          }}
+                        />
+                      )}
+                    </div>
+                    <span
+                      style={{
+                        flex: 1,
+                        fontSize: 11,
+                        color: task.completed ? '#5A4A7A' : '#E8E0F0',
+                        textDecoration: task.completed ? 'line-through' : 'none',
+                      }}
+                    >
+                      {task.title}
+                    </span>
+                    {!task.completed && (
+                      <span style={{ fontSize: 10, color: '#6B5E8C', flexShrink: 0 }}>
+                        +{task.xp_reward} XP
+                      </span>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </>
+        )}
       </div>
     </section>
   )

@@ -106,3 +106,30 @@ body::-webkit-scrollbar {
   0%, 100% { opacity: 1; }
   50% { opacity: 0; }
 }
+
+/* Task completion — dimension-colour ring glow (Option C) */
+@keyframes task-check-glow {
+  0%   { transform: scale(0.85); box-shadow: 0 0 0 0 var(--glow-color, rgba(52,211,153,.7)); }
+  40%  { transform: scale(1.18); }
+  65%  { box-shadow: 0 0 0 7px var(--glow-color-fade, rgba(52,211,153,0)); }
+  100% { transform: scale(1);    box-shadow: 0 0 0 0 var(--glow-color-fade, rgba(52,211,153,0)); }
+}
+
+/* Challenge victory card appear */
+@keyframes victory-appear {
+  0%   { opacity: 0; transform: translateY(6px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+/* XP counter count-up */
+@keyframes xp-pop {
+  0%   { opacity: 0; transform: scale(0.7); }
+  60%  { transform: scale(1.1); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+/* Row fade-settle after completion */
+@keyframes task-row-settle {
+  0%   { opacity: 1; }
+  100% { opacity: 0.45; }
+}

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { decrementBossHp, slayBoss } from '@/lib/bosses'
 import { addQuestDimensionXp, isQuestDbConfigured } from '@/lib/quest-db'
+import { saveDimensionMemory } from '@/lib/db'
 import { supabase } from '@/lib/supabase'
 
 export async function POST(
@@ -58,6 +59,26 @@ export async function POST(
     task.dimension,
     xpEarned
   )
+
+  // Passive memory: write on every 5th task completed in this dimension today
+  try {
+    const todayStr = new Date().toISOString().split('T')[0]
+    const { count } = await supabase
+      .from('tasks')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('dimension', task.dimension)
+      .eq('completed', true)
+      .gte('completed_at', `${todayStr}T00:00:00.000Z`)
+
+    const completedToday = (count ?? 0) // includes the one we just completed
+    if (completedToday > 0 && completedToday % 5 === 0) {
+      const memory = `[${todayStr}] Completed ${completedToday} tasks in ${task.dimension} today — including "${task.title}".`
+      void saveDimensionMemory(task.dimension, memory, 'task_milestone', 6, userId)
+    }
+  } catch {
+    // non-critical — don't fail the response
+  }
 
   let bossHit: {
     boss_id: string

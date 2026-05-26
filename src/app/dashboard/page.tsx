@@ -180,6 +180,14 @@ function ProtagonistCharacter() {
   )
 }
 
+function hexToRgba(hex: string, alpha: number): string {
+  const h = hex.replace('#', '')
+  const r = parseInt(h.substring(0, 2), 16)
+  const g = parseInt(h.substring(2, 4), 16)
+  const b = parseInt(h.substring(4, 6), 16)
+  return `rgba(${r},${g},${b},${alpha})`
+}
+
 function formatTimeFromIso(iso: string): string {
   if (!iso) return ''
   const d = new Date(iso)
@@ -275,6 +283,7 @@ export default function DashboardPage() {
   const [xpToast, setXpToast] = useState<XpToast | null>(null)
   const [levelUpToast, setLevelUpToast] = useState<LevelUpToast | null>(null)
   const [completingTaskId, setCompletingTaskId] = useState<string | null>(null)
+  const [justCompletedIds, setJustCompletedIds] = useState<Set<string>>(new Set())
   const [verdictKey, setVerdictKey] = useState(0)
   const [showQuickAdd, setShowQuickAdd] = useState(false)
   const [quickAddTitle, setQuickAddTitle] = useState('')
@@ -585,6 +594,14 @@ export default function DashboardPage() {
           setXpToast,
           setLevelUpToast
         )
+        setJustCompletedIds((prev) => new Set(prev).add(item.id))
+        setTimeout(() => {
+          setJustCompletedIds((prev) => {
+            const next = new Set(prev)
+            next.delete(item.id)
+            return next
+          })
+        }, 700)
         void loadDashboard()
       }
     } catch {
@@ -1216,7 +1233,12 @@ export default function DashboardPage() {
                       justifyContent: 'center',
                       padding: 0,
                       cursor: item.completed ? 'default' : 'pointer',
-                    }}
+                      '--glow-color': hexToRgba(item.color, 0.65),
+                      '--glow-color-fade': hexToRgba(item.color, 0),
+                      animation: justCompletedIds.has(item.id)
+                        ? 'task-check-glow 0.55s ease-out'
+                        : 'none',
+                    } as React.CSSProperties}
                     aria-label={item.completed ? 'Completed' : 'Mark complete'}
                   >
                     {completingTaskId === item.id && (
