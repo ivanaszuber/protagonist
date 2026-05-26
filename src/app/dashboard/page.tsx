@@ -243,6 +243,8 @@ export default function DashboardPage() {
   const [vitality, setVitality] = useState<VitalityData | null>(null)
   const [moodScore, setMoodScore] = useState<number | null>(null)
   const [hasCheckedInToday, setHasCheckedInToday] = useState(false)
+  const [witnessInsight, setWitnessInsight] = useState<string | null>(null)
+  const [witnessDismissed, setWitnessDismissed] = useState(false)
   const [quests, setQuests] = useState<MainQuest[]>([])
   const [events, setEvents] = useState<CalendarEventRow[]>([])
   const [todayTab, setTodayTab] = useState<TodayTab>('all')
@@ -353,6 +355,31 @@ export default function DashboardPage() {
     return () =>
       window.removeEventListener('protagonist:calendar-updated', onCalendarUpdated)
   }, [refreshCalendarEvents])
+
+  useEffect(() => {
+    const dismissKey = `witness_dismissed_${new Date().toISOString().slice(0, 7)}`
+    if (localStorage.getItem(dismissKey) === 'true') {
+      setWitnessDismissed(true)
+      return
+    }
+    const uid = userIdRef.current
+    fetch(`/api/witness?userId=${encodeURIComponent(uid)}`)
+      .then((r) => r.json())
+      .then((d: { insight?: string | null }) => {
+        if (d.insight) setWitnessInsight(d.insight)
+      })
+      .catch(() => {})
+  }, [])
+
+  const handleResetCheckin = useCallback(async () => {
+    await fetch('/api/dev/reset-checkin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: userIdRef.current }),
+    })
+    setHasCheckedInToday(false)
+    setMoodScore(null)
+  }, [])
 
   async function handleQuickAddSubmit() {
     if (!quickAddTitle.trim()) {
@@ -655,6 +682,90 @@ export default function DashboardPage() {
         </span>
       </button>
 
+      {witnessInsight && !witnessDismissed && (
+        <div
+          style={{
+            background: 'linear-gradient(135deg, #12083A 0%, #1A0D35 100%)',
+            border: '0.5px solid rgba(147,51,234,0.3)',
+            borderLeft: '3px solid #9333EA',
+            borderRadius: 12,
+            padding: '12px 14px',
+            marginBottom: 12,
+            position: 'relative',
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => {
+              setWitnessDismissed(true)
+              const dismissKey = `witness_dismissed_${new Date().toISOString().slice(0, 7)}`
+              localStorage.setItem(dismissKey, 'true')
+            }}
+            aria-label="Dismiss"
+            style={{
+              position: 'absolute',
+              top: 8,
+              right: 10,
+              background: 'transparent',
+              border: 'none',
+              color: '#3D2878',
+              fontSize: 16,
+              cursor: 'pointer',
+              lineHeight: 1,
+              padding: '2px 6px',
+            }}
+          >
+            ×
+          </button>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, paddingRight: 20 }}>
+            <div
+              style={{
+                width: 26,
+                height: 26,
+                borderRadius: '50%',
+                background: '#200A45',
+                border: '0.5px solid rgba(147,51,234,0.4)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+              }}
+            >
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden>
+                <ellipse cx="8" cy="8" rx="7" ry="4.5" stroke="#9333EA" strokeWidth="1.2" />
+                <circle cx="8" cy="8" r="2.5" stroke="#C084FC" strokeWidth="1" />
+                <circle cx="8" cy="8" r="1.2" fill="#E879F9" />
+                <circle cx="7" cy="7" r=".6" fill="white" opacity={0.5} />
+              </svg>
+            </div>
+            <div>
+              <div
+                style={{
+                  fontSize: 9,
+                  fontWeight: 600,
+                  color: '#6B3FA0',
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                  marginBottom: 5,
+                }}
+              >
+                The Witness
+              </div>
+              <div
+                style={{
+                  fontSize: 12,
+                  color: '#C0B0E0',
+                  lineHeight: 1.6,
+                  fontStyle: 'italic',
+                }}
+              >
+                &ldquo;{witnessInsight}&rdquo;
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Mood */}
       <div style={{ marginBottom: 12 }}>
         <span
@@ -720,16 +831,38 @@ export default function DashboardPage() {
 
       {/* Check-in */}
       {hasCheckedInToday ? (
-        <p
+        <div
           style={{
-            textAlign: 'center',
-            fontSize: 11,
-            color: '#34d399',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 8,
             marginBottom: 16,
           }}
         >
-          Checked in today ✓
-        </p>
+          <p style={{ textAlign: 'center', fontSize: 11, color: '#34d399', margin: 0 }}>
+            Checked in today ✓
+          </p>
+          {process.env.NEXT_PUBLIC_SHOW_DEV_TOOLS === 'true' && (
+            <button
+              type="button"
+              onClick={() => void handleResetCheckin()}
+              title="Dev: reset today's check-in"
+              style={{
+                background: 'transparent',
+                border: '0.5px solid #2D1B55',
+                borderRadius: 6,
+                color: '#3D2D55',
+                fontSize: 10,
+                padding: '2px 6px',
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+              }}
+            >
+              ↺
+            </button>
+          )}
+        </div>
       ) : (
         <button
           type="button"

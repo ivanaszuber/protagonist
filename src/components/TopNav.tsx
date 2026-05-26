@@ -182,34 +182,69 @@ function MenuDrawer({ open, onClose }: MenuDrawerProps) {
           </button>
         ))}
         {showDevTools && (
-          <button
-            key="dev-reset"
-            type="button"
-            onClick={() => void handleDevReset()}
-            style={{
-              width: '100%',
-              minHeight: 48,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 12,
-              padding: '0 20px',
-              background: 'transparent',
-              border: 'none',
-              borderTop: '0.5px solid #3B0010',
-              cursor: 'pointer',
-              fontFamily: 'inherit',
-              textAlign: 'left',
-            }}
-          >
-            <span style={{ fontSize: 16, width: 24, textAlign: 'center' }}>🗑</span>
-            <span style={{ flex: 1, fontSize: 14, color: '#ef4444' }}>Dev: Reset all data</span>
-            {devResetState === 'loading' && (
-              <span style={{ fontSize: 10, color: '#5A4A7A' }}>Resetting...</span>
-            )}
-            {devResetState === 'done' && (
-              <span style={{ fontSize: 10, color: '#34d399' }}>Done ✓</span>
-            )}
-          </button>
+          <>
+            <button
+              key="dev-reset-checkin"
+              type="button"
+              onClick={() => {
+                void fetch('/api/dev/reset-checkin', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ userId }),
+                }).then(() => {
+                  onClose()
+                  window.dispatchEvent(new CustomEvent('protagonist:oracle-closed'))
+                })
+              }}
+              style={{
+                width: '100%',
+                minHeight: 48,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12,
+                padding: '0 20px',
+                background: 'transparent',
+                border: 'none',
+                borderTop: '0.5px solid #2D1B55',
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                textAlign: 'left',
+              }}
+            >
+              <span style={{ fontSize: 16, width: 24, textAlign: 'center' }}>↺</span>
+              <span style={{ flex: 1, fontSize: 14, color: '#7A5FA0' }}>
+                Dev: Reset today&apos;s check-in
+              </span>
+            </button>
+            <button
+              key="dev-reset"
+              type="button"
+              onClick={() => void handleDevReset()}
+              style={{
+                width: '100%',
+                minHeight: 48,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12,
+                padding: '0 20px',
+                background: 'transparent',
+                border: 'none',
+                borderTop: '0.5px solid #3B0010',
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                textAlign: 'left',
+              }}
+            >
+              <span style={{ fontSize: 16, width: 24, textAlign: 'center' }}>🗑</span>
+              <span style={{ flex: 1, fontSize: 14, color: '#ef4444' }}>Dev: Reset all data</span>
+              {devResetState === 'loading' && (
+                <span style={{ fontSize: 10, color: '#5A4A7A' }}>Resetting...</span>
+              )}
+              {devResetState === 'done' && (
+                <span style={{ fontSize: 10, color: '#34d399' }}>Done ✓</span>
+              )}
+            </button>
+          </>
         )}
       </div>
     </>
