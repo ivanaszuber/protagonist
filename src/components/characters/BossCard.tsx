@@ -17,7 +17,7 @@ interface BossCardProps {
     slain?: boolean
     reward_xp?: number
   } | void>
-  onBossSlain: () => void
+  onBossSlain: () => Promise<void>
 }
 
 function daysUntil(dateStr: string): number {
@@ -88,7 +88,7 @@ export function BossCard({
         })
         setTimeout(() => {
           setVictory(null)
-          onBossSlain()
+          void onBossSlain()
         }, 2000)
       }
     } finally {
@@ -115,7 +115,7 @@ export function BossCard({
       if (!res.ok) {
         setGenerateError(data.error ?? 'Generation failed — try again.')
       } else {
-        onBossSlain() // reuses the refresh callback
+        await onBossSlain()
       }
     } catch {
       setGenerateError('Network error — try again.')
@@ -143,7 +143,7 @@ export function BossCard({
       if (!res.ok) {
         setGenerateError(data.error ?? 'Generation failed — try again.')
       } else {
-        onBossSlain()
+        await onBossSlain()
       }
     } catch {
       setGenerateError('Network error — try again.')

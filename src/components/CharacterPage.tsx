@@ -547,7 +547,7 @@ export function CharacterPage({ dimension }: CharacterPageProps) {
           escapedBoss={escapedBoss}
           tasks={bossTasks}
           onTaskComplete={handleBossTaskComplete}
-          onBossSlain={() => void refreshAfterBossSlain()}
+          onBossSlain={refreshAfterBossSlain}
         />
 
         <HallOfKills kills={bossKills} stats={killStats} />
