@@ -1292,13 +1292,7 @@ export default function DashboardPage() {
         >
           Champions
         </span>
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
-            gap: 8,
-          }}
-        >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {ALL_DIMENSIONS.map((dim) => {
             const quest = quests.find((q) => q.dimension === dim)
             const char = CHARACTERS[dim]
@@ -1306,8 +1300,8 @@ export default function DashboardPage() {
             const level = getLevel(xp)
             const pct = Math.round(((xp % 500) / 500) * 100)
             const Hero = HERO_MINI[dim]
-            const isRoot = dim === 'family'
             const streak = quest?.streak_days ?? 0
+            const taskCount = quest?.todays_tasks?.filter((t) => !t.completed).length ?? 0
 
             return (
               <div
@@ -1321,19 +1315,19 @@ export default function DashboardPage() {
                   }
                 }}
                 style={{
-                  gridColumn: isRoot ? '1 / -1' : undefined,
                   background: '#140C28',
                   border: '0.5px solid #2D1B55',
                   borderRadius: 12,
-                  padding: '10px 8px',
+                  padding: '8px 10px 8px 14px',
                   position: 'relative',
                   overflow: 'hidden',
                   cursor: 'pointer',
                   display: 'flex',
                   gap: 10,
-                  alignItems: 'flex-start',
+                  alignItems: 'center',
                 }}
               >
+                {/* Colour accent bar */}
                 <div
                   style={{
                     position: 'absolute',
@@ -1344,104 +1338,53 @@ export default function DashboardPage() {
                     background: char.color,
                   }}
                 />
-                {/* Left: character art + tier label stacked */}
+
+                {/* Character art — unchanged */}
                 <div
                   style={{
                     marginLeft: 4,
                     flexShrink: 0,
                     width: 38,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    gap: 4,
+                    height: 46,
+                    position: 'relative',
                   }}
                 >
-                  <div style={{ width: 38, height: 46, position: 'relative' }}>
-                    <div
-                      style={{
-                        transform: 'scale(0.38)',
-                        transformOrigin: 'top left',
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                      }}
-                    >
-                      <Hero />
-                    </div>
-                  </div>
-                  <span
+                  <div
                     style={{
-                      fontSize: 8,
-                      color: '#5A4A7A',
-                      textAlign: 'center',
-                      lineHeight: 1.3,
-                      whiteSpace: 'nowrap',
+                      transform: 'scale(0.38)',
+                      transformOrigin: 'top left',
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
                     }}
                   >
-                    {getCharacterTierLabel(dim, xp)}
-                  </span>
+                    <Hero />
+                  </div>
                 </div>
 
-                {/* Right: pill+level, name, vision, bar, streak */}
+                {/* Middle: name + tier + task count, vision, XP bar */}
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  {/* Dimension pill + Level badge paired together */}
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 4,
-                      marginBottom: 4,
-                    }}
-                  >
-                    <span
-                      style={{
-                        fontSize: 9,
-                        color: char.color,
-                        background: `${char.color}18`,
-                        border: `0.5px solid ${char.color}`,
-                        borderRadius: 20,
-                        padding: '2px 7px',
-                        lineHeight: 1.4,
-                        letterSpacing: '0.02em',
-                      }}
-                    >
-                      {dim.charAt(0).toUpperCase() + dim.slice(1)}
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 5, marginBottom: 2 }}>
+                    <span style={{ fontSize: 12, color: '#E8E0F0', fontWeight: 500 }}>
+                      {char.name}
                     </span>
-                    <span
-                      style={{
-                        background: '#1E0D40',
-                        borderRadius: 6,
-                        padding: '2px 6px',
-                        fontSize: 9,
-                        color: '#7A5FA0',
-                      }}
-                    >
-                      Lv {level}
+                    <span style={{ fontSize: 9, color: '#5A4A7A', whiteSpace: 'nowrap' }}>
+                      {getCharacterTierLabel(dim, xp)}
+                      {taskCount > 0 && (
+                        <span style={{ color: `${char.color}99` }}>
+                          {' · '}{taskCount} {taskCount === 1 ? 'task' : 'tasks'}
+                        </span>
+                      )}
                     </span>
-                    {streak > 0 && (
-                      <span style={{ fontSize: 9, color: '#fb923c', marginLeft: 'auto' }}>
-                        🔥 {streak}d
-                      </span>
-                    )}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: 11,
-                      color: '#E8E0F0',
-                      fontWeight: 500,
-                      marginBottom: 2,
-                    }}
-                  >
-                    {char.name}
                   </div>
                   <div
                     style={{
                       fontSize: 9,
-                      color: '#5A4A7A',
+                      color: '#8A80A8',
                       whiteSpace: 'nowrap',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
-                      marginBottom: 6,
+                      marginBottom: 5,
                     }}
                   >
                     {quest?.vision || 'No active quest yet'}
@@ -1463,6 +1406,48 @@ export default function DashboardPage() {
                       }}
                     />
                   </div>
+                </div>
+
+                {/* Right: dimension pill, level badge, streak */}
+                <div
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'flex-end',
+                    gap: 4,
+                    flexShrink: 0,
+                    paddingLeft: 4,
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: 9,
+                      color: char.color,
+                      background: `${char.color}18`,
+                      border: `0.5px solid ${char.color}40`,
+                      borderRadius: 20,
+                      padding: '2px 7px',
+                      lineHeight: 1.4,
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {dim.charAt(0).toUpperCase() + dim.slice(1)}
+                  </span>
+                  <span
+                    style={{
+                      background: '#1E0D40',
+                      borderRadius: 6,
+                      padding: '2px 6px',
+                      fontSize: 9,
+                      color: '#7A5FA0',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    Lv {level}
+                  </span>
+                  {streak > 0 && (
+                    <span style={{ fontSize: 9, color: '#fb923c' }}>🔥 {streak}d</span>
+                  )}
                 </div>
               </div>
             )
