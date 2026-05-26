@@ -11,13 +11,13 @@ export interface MedalDefinition {
 }
 
 export const MEDAL_DEFINITIONS: MedalDefinition[] = [
-  { key: 'first_blood', label: 'First Blood', hint: 'Complete your first task', icon: 'sword' },
+  { key: 'first_blood', label: 'First Task', hint: 'Complete your first task', icon: 'sword' },
   { key: 'on_a_roll', label: 'On a Roll', hint: '7-day task streak', icon: 'pulse' },
-  { key: 'boss_slayer', label: 'Boss Slayer', hint: 'Slay your first boss', icon: 'skull' },
-  { key: 'relentless', label: 'Relentless', hint: 'Slay 3 bosses', icon: 'flame' },
-  { key: 'legend_born', label: 'Legend Born', hint: 'Define your Legend', icon: 'star' },
-  { key: 'comeback', label: 'Comeback', hint: 'Slay an escaped boss', icon: 'shield' },
-  { key: 'veteran', label: 'Veteran', hint: 'Reach Level 10', icon: 'trophy' },
+  { key: 'boss_slayer', label: 'First Victory', hint: 'Complete your first challenge', icon: 'star' },
+  { key: 'relentless', label: 'Relentless', hint: 'Complete 3 challenges', icon: 'flame' },
+  { key: 'legend_born', label: 'Legend Born', hint: 'Define your Legend', icon: 'trophy' },
+  { key: 'comeback', label: 'Comeback', hint: 'Finish an abandoned challenge', icon: 'shield' },
+  { key: 'veteran', label: 'Veteran', hint: 'Reach Level 10', icon: 'pulse' },
 ]
 
 export interface MedalCheckContext {

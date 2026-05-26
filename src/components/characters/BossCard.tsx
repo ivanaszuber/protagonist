@@ -73,7 +73,13 @@ export function BossCard({
   useEffect(() => {
     setLocalBoss(boss)
     setLocalTasks(tasks)
-    setVictory(null)
+    // If page reloaded with an active boss where all tasks are already done,
+    // show victory state instead of a frozen 10/10 task list.
+    if (boss && tasks.length > 0 && tasks.every((t) => t.completed)) {
+      setVictory({ name: boss.name, rewardXp: boss.reward_xp })
+    } else {
+      setVictory(null)
+    }
   }, [boss, tasks])
 
   // XP count-up when victory triggers
@@ -346,7 +352,18 @@ export function BossCard({
               </p>
               <button
                 type="button"
-                onClick={() => void onBossSlain()}
+                onClick={async () => {
+                  // Finalize the boss server-side (idempotent — safe to call even if already slain)
+                  if (localBoss) {
+                    const uid = getUserId()
+                    await fetch(`/api/bosses/${localBoss.id}/slay`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ userId: uid }),
+                    }).catch(() => {})
+                  }
+                  await onBossSlain()
+                }}
                 style={{
                   padding: '8px 18px',
                   background: '#1E0D40',

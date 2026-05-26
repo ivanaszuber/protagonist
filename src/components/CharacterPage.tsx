@@ -310,6 +310,17 @@ export function CharacterPage({ dimension }: CharacterPageProps) {
             return next
           })
         }, 700)
+        // Re-check medals silently after every task completion
+        void fetch('/api/medals/check', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: uid, dimension }),
+        })
+          .then((r) => r.json())
+          .then((d: { earned?: string[] }) => {
+            if (d.earned) setEarnedMedals(d.earned)
+          })
+          .catch(() => {})
       }
     } finally {
       setCompletingId(null)
