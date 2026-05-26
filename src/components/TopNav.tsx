@@ -255,18 +255,17 @@ export function TopNav({ streakDays = 0 }: TopNavProps) {
   const [menuOpen, setMenuOpen] = useState(false)
   const closeMenu = useCallback(() => setMenuOpen(false), [])
 
-  const dateLabel = new Date().toLocaleDateString('en-GB', {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-  })
+  const days = Math.max(1, streakDays)
+  const xpBonus = Math.min(50, days * 2)
 
   return (
     <>
       <header
         style={{
-          position: 'sticky',
+          position: 'fixed',
           top: 0,
+          left: 0,
+          right: 0,
           zIndex: 40,
           background: '#110A22',
           borderBottom: '0.5px solid #2D1B55',
@@ -274,16 +273,27 @@ export function TopNav({ streakDays = 0 }: TopNavProps) {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          minHeight: 40,
+          minHeight: 44,
           boxSizing: 'border-box',
+          maxWidth: 430,
+          margin: '0 auto',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontSize: 10, color: '#5A4A7A' }}>{dateLabel}</span>
-          <>
-            <span style={{ fontSize: 10, color: '#3D2D55' }}>·</span>
-            <span style={{ fontSize: 10, color: '#fb923c' }}>🔥 {Math.max(1, streakDays)}d</span>
-          </>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            background: 'rgba(251,146,60,0.10)',
+            border: '0.5px solid rgba(251,146,60,0.25)',
+            borderRadius: 20,
+            padding: '4px 10px',
+          }}
+        >
+          <span style={{ fontSize: 12 }}>🔥</span>
+          <span style={{ fontSize: 11, fontWeight: 600, color: '#fb923c' }}>{days} day streak</span>
+          <span style={{ fontSize: 10, color: '#5A4A7A' }}>·</span>
+          <span style={{ fontSize: 10, color: '#a855f7', fontWeight: 500 }}>+{xpBonus}% XP</span>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>

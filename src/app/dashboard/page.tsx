@@ -556,7 +556,7 @@ export default function DashboardPage() {
       style={{
         background: '#0D0820',
         minHeight: '100dvh',
-        padding: '0 0 calc(120px + env(safe-area-inset-bottom, 0px))',
+        padding: '44px 0 calc(120px + env(safe-area-inset-bottom, 0px))',
         fontFamily: 'var(--font-space-grotesk), system-ui, sans-serif',
         overflowY: 'auto',
         scrollbarWidth: 'none',
@@ -1290,34 +1290,52 @@ export default function DashboardPage() {
                     background: char.color,
                   }}
                 />
+                {/* Left: character art + tier label stacked */}
                 <div
                   style={{
                     marginLeft: 4,
                     flexShrink: 0,
                     width: 38,
-                    height: 46,
-                    position: 'relative',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: 4,
                   }}
                 >
-                  <div
+                  <div style={{ width: 38, height: 46, position: 'relative' }}>
+                    <div
+                      style={{
+                        transform: 'scale(0.38)',
+                        transformOrigin: 'top left',
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                      }}
+                    >
+                      <Hero />
+                    </div>
+                  </div>
+                  <span
                     style={{
-                      transform: 'scale(0.38)',
-                      transformOrigin: 'top left',
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
+                      fontSize: 8,
+                      color: '#5A4A7A',
+                      textAlign: 'center',
+                      lineHeight: 1.3,
+                      whiteSpace: 'nowrap',
                     }}
                   >
-                    <Hero />
-                  </div>
+                    {getCharacterTierLabel(dim, xp)}
+                  </span>
                 </div>
+
+                {/* Right: pill+level, name, vision, bar, streak */}
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  {/* Dimension pill + Level badge on same row */}
+                  {/* Dimension pill + Level badge paired together */}
                   <div
                     style={{
                       display: 'flex',
                       alignItems: 'center',
-                      justifyContent: 'space-between',
+                      gap: 4,
                       marginBottom: 4,
                     }}
                   >
@@ -1346,6 +1364,11 @@ export default function DashboardPage() {
                     >
                       Lv {level}
                     </span>
+                    {streak > 0 && (
+                      <span style={{ fontSize: 9, color: '#fb923c', marginLeft: 'auto' }}>
+                        🔥 {streak}d
+                      </span>
+                    )}
                   </div>
                   <div
                     style={{
@@ -1375,7 +1398,6 @@ export default function DashboardPage() {
                       background: '#2D1B55',
                       borderRadius: 2,
                       overflow: 'hidden',
-                      marginBottom: 6,
                     }}
                   >
                     <div
@@ -1386,20 +1408,6 @@ export default function DashboardPage() {
                         borderRadius: 2,
                       }}
                     />
-                  </div>
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                    }}
-                  >
-                    <span style={{ fontSize: 9, color: '#7A5FA0' }}>
-                      {getCharacterTierLabel(dim, xp)}
-                    </span>
-                    {streak > 0 && (
-                      <span style={{ fontSize: 9, color: '#fb923c' }}>🔥 {streak}d</span>
-                    )}
                   </div>
                 </div>
               </div>
