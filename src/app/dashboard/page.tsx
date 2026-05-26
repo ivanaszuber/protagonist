@@ -36,6 +36,7 @@ interface VitalityData {
   cycle_day: number | null
   cycle_phase: string | null
   mood_today: number | null
+  mood_last_logged_at: string | null
 }
 
 interface TaskRow {
@@ -198,6 +199,39 @@ function formatTimeFromIso(iso: string): string {
   return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
 }
 
+function formatMoodTimestamp(iso: string): string {
+  const logged = new Date(iso)
+  const now = new Date()
+  const isToday =
+    logged.getFullYear() === now.getFullYear() &&
+    logged.getMonth() === now.getMonth() &&
+    logged.getDate() === now.getDate()
+
+  const timeStr = logged.toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
+
+  if (isToday) return timeStr
+
+  const yesterday = new Date(now)
+  yesterday.setDate(now.getDate() - 1)
+  const isYesterday =
+    logged.getFullYear() === yesterday.getFullYear() &&
+    logged.getMonth() === yesterday.getMonth() &&
+    logged.getDate() === yesterday.getDate()
+
+  if (isYesterday) return `Yesterday · ${timeStr}`
+
+  const dayLabel = logged.toLocaleDateString('en-GB', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+  })
+  return `${dayLabel} · ${timeStr}`
+}
+
 const quickAddInputStyle: CSSProperties = {
   width: '100%',
   background: '#1A0D3A',
@@ -242,6 +276,7 @@ export default function DashboardPage() {
   const [vitalityLoading, setVitalityLoading] = useState(true)
   const [vitality, setVitality] = useState<VitalityData | null>(null)
   const [moodScore, setMoodScore] = useState<number | null>(null)
+  const [moodLoggedAt, setMoodLoggedAt] = useState<string | null>(null)
   const [hasCheckedInToday, setHasCheckedInToday] = useState(false)
   const [witnessInsight, setWitnessInsight] = useState<string | null>(null)
   const [witnessDismissed, setWitnessDismissed] = useState(false)
@@ -298,6 +333,7 @@ export default function DashboardPage() {
       const v = vitalityRes.value as VitalityData
       setVitality(v)
       setMoodScore(v.mood_today)
+      setMoodLoggedAt(v.mood_last_logged_at ?? null)
     }
     if (questsRes.status === 'fulfilled') {
       setQuests((questsRes.value.quests ?? []) as MainQuest[])
@@ -379,6 +415,7 @@ export default function DashboardPage() {
     })
     setHasCheckedInToday(false)
     setMoodScore(null)
+    setMoodLoggedAt(null)
   }, [])
 
   async function handleQuickAddSubmit() {
@@ -496,15 +533,20 @@ export default function DashboardPage() {
     return todayItems
   }, [todayItems, todayTab])
 
-  async function handleMoodSelect(score: number) {
+  function handleMoodSelect(score: number) {
     setMoodScore(score)
     setVerdictKey((k) => k + 1)
     const uid = userIdRef.current
-    await fetch('/api/mood', {
+    void fetch('/api/mood', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ userId: uid, mood_score: score }),
     })
+      .then((res) => res.json())
+      .then((data: { mood?: { created_at?: string } }) => {
+        if (data.mood?.created_at) setMoodLoggedAt(data.mood.created_at)
+      })
+      .catch(() => {})
   }
 
   async function handleCompleteTask(item: TodayItem) {
@@ -824,6 +866,18 @@ export default function DashboardPage() {
               }}
             >
               {MOOD_LABELS[moodScore].text}
+            </span>
+          )}
+          {moodLoggedAt && (
+            <span
+              style={{
+                marginLeft: 'auto',
+                fontSize: 9,
+                color: '#3D2D55',
+                flexShrink: 0,
+              }}
+            >
+              {formatMoodTimestamp(moodLoggedAt)}
             </span>
           )}
         </div>

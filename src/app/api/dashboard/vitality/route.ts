@@ -69,9 +69,17 @@ export async function GET(request: Request) {
     const today = todayDate()
     const { data: moodRow } = await supabase
       .from('mood_entries')
-      .select('mood_score')
+      .select('mood_score, created_at')
       .eq('user_id', userId)
       .gte('created_at', `${today}T00:00:00`)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    const { data: lastMoodRow } = await supabase
+      .from('mood_entries')
+      .select('created_at')
+      .eq('user_id', userId)
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle()
@@ -86,6 +94,7 @@ export async function GET(request: Request) {
       cycle_day,
       cycle_phase,
       mood_today: moodRow?.mood_score ?? null,
+      mood_last_logged_at: lastMoodRow?.created_at ?? null,
     })
   }
 
@@ -97,5 +106,6 @@ export async function GET(request: Request) {
     cycle_day,
     cycle_phase,
     mood_today: null,
+    mood_last_logged_at: null,
   })
 }
