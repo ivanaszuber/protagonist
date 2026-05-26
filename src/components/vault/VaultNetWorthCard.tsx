@@ -565,48 +565,40 @@ export function VaultNetWorthCard({ userId, accentColor }: VaultNetWorthCardProp
       {/* Inline confession form — slides down */}
       <div
         style={{
-          maxHeight: slipOpen ? 520 : 0,
+          maxHeight: slipOpen ? 480 : 0,
           overflow: 'hidden',
           transition: 'max-height 0.35s ease',
         }}
       >
-        <div
-          style={{
-            marginTop: 12,
-            background: '#12101E',
-            borderRadius: 14,
-            borderLeft: '3px solid #1D9E75',
-            padding: '16px 14px 20px',
-          }}
-        >
+        <div style={{ marginTop: 14, borderTop: '0.5px solid #1E0D40', paddingTop: 14 }}>
           {/* Sad animated robot + message */}
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, marginBottom: 18 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
             <div
               style={{
                 flexShrink: 0,
                 position: 'relative',
-                width: 72,
-                height: 88,
+                width: 64,
+                height: 80,
                 animation: 'vault-slip-wobble 1.4s ease-in-out infinite',
                 transformOrigin: 'bottom center',
               }}
             >
-              {/* Sad vault robot — same SVG, sad expression */}
-              <svg width="72" height="88" viewBox="0 0 42 56" fill="none" aria-hidden>
+              {/* Sad vault robot — GREEN, sad brows (inner corners UP) */}
+              <svg width="64" height="80" viewBox="0 0 42 56" fill="none" aria-hidden>
                 <circle cx="18" cy="7" r="5.5" fill="#FAC775" opacity="0.85" />
                 <circle cx="18" cy="7" r="3.5" fill="#EF9F27" />
                 <path d="M17.5 4.5V9.5M15.5 7H21" stroke="#FAC775" strokeWidth="1.2" strokeLinecap="round" />
                 <rect x="3" y="12" width="30" height="24" rx="9" fill="#1D9E75" />
                 <circle cx="13" cy="24" r="6" fill="#012A1E" />
                 <circle cx="26" cy="24" r="6" fill="#012A1E" />
-                {/* pupils down — sad look */}
-                <circle cx="11" cy="23" r="2" fill="white" opacity="0.5" />
-                <circle cx="24" cy="23" r="2" fill="white" opacity="0.5" />
-                {/* sad brows angled inward */}
-                <path d="M9 20L14 22" stroke="#9FE1CB" strokeWidth="1.2" strokeLinecap="round" />
-                <path d="M22 22L27 20" stroke="#9FE1CB" strokeWidth="1.2" strokeLinecap="round" />
+                {/* pupils down-center — sad look */}
+                <circle cx="13" cy="25" r="2.5" fill="white" opacity="0.55" />
+                <circle cx="26" cy="25" r="2.5" fill="white" opacity="0.55" />
+                {/* sad brows: inner corners UP, outer corners DOWN */}
+                <path d="M8 22L13 20" stroke="#9FE1CB" strokeWidth="1.2" strokeLinecap="round" />
+                <path d="M23 20L28 22" stroke="#9FE1CB" strokeWidth="1.2" strokeLinecap="round" />
                 {/* frown */}
-                <path d="M10 33Q18 29 26 33" stroke="#012A1E" strokeWidth="1.8" fill="none" strokeLinecap="round" />
+                <path d="M10 33Q18 30 26 33" stroke="#012A1E" strokeWidth="1.8" fill="none" strokeLinecap="round" />
                 <rect x="7" y="38" width="22" height="16" rx="5" fill="#0F6E56" />
                 <path d="M11 51L16 47L20 49L26 44" stroke="#1D9E75" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" opacity="0.75" />
               </svg>
@@ -614,94 +606,94 @@ export function VaultNetWorthCard({ userId, accentColor }: VaultNetWorthCardProp
               <div
                 style={{
                   position: 'absolute',
-                  left: 19,
-                  top: 50,
-                  width: 5,
-                  height: 9,
+                  left: 17,
+                  top: 46,
+                  width: 4,
+                  height: 8,
                   background: '#9FE1CB',
-                  borderRadius: '0 0 5px 5px',
+                  borderRadius: '0 0 4px 4px',
                   animation: 'vault-tear-fall 1.1s ease-in infinite',
                 }}
               />
               <div
                 style={{
                   position: 'absolute',
-                  left: 40,
-                  top: 50,
-                  width: 5,
-                  height: 9,
+                  left: 37,
+                  top: 46,
+                  width: 4,
+                  height: 8,
                   background: '#9FE1CB',
-                  borderRadius: '0 0 5px 5px',
+                  borderRadius: '0 0 4px 4px',
                   animation: 'vault-tear-fall 1.1s ease-in 0.45s infinite',
                 }}
               />
             </div>
-            <div style={{ paddingTop: 4 }}>
-              <p style={{ fontSize: 17, fontWeight: 600, color: '#E8824A', marginBottom: 6 }}>
+            <div>
+              <p style={{ fontSize: 13, fontWeight: 600, color: '#E8824A', margin: '0 0 4px' }}>
                 Vault is hurt 🥺
               </p>
-              <p style={{ fontSize: 13, color: '#7A6A8A', lineHeight: 1.55 }}>
+              <p style={{ fontSize: 11, color: '#7A6A8A', lineHeight: 1.55, margin: 0 }}>
                 Shadow gap widened.<br />
                 Auto-recovers tomorrow.
               </p>
             </div>
           </div>
 
-          {/* Confession form */}
-          <div style={{ background: '#1A1630', borderRadius: 14, padding: 14 }}>
-            <p
-              style={{
-                fontSize: 11,
-                fontWeight: 600,
-                color: '#6A5A8A',
-                letterSpacing: '0.1em',
-                textTransform: 'uppercase',
-                marginBottom: 12,
-              }}
-            >
-              What did you spend on?
-            </p>
+          {/* What did you spend on */}
+          <p
+            style={{
+              fontSize: 10,
+              fontWeight: 600,
+              color: '#5A4A7A',
+              letterSpacing: '0.1em',
+              textTransform: 'uppercase',
+              margin: '0 0 8px',
+            }}
+          >
+            What did you spend on?
+          </p>
 
-            {/* Category chips */}
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginBottom: 12 }}>
-              {SLIP_CATEGORIES.map((cat) => (
-                <button
-                  key={cat.key}
-                  type="button"
-                  onClick={() => setSlipCat(cat.key)}
-                  style={{
-                    background: slipCat === cat.key ? '#1E1A34' : '#12101E',
-                    border: `0.5px solid ${slipCat === cat.key ? '#5A40A0' : '#2A2040'}`,
-                    borderRadius: 22,
-                    padding: '7px 14px',
-                    fontSize: 13,
-                    color: slipCat === cat.key ? '#C8B8F0' : '#8A7AAA',
-                    cursor: 'pointer',
-                    fontFamily: 'inherit',
-                  }}
-                >
-                  {cat.emoji} {cat.label}
-                </button>
-              ))}
+          {/* Category chips */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
+            {SLIP_CATEGORIES.map((cat) => (
+              <button
+                key={cat.key}
+                type="button"
+                onClick={() => setSlipCat(cat.key)}
+                style={{
+                  background: slipCat === cat.key ? '#1E1A34' : '#12101E',
+                  border: `0.5px solid ${slipCat === cat.key ? '#5A40A0' : '#2A2040'}`,
+                  borderRadius: 18,
+                  padding: '5px 11px',
+                  fontSize: 11,
+                  color: slipCat === cat.key ? '#C8B8F0' : '#8A7AAA',
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                }}
+              >
+                {cat.emoji} {cat.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Amount — underline style */}
+          <div style={{ marginBottom: 10 }}>
+            <div style={{ fontSize: 10, color: '#4A3870', marginBottom: 4, letterSpacing: '0.04em' }}>
+              Amount
             </div>
-
-            {/* Amount */}
             <div
               style={{
-                background: '#12101E',
-                border: '0.5px solid #2A2040',
-                borderRadius: 12,
-                padding: '12px 16px',
                 display: 'flex',
                 alignItems: 'center',
-                gap: 10,
-                marginBottom: 10,
+                gap: 6,
+                borderBottom: '0.5px solid #2D1B55',
+                paddingBottom: 6,
               }}
             >
-              <span style={{ fontSize: 18, color: '#5A4A7A' }}>£</span>
+              <span style={{ fontSize: 12, color: '#3D2070' }}>£</span>
               <input
                 type="number"
-                placeholder="How much?"
+                placeholder="0"
                 value={slipAmount}
                 onChange={(e) => setSlipAmount(e.target.value)}
                 style={{
@@ -709,26 +701,24 @@ export function VaultNetWorthCard({ userId, accentColor }: VaultNetWorthCardProp
                   background: 'transparent',
                   border: 'none',
                   outline: 'none',
-                  fontSize: 18,
+                  fontSize: 13,
+                  fontWeight: 500,
                   color: '#E8E0F0',
                   fontFamily: 'inherit',
                 }}
               />
             </div>
+          </div>
 
-            {/* Optional note */}
-            <div
-              style={{
-                background: '#12101E',
-                border: '0.5px solid #2A2040',
-                borderRadius: 12,
-                padding: '12px 16px',
-                marginBottom: 12,
-              }}
-            >
+          {/* Note — underline style */}
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ fontSize: 10, color: '#4A3870', marginBottom: 4, letterSpacing: '0.04em' }}>
+              Note (optional)
+            </div>
+            <div style={{ borderBottom: '0.5px solid #1E0D40', paddingBottom: 6 }}>
               <input
                 type="text"
-                placeholder="What was it? (optional)"
+                placeholder="What was it?"
                 value={slipNote}
                 onChange={(e) => setSlipNote(e.target.value)}
                 style={{
@@ -736,35 +726,36 @@ export function VaultNetWorthCard({ userId, accentColor }: VaultNetWorthCardProp
                   background: 'transparent',
                   border: 'none',
                   outline: 'none',
-                  fontSize: 13,
-                  color: '#C0B0D8',
+                  fontSize: 11,
+                  color: '#9B8EC4',
                   fontFamily: 'inherit',
+                  boxSizing: 'border-box',
                 }}
               />
             </div>
-
-            {/* Submit */}
-            <button
-              type="button"
-              onClick={() => void handleSlipConfirm()}
-              disabled={slipSaving || !slipAmount}
-              style={{
-                width: '100%',
-                background: '#2A0E0E',
-                border: '0.5px solid #7A2020',
-                borderRadius: 12,
-                padding: 16,
-                fontSize: 15,
-                fontWeight: 500,
-                color: '#E05050',
-                cursor: slipSaving || !slipAmount ? 'default' : 'pointer',
-                opacity: slipSaving || !slipAmount ? 0.6 : 1,
-                fontFamily: 'inherit',
-              }}
-            >
-              {slipSaving ? 'Logging...' : 'I know, I know... log it'}
-            </button>
           </div>
+
+          {/* Submit */}
+          <button
+            type="button"
+            onClick={() => void handleSlipConfirm()}
+            disabled={slipSaving || !slipAmount}
+            style={{
+              width: '100%',
+              background: '#2A0E0E',
+              border: '0.5px solid #7A2020',
+              borderRadius: 10,
+              padding: 10,
+              fontSize: 12,
+              fontWeight: 500,
+              color: '#E05050',
+              cursor: slipSaving || !slipAmount ? 'default' : 'pointer',
+              opacity: slipSaving || !slipAmount ? 0.6 : 1,
+              fontFamily: 'inherit',
+            }}
+          >
+            {slipSaving ? 'Logging...' : 'I know, I know... log it'}
+          </button>
         </div>
       </div>
     </div>
