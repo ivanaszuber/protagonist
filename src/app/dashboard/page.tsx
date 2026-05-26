@@ -92,6 +92,76 @@ const MOOD_OPTIONS = [
   { value: 5, border: '#a855f7', bg: '#1A0830' },
 ] as const
 
+const MOOD_LABELS: Record<number, { text: string; color: string }> = {
+  1: { text: 'Rough', color: '#ef4444' },
+  2: { text: 'Low', color: '#fb923c' },
+  3: { text: 'Okay', color: '#fbbf24' },
+  4: { text: 'Good', color: '#4ade80' },
+  5: { text: 'Energised', color: '#a855f7' },
+}
+
+const BIO_CIRCUMFERENCE = 2 * Math.PI * 13  // r=13, inside a 32px circle
+
+function BiometricRing({
+  value,
+  color,
+  bg,
+  label,
+  loading,
+}: {
+  value: number | null | undefined
+  color: string
+  bg: string
+  label: string
+  loading: boolean
+}) {
+  const score = value ?? 0
+  const offset = loading || value == null ? BIO_CIRCUMFERENCE : BIO_CIRCUMFERENCE * (1 - score / 100)
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <div style={{ position: 'relative', width: 32, height: 32, flexShrink: 0 }}>
+        <svg
+          width="32"
+          height="32"
+          viewBox="0 0 32 32"
+          style={{ transform: 'rotate(-90deg)' }}
+        >
+          {/* track */}
+          <circle cx="16" cy="16" r="13" fill={bg} stroke="rgba(255,255,255,0.06)" strokeWidth="3" />
+          {/* progress arc */}
+          <circle
+            cx="16"
+            cy="16"
+            r="13"
+            fill="none"
+            stroke={color}
+            strokeWidth="3"
+            strokeDasharray={BIO_CIRCUMFERENCE}
+            strokeDashoffset={offset}
+            strokeLinecap="round"
+            style={{ transition: 'stroke-dashoffset 0.6s ease-out' }}
+          />
+        </svg>
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: loading || value == null ? 8 : 9,
+            fontWeight: 700,
+            color: loading || value == null ? '#5A4A7A' : color,
+          }}
+        >
+          {loading ? '--' : value != null ? value : '--'}
+        </div>
+      </div>
+      <span style={{ fontSize: 9, color: '#5A4A7A' }}>{label}</span>
+    </div>
+  )
+}
+
 function ProtagonistCharacter() {
   return (
     <div style={{ animation: 'protagonist-float 3.2s ease-in-out infinite' }}>
@@ -530,50 +600,9 @@ export default function DashboardPage() {
 
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {(
-              [
-                {
-                  label: 'Ready',
-                  value: vitality?.readiness_score,
-                  color: '#34d399',
-                  bg: '#16523A',
-                },
-                {
-                  label: 'Sleep',
-                  value: vitality?.sleep_score,
-                  color: '#60a5fa',
-                  bg: '#1A2E4A',
-                },
-                {
-                  label: 'Move',
-                  value: vitality?.activity_score,
-                  color: '#fb923c',
-                  bg: '#3B1A0A',
-                },
-              ] as const
-            ).map((bio) => (
-              <div key={bio.label} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <div
-                  style={{
-                    width: 32,
-                    height: 32,
-                    borderRadius: '50%',
-                    background: bio.bg,
-                    border: `2px solid ${bio.color}`,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: 11,
-                    fontWeight: 700,
-                    color: bio.color,
-                    flexShrink: 0,
-                  }}
-                >
-                  {vitalityLoading ? '--' : bio.value != null ? bio.value : '--'}
-                </div>
-                <span style={{ fontSize: 9, color: '#5A4A7A' }}>{bio.label}</span>
-              </div>
-            ))}
+            <BiometricRing label="Ready" value={vitality?.readiness_score} color="#34d399" bg="#16523A" loading={vitalityLoading} />
+            <BiometricRing label="Sleep" value={vitality?.sleep_score} color="#60a5fa" bg="#1A2E4A" loading={vitalityLoading} />
+            <BiometricRing label="Move" value={vitality?.activity_score} color="#fb923c" bg="#3B1A0A" loading={vitalityLoading} />
           </div>
           {cycleLabel && (
             <div
@@ -677,6 +706,20 @@ export default function DashboardPage() {
               </button>
             )
           })}
+          {moodScore != null && MOOD_LABELS[moodScore] && (
+            <span
+              key={moodScore}
+              style={{
+                fontSize: 11,
+                fontWeight: 500,
+                color: MOOD_LABELS[moodScore].color,
+                marginLeft: 4,
+                animation: 'verdict-flash 0.3s ease-out',
+              }}
+            >
+              {MOOD_LABELS[moodScore].text}
+            </span>
+          )}
         </div>
       </div>
 
@@ -1141,19 +1184,40 @@ export default function DashboardPage() {
                   </div>
                 </div>
                 <div style={{ flex: 1, minWidth: 0, paddingRight: 4 }}>
+                  {/* Dimension pill + Level badge on same row */}
                   <div
                     style={{
-                      position: 'absolute',
-                      top: 8,
-                      right: 8,
-                      background: '#1E0D40',
-                      borderRadius: 6,
-                      padding: '2px 6px',
-                      fontSize: 9,
-                      color: '#7A5FA0',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      marginBottom: 4,
                     }}
                   >
-                    Lv {level}
+                    <span
+                      style={{
+                        fontSize: 9,
+                        color: char.color,
+                        background: `${char.color}18`,
+                        border: `0.5px solid ${char.color}`,
+                        borderRadius: 20,
+                        padding: '2px 7px',
+                        lineHeight: 1.4,
+                        letterSpacing: '0.02em',
+                      }}
+                    >
+                      {dim.charAt(0).toUpperCase() + dim.slice(1)}
+                    </span>
+                    <span
+                      style={{
+                        background: '#1E0D40',
+                        borderRadius: 6,
+                        padding: '2px 6px',
+                        fontSize: 9,
+                        color: '#7A5FA0',
+                      }}
+                    >
+                      Lv {level}
+                    </span>
                   </div>
                   <div
                     style={{
@@ -1161,20 +1225,9 @@ export default function DashboardPage() {
                       color: '#E8E0F0',
                       fontWeight: 500,
                       marginBottom: 2,
-                      paddingTop: isRoot ? 0 : 2,
                     }}
                   >
                     {char.name}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: 9,
-                      color: char.color,
-                      marginBottom: 4,
-                      opacity: 0.75,
-                    }}
-                  >
-                    {dim.charAt(0).toUpperCase() + dim.slice(1)}
                   </div>
                   <div
                     style={{

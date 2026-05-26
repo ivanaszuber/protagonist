@@ -178,26 +178,52 @@ export function OracleSheet() {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition
     if (!SR) return
     const rec = new SR()
-    rec.continuous = false
-    rec.interimResults = false
-    rec.lang = 'en-US'
+    rec.continuous = true       // keep listening until user taps stop
+    rec.interimResults = true   // accumulate transcript live
+    rec.lang = 'en-GB'
     recognitionRef.current = rec
     setState('recording')
+    setInputText('')
+
     rec.onresult = (e: SpeechRecognitionEvent) => {
-      const t = e.results[0]?.[0]?.transcript ?? ''
-      setInputText(t)
-      setState('idle')
+      // Concatenate all results (final + interim) to build the full transcript
+      let transcript = ''
+      for (let i = 0; i < e.results.length; i++) {
+        transcript += e.results[i][0].transcript
+      }
+      setInputText(transcript)
     }
-    rec.onerror = () => setState('idle')
+
+    rec.onerror = (e: SpeechRecognitionErrorEvent) => {
+      // 'aborted' fires when we call rec.stop() ourselves — not a real error
+      if (e.error !== 'aborted') setState('idle')
+    }
+
     rec.onend = () => {
-      setState((s) => (s === 'recording' ? 'idle' : s))
+      // Auto-restart if the browser cut us off mid-recording (e.g. timeout)
+      // Only restart if we're still supposed to be recording
+      setState((s) => {
+        if (s === 'recording') {
+          try {
+            rec.start()
+          } catch {
+            // rec already stopped/replaced — stay idle
+            return 'idle'
+          }
+          return 'recording'
+        }
+        return s
+      })
     }
+
     rec.start()
   }, [])
 
   const stopVoice = useCallback(() => {
-    recognitionRef.current?.stop()
+    // Set state to idle FIRST so onend doesn't restart the recognition
     setState('idle')
+    recognitionRef.current?.stop()
+    recognitionRef.current = null
   }, [])
 
   const sendChatToArc = useCallback(
@@ -530,19 +556,45 @@ export function OracleSheet() {
                 }}
               >
                 {state === 'recording' ? (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 3, height: 28 }}>
-                    {[6, 14, 20, 10, 18, 8, 22, 12, 16, 6, 20, 10, 14].map((h, i) => (
+                  <div style={{ minHeight: 42, position: 'relative' }}>
+                    {inputText ? (
                       <div
-                        key={i}
                         style={{
-                          width: 3,
-                          height: h,
-                          borderRadius: 2,
-                          background: '#9333EA',
-                          opacity: 0.4 + (i % 3) * 0.2,
+                          fontSize: 13,
+                          color: '#C0B0E0',
+                          lineHeight: 1.5,
+                          paddingRight: 16,
                         }}
-                      />
-                    ))}
+                      >
+                        {inputText}
+                        <span
+                          style={{
+                            display: 'inline-block',
+                            width: 2,
+                            height: 13,
+                            background: '#9333EA',
+                            marginLeft: 2,
+                            verticalAlign: 'text-bottom',
+                            animation: 'oracle-cursor-blink 1s step-end infinite',
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 3, height: 28 }}>
+                        {[6, 14, 20, 10, 18, 8, 22, 12, 16, 6, 20, 10, 14].map((h, i) => (
+                          <div
+                            key={i}
+                            style={{
+                              width: 3,
+                              height: h,
+                              borderRadius: 2,
+                              background: '#9333EA',
+                              opacity: 0.4 + (i % 3) * 0.2,
+                            }}
+                          />
+                        ))}
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <textarea

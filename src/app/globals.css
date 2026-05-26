@@ -100,3 +100,8 @@ body::-webkit-scrollbar {
     opacity: 1;
   }
 }
+
+@keyframes oracle-cursor-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}

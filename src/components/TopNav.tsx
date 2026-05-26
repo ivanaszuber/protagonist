@@ -107,7 +107,7 @@ function MenuDrawer({ open, onClose }: MenuDrawerProps) {
           position: 'fixed',
           inset: 0,
           background: 'rgba(0,0,0,0.5)',
-          zIndex: 45,
+          zIndex: 60,
         }}
       />
       <div
@@ -116,7 +116,7 @@ function MenuDrawer({ open, onClose }: MenuDrawerProps) {
           bottom: 0,
           left: 0,
           right: 0,
-          zIndex: 46,
+          zIndex: 61,
           background: '#140C28',
           borderRadius: '20px 20px 0 0',
           borderTop: '0.5px solid #2D1B55',
@@ -195,12 +195,10 @@ export function TopNav({ streakDays = 0 }: TopNavProps) {
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <span style={{ fontSize: 10, color: '#5A4A7A' }}>{dateLabel}</span>
-          {streakDays > 0 && (
-            <>
-              <span style={{ fontSize: 10, color: '#3D2D55' }}>·</span>
-              <span style={{ fontSize: 10, color: '#fb923c' }}>🔥 {streakDays}d</span>
-            </>
-          )}
+          <>
+            <span style={{ fontSize: 10, color: '#3D2D55' }}>·</span>
+            <span style={{ fontSize: 10, color: '#fb923c' }}>🔥 {Math.max(1, streakDays)}d</span>
+          </>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
