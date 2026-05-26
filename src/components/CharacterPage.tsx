@@ -33,7 +33,7 @@ import { HallOfKills } from '@/components/characters/HallOfKills'
 import { MedalsRow } from '@/components/characters/MedalsRow'
 import { VaultNetWorthCard } from '@/components/vault/VaultNetWorthCard'
 import type { BossBattle, BossKillRow, BossTask } from '@/lib/bosses'
-import { MEDAL_DEFINITIONS } from '@/lib/medals'
+import { getMedalDefinitions } from '@/lib/medals'
 
 interface Milestone extends MainQuestMilestone {}
 
@@ -504,7 +504,7 @@ export function CharacterPage({ dimension }: CharacterPageProps) {
         <HallOfKills kills={bossKills} stats={killStats} />
 
         <MedalsRow
-          definitions={MEDAL_DEFINITIONS}
+          definitions={getMedalDefinitions(dimension)}
           earned={earnedMedals}
           accentColor={accentColor}
         />

@@ -73,12 +73,30 @@ function MedalIcon({ icon, earned }: { icon: MedalDefinition['icon']; earned: bo
           <path d="M12 14V17M9 20H15" stroke={stroke} strokeWidth="1.5" />
         </svg>
       )
+    case 'coin':
+      return (
+        <svg {...common}>
+          <circle cx="12" cy="12" r="8" stroke={stroke} strokeWidth="1.5" fill={fill} />
+          <path
+            d="M12 8v8M9 10.5h4.5a1.5 1.5 0 0 1 0 3H9"
+            stroke={stroke}
+            strokeWidth="1.5"
+            strokeLinecap="round"
+          />
+        </svg>
+      )
     default:
       return null
   }
 }
 
 export function MedalsRow({ definitions, earned, accentColor }: MedalsRowProps) {
+  const sorted = [...definitions].sort((a, b) => {
+    const aEarned = earned.includes(a.key) ? 0 : 1
+    const bEarned = earned.includes(b.key) ? 0 : 1
+    return aEarned - bEarned
+  })
+
   return (
     <section style={{ marginBottom: 24 }}>
       <span
@@ -103,7 +121,7 @@ export function MedalsRow({ definitions, earned, accentColor }: MedalsRowProps) 
           scrollbarWidth: 'none',
         }}
       >
-        {definitions.map((medal) => {
+        {sorted.map((medal) => {
           const isEarned = earned.includes(medal.key)
           return (
             <div

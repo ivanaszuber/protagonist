@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { fetchVaultMedalQuestStats, runVaultMedalCheck } from '@/lib/medals'
 import { computeVaultDerived, getVaultSettings, upsertVaultSettings, type VaultSettings } from '@/lib/vault'
 
 function buildResponse(settings: VaultSettings) {
@@ -39,8 +40,17 @@ export async function PUT(request: Request) {
   }
 
   try {
+    const prevSettings = await getVaultSettings(userId)
+    const prevGap = prevSettings.shadow_gap
     const settings = await upsertVaultSettings(userId, patch)
-    return NextResponse.json(buildResponse(settings))
+
+    const questStats = await fetchVaultMedalQuestStats(userId)
+    const newMedals = await runVaultMedalCheck(userId, settings, prevGap, questStats)
+
+    return NextResponse.json({
+      ...buildResponse(settings),
+      new_medals: newMedals,
+    })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Save failed'
     return NextResponse.json({ error: message }, { status: 500 })

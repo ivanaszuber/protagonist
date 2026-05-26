@@ -1,7 +1,11 @@
 import { NextResponse } from 'next/server'
-import { checkAndAwardMedals, getEarnedMedalKeys } from '@/lib/medals'
+import {
+  checkAndAwardMedals,
+  getEarnedMedalKeys,
+  runVaultMedalCheck,
+} from '@/lib/medals'
 import { getQuestDimensionXp, isQuestDbConfigured } from '@/lib/quest-db'
-import { supabase } from '@/lib/supabase'
+import { isSupabaseConfigured, supabase } from '@/lib/supabase'
 import type { Dimension } from '@/lib/character'
 
 const VALID_DIMENSIONS = new Set([
@@ -94,7 +98,9 @@ export async function POST(request: Request) {
     else break
   }
 
-  const newMedals = await checkAndAwardMedals({
+  const allNewMedals: string[] = []
+
+  const genericNew = await checkAndAwardMedals({
     userId,
     dimension: dim,
     dimensionXp: xp,
@@ -104,8 +110,31 @@ export async function POST(request: Request) {
     bossesSlainAfterEscape,
     streakDays,
   })
+  allNewMedals.push(...genericNew)
+
+  if (dimension === 'wealth' && isSupabaseConfigured()) {
+    const { data: vaultSettings } = await supabase
+      .from('vault_settings')
+      .select('invested, cash, nw_goal, shadow_gap, monthly_income')
+      .eq('user_id', userId)
+      .maybeSingle()
+
+    if (vaultSettings) {
+      const vaultNewlyEarned = await runVaultMedalCheck(
+        userId,
+        vaultSettings,
+        Number(vaultSettings.shadow_gap) || 0,
+        {
+          hasLegend: Boolean(quest?.vision?.trim()),
+          tasksCompletedCount: taskCount ?? 0,
+          bossesSlain: (slainKills ?? []).length,
+        }
+      )
+      allNewMedals.push(...vaultNewlyEarned)
+    }
+  }
 
   const earned = await getEarnedMedalKeys(userId, dimension)
 
-  return NextResponse.json({ earned, new_medals: newMedals })
+  return NextResponse.json({ earned, new_medals: allNewMedals })
 }
