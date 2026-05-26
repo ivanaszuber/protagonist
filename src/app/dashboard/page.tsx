@@ -322,20 +322,36 @@ function ChampionMedalIcon({ icon, earned, color }: { icon: MedalDefinition['ico
   return <svg {...common}>{path}</svg>
 }
 
+// ── Module-level cache: survives React unmount/remount in the same browser tab ──
+// This means navigating away and back shows data instantly instead of a blank screen.
+interface DashboardCache {
+  vitality: VitalityData | null
+  quests: MainQuest[]
+  dimXpMap: Record<string, number>
+  dimMedalsMap: Record<string, string[]>
+  hasCheckedInToday: boolean
+  moodScore: number | null
+  moodLoggedAt: string | null
+  events: CalendarEventRow[]
+  dateStr: string
+}
+let _cache: DashboardCache | null = null
+
 export default function DashboardPage() {
   const router = useRouter()
   const userIdRef = useRef(getUserId())
   const selectedDateRef = useRef(new Date())
 
-  const [vitalityLoading, setVitalityLoading] = useState(true)
-  const [vitality, setVitality] = useState<VitalityData | null>(null)
-  const [moodScore, setMoodScore] = useState<number | null>(null)
-  const [moodLoggedAt, setMoodLoggedAt] = useState<string | null>(null)
-  const [hasCheckedInToday, setHasCheckedInToday] = useState(false)
+  // Initialise from cache so revisiting the page never shows a blank screen
+  const [vitalityLoading, setVitalityLoading] = useState(() => _cache == null)
+  const [vitality, setVitality] = useState<VitalityData | null>(() => _cache?.vitality ?? null)
+  const [moodScore, setMoodScore] = useState<number | null>(() => _cache?.moodScore ?? null)
+  const [moodLoggedAt, setMoodLoggedAt] = useState<string | null>(() => _cache?.moodLoggedAt ?? null)
+  const [hasCheckedInToday, setHasCheckedInToday] = useState(() => _cache?.hasCheckedInToday ?? false)
   const [witnessInsight, setWitnessInsight] = useState<string | null>(null)
   const [witnessDismissed, setWitnessDismissed] = useState(false)
-  const [quests, setQuests] = useState<MainQuest[]>([])
-  const [events, setEvents] = useState<CalendarEventRow[]>([])
+  const [quests, setQuests] = useState<MainQuest[]>(() => _cache?.quests ?? [])
+  const [events, setEvents] = useState<CalendarEventRow[]>(() => _cache?.events ?? [])
   const [hpDisplay, setHpDisplay] = useState<number | null>(null)
   const [xpToast, setXpToast] = useState<XpToast | null>(null)
   const [levelUpToast, setLevelUpToast] = useState<LevelUpToast | null>(null)
@@ -353,8 +369,8 @@ export default function DashboardPage() {
     selectedDateRef.current = d
     setSelectedDate(d)
   }, [])
-  const [dimXpMap, setDimXpMap] = useState<Record<string, number>>({})
-  const [dimMedalsMap, setDimMedalsMap] = useState<Record<string, string[]>>({})
+  const [dimXpMap, setDimXpMap] = useState<Record<string, number>>(() => _cache?.dimXpMap ?? {})
+  const [dimMedalsMap, setDimMedalsMap] = useState<Record<string, string[]>>(() => _cache?.dimMedalsMap ?? {})
   const [verdictKey, setVerdictKey] = useState(0)
   const [showQuickAdd, setShowQuickAdd] = useState(false)
   const [quickAddTitle, setQuickAddTitle] = useState('')
@@ -385,84 +401,131 @@ export default function DashboardPage() {
     }
   }, [])
 
+  // Full dashboard load: vitality + quests + calendar + checkin + medals.
+  // Only shows loading state on very first visit (no cache). Subsequent calls
+  // refresh in the background without blanking the UI.
   const loadDashboard = useCallback(async (dateOverride?: string) => {
     const uid = userIdRef.current
-    setVitalityLoading(true)
+    const hasCache = _cache != null
+    if (!hasCache) setVitalityLoading(true)
 
-    // Sync Oura first so vitality reads fresh data (cycle phase, scores)
-    await fetch('/api/oura/sync', {
+    // Fire Oura sync in the background — don't await it, it's slow
+    fetch('/api/oura/sync', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ userId: uid }),
-    }).catch(() => {/* not connected or failed — continue anyway */})
+    }).catch(() => {})
 
     const dateStr = dateOverride ?? toDateStr(new Date())
 
     const [vitalityRes, questsRes, calRes, checkInRes, medalsRes] = await Promise.allSettled([
       fetch(`/api/dashboard/vitality?userId=${encodeURIComponent(uid)}`).then((r) => r.json()),
       fetch(`/api/quests/main?userId=${encodeURIComponent(uid)}&date=${encodeURIComponent(dateStr)}`).then((r) => r.json()),
-      fetch(`/api/calendar/next?userId=${encodeURIComponent(uid)}&limit=20&date=${encodeURIComponent(dateStr)}`).then((r) =>
-        r.json()
-      ),
+      fetch(`/api/calendar/next?userId=${encodeURIComponent(uid)}&limit=20&date=${encodeURIComponent(dateStr)}`).then((r) => r.json()),
       fetch(`/api/checkin/today?userId=${encodeURIComponent(uid)}`).then((r) => r.json()),
       fetch(`/api/medals/all?userId=${encodeURIComponent(uid)}`).then((r) => r.json()),
     ])
+
+    // Build updated cache entry from whatever succeeded
+    const next: DashboardCache = _cache ?? {
+      vitality: null, quests: [], dimXpMap: {}, dimMedalsMap: {},
+      hasCheckedInToday: false, moodScore: null, moodLoggedAt: null,
+      events: [], dateStr,
+    }
 
     if (vitalityRes.status === 'fulfilled') {
       const v = vitalityRes.value as VitalityData
       setVitality(v)
       setMoodScore(v.mood_today)
       setMoodLoggedAt(v.mood_last_logged_at ?? null)
+      next.vitality = v
+      next.moodScore = v.mood_today
+      next.moodLoggedAt = v.mood_last_logged_at ?? null
     }
     if (questsRes.status === 'fulfilled') {
-      setQuests((questsRes.value.quests ?? []) as MainQuest[])
+      const qs = (questsRes.value.quests ?? []) as MainQuest[]
+      setQuests(qs)
+      next.quests = qs
+      next.dateStr = dateStr
       if (questsRes.value.dimXpMap) {
-        setDimXpMap(questsRes.value.dimXpMap as Record<string, number>)
+        const xm = questsRes.value.dimXpMap as Record<string, number>
+        setDimXpMap(xm)
+        next.dimXpMap = xm
       }
     }
     if (medalsRes.status === 'fulfilled') {
-      setDimMedalsMap((medalsRes.value.earned ?? {}) as Record<string, string[]>)
+      const mm = (medalsRes.value.earned ?? {}) as Record<string, string[]>
+      setDimMedalsMap(mm)
+      next.dimMedalsMap = mm
     }
     if (calRes.status === 'fulfilled') {
       const eventsData = (calRes.value.events ?? []) as CalendarEventRow[]
       setEvents(eventsData)
-
+      next.events = eventsData
+      // If nothing returned, try a calendar sync then re-fetch once
       if (eventsData.length === 0) {
         fetch('/api/calendar/sync', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ userId: uid }),
         })
-          .then(() =>
-            fetch(`/api/calendar/next?userId=${encodeURIComponent(uid)}&limit=10&date=${encodeURIComponent(dateStr)}`)
-          )
+          .then(() => fetch(`/api/calendar/next?userId=${encodeURIComponent(uid)}&limit=10&date=${encodeURIComponent(dateStr)}`))
           .then((r) => r.json())
           .then((d: { events?: CalendarEventRow[] }) => {
-            if (d.events?.length) setEvents(d.events)
+            if (d.events?.length) {
+              setEvents(d.events)
+              if (_cache) _cache.events = d.events
+            }
           })
-          .catch(() => {
-            /* calendar optional */
-          })
+          .catch(() => {})
       }
     }
     if (checkInRes.status === 'fulfilled') {
-      setHasCheckedInToday(Boolean(checkInRes.value.hasCheckIn))
+      const v = Boolean(checkInRes.value.hasCheckIn)
+      setHasCheckedInToday(v)
+      next.hasCheckedInToday = v
     }
+
+    _cache = next
     setVitalityLoading(false)
   }, [])
 
+  // Light load for date navigation: only tasks + calendar events.
+  // Vitality/medals/checkin don't change per date so we skip them.
+  const loadDateData = useCallback(async (dateStr: string) => {
+    const uid = userIdRef.current
+    const [questsRes, calRes] = await Promise.allSettled([
+      fetch(`/api/quests/main?userId=${encodeURIComponent(uid)}&date=${encodeURIComponent(dateStr)}`).then((r) => r.json()),
+      fetch(`/api/calendar/next?userId=${encodeURIComponent(uid)}&limit=20&date=${encodeURIComponent(dateStr)}`).then((r) => r.json()),
+    ])
+    if (questsRes.status === 'fulfilled') {
+      const qs = (questsRes.value.quests ?? []) as MainQuest[]
+      setQuests(qs)
+      if (questsRes.value.dimXpMap) setDimXpMap(questsRes.value.dimXpMap as Record<string, number>)
+      if (_cache) { _cache.quests = qs; _cache.dateStr = dateStr }
+    }
+    if (calRes.status === 'fulfilled') {
+      const eventsData = (calRes.value.events ?? []) as CalendarEventRow[]
+      setEvents(eventsData)
+      if (_cache) { _cache.events = eventsData; _cache.dateStr = dateStr }
+    }
+  }, [])
+
+  const isInitialMount = useRef(true)
   useEffect(() => {
-    void loadDashboard(toDateStr(selectedDate))
-  }, [loadDashboard, selectedDate])
+    if (isInitialMount.current) {
+      isInitialMount.current = false
+      void loadDashboard(toDateStr(selectedDate))
+    } else {
+      // Date changed — only refresh tasks + calendar, not vitality/medals/etc.
+      void loadDateData(toDateStr(selectedDate))
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDate])
 
   useEffect(() => {
     function onOracleClose() {
-      void fetch(`/api/checkin/today?userId=${encodeURIComponent(userIdRef.current)}`)
-        .then((r) => r.json())
-        .then((d: { hasCheckIn?: boolean }) => {
-          setHasCheckedInToday(Boolean(d.hasCheckIn))
-          void loadDashboard(toDateStr(selectedDateRef.current))
-        })
+      void loadDashboard(toDateStr(selectedDateRef.current))
     }
     window.addEventListener('protagonist:oracle-closed', onOracleClose)
     return () => window.removeEventListener('protagonist:oracle-closed', onOracleClose)
