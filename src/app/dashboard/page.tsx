@@ -341,6 +341,8 @@ export default function DashboardPage() {
   const [levelUpToast, setLevelUpToast] = useState<LevelUpToast | null>(null)
   const [completingTaskId, setCompletingTaskId] = useState<string | null>(null)
   const [justCompletedIds, setJustCompletedIds] = useState<Set<string>>(new Set())
+  const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null)
+  const [reschedulingTaskId, setReschedulingTaskId] = useState<string | null>(null)
   const todayDate = useMemo(() => new Date(), [])
   const todayStr = useMemo(() => toDateStr(todayDate), [todayDate])
   const [selectedDate, setSelectedDate] = useState<Date>(todayDate)
@@ -689,6 +691,49 @@ export default function DashboardPage() {
     } finally {
       setCompletingTaskId(null)
     }
+  }
+
+  function getTomorrowStr() {
+    const d = new Date()
+    d.setDate(d.getDate() + 1)
+    return d.toISOString().split('T')[0]
+  }
+
+  async function handleRescheduleTask(id: string, newDate: string | null) {
+    setReschedulingTaskId(id)
+    // Optimistic: remove from current day's list immediately
+    setQuests((prev) =>
+      prev.map((q) => ({
+        ...q,
+        todays_tasks: q.todays_tasks?.filter((t) => t.id !== id),
+      }))
+    )
+    setExpandedTaskId(null)
+    try {
+      await fetch(`/api/quests/tasks/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: userIdRef.current, task_date: newDate }),
+      })
+    } finally {
+      setReschedulingTaskId(null)
+    }
+  }
+
+  async function handleDeleteTask(id: string) {
+    // Optimistic: remove immediately
+    setQuests((prev) =>
+      prev.map((q) => ({
+        ...q,
+        todays_tasks: q.todays_tasks?.filter((t) => t.id !== id),
+      }))
+    )
+    setExpandedTaskId(null)
+    await fetch(`/api/quests/tasks/${id}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: userIdRef.current }),
+    }).catch(() => {})
   }
 
   const dashOffset =
@@ -1347,95 +1392,211 @@ export default function DashboardPage() {
                   </svg>
                 </div>
               )
-              return (
-                <div
-                  key={item.id}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => void handleCompleteTask(item)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') void handleCompleteTask(item)
-                  }}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    gap: 8,
-                    padding: '6px 0',
-                    cursor: item.completed ? 'default' : 'pointer',
-                    opacity: item.completed ? 0.4 : 1,
-                  }}
-                >
-                  <span style={{ width: 80, flexShrink: 0 }} />
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      void handleCompleteTask(item)
-                    }}
-                    disabled={item.completed}
-                    style={{
-                      width: 16,
-                      height: 16,
-                      borderRadius: '50%',
-                      border: `1.5px solid ${item.completed ? '#34d399' : item.color}`,
-                      background: item.completed ? '#34d399' : 'transparent',
-                      flexShrink: 0,
-                      marginTop: 2,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      padding: 0,
-                      cursor: item.completed ? 'default' : 'pointer',
-                      '--glow-color': hexToRgba(item.color, 0.65),
-                      '--glow-color-fade': hexToRgba(item.color, 0),
-                      animation: justCompletedIds.has(item.id)
-                        ? 'task-check-glow 0.55s ease-out'
-                        : 'none',
-                    } as React.CSSProperties}
-                    aria-label={item.completed ? 'Completed' : 'Mark complete'}
-                  >
-                    {completingTaskId === item.id && (
-                      <div
-                        style={{
-                          width: 8,
-                          height: 8,
-                          borderRadius: '50%',
-                          border: `1.5px solid ${item.color}`,
-                          borderTopColor: 'transparent',
-                          animation: 'spin 0.6s linear infinite',
-                        }}
-                      />
-                    )}
-                    {item.completed && completingTaskId !== item.id && (
-                      <svg width="8" height="8" viewBox="0 0 10 10" fill="none">
-                        <path
-                          d="M2.5 5l2 2 3-3.5"
-                          stroke="white"
-                          strokeWidth="1.4"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                      </svg>
-                    )}
-                  </button>
-                  <div style={{ flex: 1, minWidth: 0 }}>
+              {
+                const isExpanded = expandedTaskId === item.id && !item.completed
+                return (
+                  <div key={item.id} style={{ display: 'flex', flexDirection: 'column' }}>
+                    {/* Task row */}
                     <div
                       style={{
-                        fontSize: 12,
-                        color: '#C8C0E0',
-                        textDecoration: item.completed ? 'line-through' : 'none',
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        gap: 8,
+                        padding: '6px 0 6px',
+                        opacity: item.completed ? 0.4 : 1,
+                        cursor: item.completed ? 'default' : 'pointer',
                       }}
                     >
-                      {item.title}
+                      <span style={{ width: 80, flexShrink: 0 }} />
+                      {/* Circle — completes the task */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          void handleCompleteTask(item)
+                        }}
+                        disabled={item.completed}
+                        style={{
+                          width: 16,
+                          height: 16,
+                          borderRadius: '50%',
+                          border: `1.5px solid ${item.completed ? '#34d399' : item.color}`,
+                          background: item.completed ? '#34d399' : 'transparent',
+                          flexShrink: 0,
+                          marginTop: 2,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          padding: 0,
+                          cursor: item.completed ? 'default' : 'pointer',
+                          '--glow-color': hexToRgba(item.color, 0.65),
+                          '--glow-color-fade': hexToRgba(item.color, 0),
+                          animation: justCompletedIds.has(item.id)
+                            ? 'task-check-glow 0.55s ease-out'
+                            : 'none',
+                        } as React.CSSProperties}
+                        aria-label={item.completed ? 'Completed' : 'Mark complete'}
+                      >
+                        {completingTaskId === item.id && (
+                          <div
+                            style={{
+                              width: 8,
+                              height: 8,
+                              borderRadius: '50%',
+                              border: `1.5px solid ${item.color}`,
+                              borderTopColor: 'transparent',
+                              animation: 'spin 0.6s linear infinite',
+                            }}
+                          />
+                        )}
+                        {item.completed && completingTaskId !== item.id && (
+                          <svg width="8" height="8" viewBox="0 0 10 10" fill="none">
+                            <path
+                              d="M2.5 5l2 2 3-3.5"
+                              stroke="white"
+                              strokeWidth="1.4"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          </svg>
+                        )}
+                      </button>
+                      {/* Text area — expands action strip */}
+                      <div
+                        role="button"
+                        tabIndex={item.completed ? -1 : 0}
+                        onClick={() => {
+                          if (!item.completed) {
+                            setExpandedTaskId(isExpanded ? null : item.id)
+                          }
+                        }}
+                        onKeyDown={(e) => {
+                          if ((e.key === 'Enter' || e.key === ' ') && !item.completed) {
+                            setExpandedTaskId(isExpanded ? null : item.id)
+                          }
+                        }}
+                        style={{ flex: 1, minWidth: 0, cursor: item.completed ? 'default' : 'pointer' }}
+                      >
+                        <div
+                          style={{
+                            fontSize: 12,
+                            color: isExpanded ? '#E8E0F0' : '#C8C0E0',
+                            textDecoration: item.completed ? 'line-through' : 'none',
+                          }}
+                        >
+                          {item.title}
+                        </div>
+                        {item.dimension && (
+                          <div style={{ fontSize: 9, color: item.color, marginTop: 2 }}>
+                            {CHARACTERS[item.dimension].name} · +{item.xp_reward} XP
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    {item.dimension && (
-                      <div style={{ fontSize: 9, color: item.color, marginTop: 2 }}>
-                        {CHARACTERS[item.dimension].name} · +{item.xp_reward} XP
+                    {/* Inline action strip */}
+                    {isExpanded && (
+                      <div
+                        style={{
+                          display: 'flex',
+                          gap: 6,
+                          paddingLeft: 88,
+                          paddingBottom: 8,
+                          paddingTop: 2,
+                        }}
+                      >
+                        {/* Tomorrow */}
+                        <button
+                          type="button"
+                          disabled={reschedulingTaskId === item.id}
+                          onClick={() => void handleRescheduleTask(item.id, getTomorrowStr())}
+                          style={{
+                            padding: '5px 11px',
+                            borderRadius: 20,
+                            border: `0.5px solid ${item.color}60`,
+                            background: `${item.color}12`,
+                            color: item.color,
+                            fontSize: 10,
+                            fontWeight: 500,
+                            cursor: 'pointer',
+                            fontFamily: 'inherit',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          → Tomorrow
+                        </button>
+                        {/* Pick date */}
+                        <label
+                          style={{
+                            padding: '5px 11px',
+                            borderRadius: 20,
+                            border: '0.5px solid #2D1B55',
+                            background: 'transparent',
+                            color: '#7A6090',
+                            fontSize: 10,
+                            fontWeight: 500,
+                            cursor: 'pointer',
+                            whiteSpace: 'nowrap',
+                            position: 'relative',
+                          }}
+                        >
+                          📅 Pick date
+                          <input
+                            type="date"
+                            min={getTomorrowStr()}
+                            onChange={(e) => {
+                              if (e.target.value) void handleRescheduleTask(item.id, e.target.value)
+                            }}
+                            style={{
+                              position: 'absolute',
+                              inset: 0,
+                              opacity: 0,
+                              cursor: 'pointer',
+                              width: '100%',
+                            }}
+                          />
+                        </label>
+                        {/* Someday */}
+                        <button
+                          type="button"
+                          disabled={reschedulingTaskId === item.id}
+                          onClick={() => void handleRescheduleTask(item.id, null)}
+                          style={{
+                            padding: '5px 11px',
+                            borderRadius: 20,
+                            border: '0.5px solid #2D1B55',
+                            background: 'transparent',
+                            color: '#5A4A7A',
+                            fontSize: 10,
+                            cursor: 'pointer',
+                            fontFamily: 'inherit',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          Someday
+                        </button>
+                        {/* Delete */}
+                        <button
+                          type="button"
+                          onClick={() => void handleDeleteTask(item.id)}
+                          style={{
+                            padding: '5px 11px',
+                            borderRadius: 20,
+                            border: '0.5px solid rgba(239,68,68,0.25)',
+                            background: 'transparent',
+                            color: '#ef4444',
+                            fontSize: 10,
+                            cursor: 'pointer',
+                            fontFamily: 'inherit',
+                            opacity: 0.7,
+                          }}
+                        >
+                          Delete
+                        </button>
                       </div>
                     )}
                   </div>
-                </div>
-              )
+                )
+              }
             })}
           </div>
         )}
