@@ -80,6 +80,22 @@ export async function POST(request: Request) {
     }
   }
 
+  let vaultContext = 'invested: unknown, cash: unknown'
+  if (isSupabaseConfigured()) {
+    try {
+      const { data: vault } = await supabase
+        .from('vault_settings')
+        .select('invested, cash')
+        .eq('user_id', userId)
+        .maybeSingle()
+      if (vault) {
+        vaultContext = `invested: £${vault.invested}, cash: £${vault.cash}`
+      }
+    } catch {
+      /* vault optional */
+    }
+  }
+
   const prompt = `You are a smart assistant for the Protagonist app. The user spoke or typed: "${text}"
 
 Today's date is ${today}.
@@ -90,6 +106,9 @@ ${questContext}
 The user's calendar events (today + tomorrow):
 ${calendarContext}
 
+The user's vault balances:
+${vaultContext}
+
 Classify this input into one of these intents:
 1. TASK — ALWAYS use this if the message starts with or contains "add task", "add a task", "new task", "create task", "remind me to", "I need to", "don't forget", "book", "schedule", "prep", or any clear action item the user WANTS TO DO in the future. When in doubt between TASK and CHAT, choose TASK.
 2. COMPLETED_ACTIVITY — user is reporting something they ALREADY DID. Keywords: "I just", "I did", "I went", "I had", "I finished", "I completed", "I got", "just done", "just had", "already did", "did my", "went for", "went to", "trained", "ran", "walked", "ate", "cooked", "read", "meditated", "worked on". The activity has ALREADY HAPPENED — use this instead of TASK. Do NOT use COMPLETED_ACTIVITY if the user says "remind me" or "I need to" (those are future tasks).
@@ -99,7 +118,8 @@ Classify this input into one of these intents:
 6. CALENDAR_CREATE — user wants to create, schedule, block, or add a new calendar event or appointment. Keywords: "block", "schedule", "add to calendar", "book time", "create event", "put in my calendar", "add a meeting", "add an appointment". Only when clearly creating a new event, not viewing existing ones.
 7. CALENDAR_UPDATE — user wants to reschedule, move, or change the time/date of an existing calendar event. Keywords: "move", "reschedule", "push", "change time", "shift", "postpone". Only use when clearly referring to an existing event that appears in the calendar context above.
 8. CALENDAR_DELETE — user wants to cancel or delete an existing calendar event. Keywords: "cancel", "delete", "remove", "drop", "skip". Only use when clearly referring to an existing event that appears in the calendar context above.
-9. CHAT — questions, advice, open conversation. Never use CHAT if there's a clear action item. Use CHAT if the user wants to update/delete an event but no matching event exists in the calendar context.
+9. VAULT_UPDATE — user is reporting a change to their net worth or savings balance. Triggers: "my revolut is now", "my savings is now", "cash is now", "just transferred", "invested another", "net worth update", "my ISA is now", "my portfolio is", "topped up", "withdrew from savings". Extract field and amount. If user gives a delta ("I added £2k to savings"), use cash_delta or invested_delta with the delta amount; convert to absolute only if prior balance is clear from vault context.
+10. CHAT — questions, advice, open conversation. Never use CHAT if there's a clear action item. Use CHAT if the user wants to update/delete an event but no matching event exists in the calendar context.
 
 For COMPLETED_ACTIVITY, extract the same fields as TASK but put them in "completed_task":
 - title: clean activity title (e.g. "20 minute walk", "Gym session", "Read 30 minutes")
@@ -154,9 +174,15 @@ For CALENDAR_DELETE, extract:
 - event_date: the event's date (YYYY-MM-DD)
 - event_time: the event's start time (HH:MM) or null
 
+For VAULT_UPDATE, extract:
+- field: "invested" | "cash" | "cash_delta" | "invested_delta" | "both"
+- amount: number in GBP (full new balance for invested/cash/both, or delta amount for *_delta fields)
+- notes: optional context string or null
+The oracleReply should be warm and brief — acknowledge the update and mention the new total net worth if both invested and cash can be inferred.
+
 Respond ONLY with valid JSON, no explanation:
 {
-  "intent": "TASK" | "COMPLETED_ACTIVITY" | "NOTE" | "LEGEND" | "BOSS" | "CALENDAR_CREATE" | "CALENDAR_UPDATE" | "CALENDAR_DELETE" | "CHAT",
+  "intent": "TASK" | "COMPLETED_ACTIVITY" | "NOTE" | "LEGEND" | "BOSS" | "CALENDAR_CREATE" | "CALENDAR_UPDATE" | "CALENDAR_DELETE" | "VAULT_UPDATE" | "CHAT",
   "completed_task": {
     "title": "...",
     "dimension": "career" | "social" | "wealth" | "vitality" | "mind" | "love" | "family" | null,
@@ -203,6 +229,11 @@ Respond ONLY with valid JSON, no explanation:
     "event_title": "...",
     "event_time": "HH:MM" | null,
     "event_date": "YYYY-MM-DD"
+  } | null,
+  "vault_update": {
+    "field": "invested" | "cash" | "cash_delta" | "invested_delta" | "both",
+    "amount": 56000,
+    "notes": "Revolut savings pot" | null
   } | null,
   "oracleReply": "..."
 }`

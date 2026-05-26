@@ -23,6 +23,7 @@ type SheetState =
   | 'checkin-listening'
   | 'checkin-thinking'
   | 'checkin-done'
+  | 'vault-updated'
 
 interface MorningContext {
   readiness: number | null
@@ -83,6 +84,12 @@ interface CalendarDeleteInput {
   event_time: string | null
 }
 
+interface VaultUpdateInput {
+  field: 'invested' | 'cash' | 'cash_delta' | 'invested_delta' | 'both'
+  amount: number
+  notes?: string | null
+}
+
 interface ClassifyResult {
   intent:
     | 'TASK'
@@ -93,6 +100,7 @@ interface ClassifyResult {
     | 'CALENDAR_CREATE'
     | 'CALENDAR_UPDATE'
     | 'CALENDAR_DELETE'
+    | 'VAULT_UPDATE'
     | 'CHAT'
   task: ParsedTask | null
   completed_task?: {
@@ -107,6 +115,7 @@ interface ClassifyResult {
   calendar_event?: CalendarEventInput | null
   calendar_update?: CalendarUpdateInput | null
   calendar_delete?: CalendarDeleteInput | null
+  vault_update?: VaultUpdateInput | null
   oracleReply: string | null
 }
 
@@ -175,6 +184,7 @@ export function OracleSheet() {
   const [calendarManageDoneMsg, setCalendarManageDoneMsg] = useState('')
   const [calendarInsufficientScope, setCalendarInsufficientScope] = useState(false)
   const [calendarDoneTitle, setCalendarDoneTitle] = useState('')
+  const [vaultUpdatedTotal, setVaultUpdatedTotal] = useState<number | null>(null)
   const [morningContext, setMorningContext] = useState<MorningContext | null>(null)
   const [checkinResult, setCheckinResult] = useState<MorningCheckinResult | null>(null)
   const recognitionRef = useRef<SpeechRecognition | null>(null)
@@ -238,6 +248,7 @@ export function OracleSheet() {
     setCalendarManaging(false)
     setCalendarManageAction(null)
     setCalendarManageDoneMsg('')
+    setVaultUpdatedTotal(null)
     setMorningContext(null)
     setCheckinResult(null)
     if (recognitionRef.current) {
@@ -540,6 +551,37 @@ export function OracleSheet() {
         setResult(data)
         setCalendarManageAction('delete')
         setState('calendar-delete-confirm')
+      } else if (data.intent === 'VAULT_UPDATE' && data.vault_update) {
+        const vu = data.vault_update
+        const settingsRes = await fetch(`/api/vault/settings?userId=${encodeURIComponent(userId)}`)
+        const settingsJson = (await settingsRes.json()) as {
+          settings?: { invested: number; cash: number }
+        }
+        const current = settingsJson.settings ?? { invested: 0, cash: 0 }
+
+        const patch: Record<string, number> = {}
+        if (vu.field === 'cash') patch.cash = vu.amount
+        if (vu.field === 'invested') patch.invested = vu.amount
+        if (vu.field === 'both') {
+          patch.cash = vu.amount
+          patch.invested = vu.amount
+        }
+        if (vu.field === 'cash_delta') patch.cash = current.cash + vu.amount
+        if (vu.field === 'invested_delta') patch.invested = current.invested + vu.amount
+
+        const newInvested = patch.invested ?? current.invested
+        const newCash = patch.cash ?? current.cash
+        setVaultUpdatedTotal(newInvested + newCash)
+
+        await fetch('/api/vault/settings', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, patch }),
+        })
+
+        setResult(data)
+        window.dispatchEvent(new CustomEvent('protagonist:vault-updated'))
+        setState('vault-updated')
       } else if (data.intent === 'BOSS' && data.boss?.dimension) {
         const genRes = await fetch('/api/bosses/generate', {
           method: 'POST',
@@ -671,7 +713,9 @@ export function OracleSheet() {
                   ? `saved · ${result?.task?.dimension ? dimensionLabel(result.task.dimension) : ''}`
                   : state === 'activity-done'
                     ? `logged & +${result?.task?.xpReward ?? 50} XP`
-                    : state === 'note-done'
+                    : state === 'vault-updated'
+                      ? 'Net worth synced'
+                      : state === 'note-done'
                       ? 'reflecting on your note...'
                       : state === 'calendar-confirm'
                         ? 'confirm calendar event'
@@ -763,7 +807,9 @@ export function OracleSheet() {
                           ? 'Task added'
                           : state === 'activity-done'
                             ? 'Activity logged ✓'
-                            : state === 'calendar-confirm'
+                            : state === 'vault-updated'
+                              ? 'Vault updated ✓'
+                              : state === 'calendar-confirm'
                             ? 'Calendar event'
                             : state === 'calendar-update-confirm'
                               ? 'Reschedule event'
@@ -787,7 +833,7 @@ export function OracleSheet() {
                       ? '#9333EA'
                       : state === 'thinking' || state === 'checkin-thinking'
                         ? '#5A4A7A'
-                        : state === 'task-done' || state === 'activity-done'
+                        : state === 'task-done' || state === 'activity-done' || state === 'vault-updated'
                           ? '#34d399'
                           : state === 'note-done'
                             ? '#C084FC'
@@ -1242,6 +1288,64 @@ export function OracleSheet() {
                   }}
                 >
                   Add another
+                </button>
+              </div>
+            </>
+          )}
+
+          {state === 'vault-updated' && (
+            <>
+              {result?.oracleReply && (
+                <div
+                  style={{
+                    background: '#1A0D35',
+                    border: '0.5px solid #2D1B55',
+                    borderLeft: '3px solid #1D9E75',
+                    padding: '10px 12px',
+                    marginBottom: 10,
+                    borderRadius: '0 10px 10px 10px',
+                  }}
+                >
+                  <div style={{ fontSize: 10, color: '#1D9E75', marginBottom: 4 }}>Oracle</div>
+                  <div
+                    style={{ fontSize: 12, color: '#A090C0', fontStyle: 'italic', lineHeight: 1.5 }}
+                    dangerouslySetInnerHTML={{ __html: renderMarkdown(result.oracleReply) }}
+                  />
+                </div>
+              )}
+              {vaultUpdatedTotal != null && (
+                <div
+                  style={{
+                    background: '#0A1F17',
+                    borderRadius: 10,
+                    border: '0.5px solid rgba(29,158,117,0.35)',
+                    padding: '10px 12px',
+                    marginBottom: 10,
+                    fontSize: 13,
+                    color: '#1D9E75',
+                    fontWeight: 500,
+                  }}
+                >
+                  New total net worth: £{Math.round(vaultUpdatedTotal).toLocaleString('en-GB')}
+                </div>
+              )}
+              <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+                <button
+                  type="button"
+                  onClick={close}
+                  style={{
+                    flex: 1,
+                    height: 44,
+                    borderRadius: 10,
+                    background: '#1E0D40',
+                    border: '0.5px solid #2D1B55',
+                    color: '#7A5FA0',
+                    fontSize: 12,
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                  }}
+                >
+                  Done
                 </button>
               </div>
             </>
