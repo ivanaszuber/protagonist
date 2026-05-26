@@ -854,14 +854,22 @@ export default function DashboardPage() {
                   style={{
                     marginLeft: 4,
                     flexShrink: 0,
-                    transform: 'scale(0.55)',
-                    transformOrigin: isRoot ? 'left center' : 'top left',
-                    height: isRoot ? 42 : 38,
-                    width: isRoot ? 52 : 48,
-                    overflow: 'hidden',
+                    width: 38,
+                    height: 46,
+                    position: 'relative',
                   }}
                 >
-                  <Hero />
+                  <div
+                    style={{
+                      transform: 'scale(0.38)',
+                      transformOrigin: 'top left',
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                    }}
+                  >
+                    <Hero />
+                  </div>
                 </div>
                 <div style={{ flex: 1, minWidth: 0, paddingRight: 4 }}>
                   <div
@@ -888,6 +896,16 @@ export default function DashboardPage() {
                     }}
                   >
                     {char.name}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 9,
+                      color: char.color,
+                      marginBottom: 4,
+                      opacity: 0.75,
+                    }}
+                  >
+                    {dim.charAt(0).toUpperCase() + dim.slice(1)}
                   </div>
                   <div
                     style={{

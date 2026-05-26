@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { decrementBossHp, slayBoss } from '@/lib/bosses'
 import { addQuestDimensionXp, isQuestDbConfigured } from '@/lib/quest-db'
 import { supabase } from '@/lib/supabase'
 
@@ -58,10 +59,37 @@ export async function POST(
     xpEarned
   )
 
+  let bossHit: {
+    boss_id: string
+    hp_remaining: number
+    slain: boolean
+    reward_xp?: number
+  } | null = null
+
+  if (task.boss_battle_id) {
+    const damage = (task.hp_damage as number) ?? 1
+    const { boss: updatedBoss, slain } = await decrementBossHp(
+      task.boss_battle_id as string,
+      damage
+    )
+    if (updatedBoss) {
+      bossHit = {
+        boss_id: updatedBoss.id,
+        hp_remaining: updatedBoss.hp_remaining,
+        slain,
+      }
+      if (slain) {
+        const slayResult = await slayBoss(userId, updatedBoss.id)
+        bossHit.reward_xp = slayResult.rewardXp
+      }
+    }
+  }
+
   return NextResponse.json({
     xp_earned: xpEarned,
     total_xp: totalXp,
     leveled_up: leveledUp,
     new_level: newLevel,
+    boss: bossHit,
   })
 }

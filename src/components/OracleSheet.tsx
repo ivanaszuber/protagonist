@@ -24,9 +24,11 @@ interface ParsedTask {
 }
 
 interface ClassifyResult {
-  intent: 'TASK' | 'NOTE' | 'CHAT'
+  intent: 'TASK' | 'NOTE' | 'LEGEND' | 'BOSS' | 'CHAT'
   task: ParsedTask | null
   note: { text: string } | null
+  legend?: { dimension: string; vision: string | null } | null
+  boss?: { dimension: string } | null
   oracleReply: string | null
 }
 
@@ -169,6 +171,36 @@ export function OracleSheet() {
         // Tell any open Tasks page to refresh
         window.dispatchEvent(new CustomEvent('protagonist:task-added'))
         setState('task-done')
+      } else if (data.intent === 'LEGEND' && data.legend?.dimension && data.legend.vision) {
+        await fetch('/api/quests/vision', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId,
+            dimension: data.legend.dimension,
+            vision: data.legend.vision,
+          }),
+        })
+        const arcReply =
+          data.oracleReply ?? `Your Legend is set: "${data.legend.vision}"`
+        setResult({ ...data, oracleReply: arcReply })
+        setState('note-done')
+      } else if (data.intent === 'BOSS' && data.boss?.dimension) {
+        const genRes = await fetch('/api/bosses/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId,
+            dimension: data.boss.dimension,
+            userMessage: text,
+          }),
+        })
+        const genData = await genRes.json()
+        const reply = genRes.ok
+          ? `Boss battle created: ${(genData.boss as { name?: string })?.name ?? 'Your nemesis awaits.'}`
+          : (genData.error as string) ?? 'Could not create boss battle.'
+        setResult({ ...data, oracleReply: reply })
+        setState('note-done')
       } else if (data.intent === 'NOTE') {
         const arcReply = await sendChatToArc(text)
 

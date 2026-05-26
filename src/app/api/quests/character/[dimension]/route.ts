@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
-import { cookies } from 'next/headers'
+import { resolveUserId } from '@/lib/api-user'
+import { getBossKillStats } from '@/lib/bosses'
 import { isQuestDbConfigured, QUEST_XP_TABLE } from '@/lib/quest-db'
 import { supabase } from '@/lib/supabase'
 
@@ -12,13 +13,6 @@ const VALID_DIMENSIONS = new Set([
   'love',
   'family',
 ])
-
-async function resolveUserId(request: Request): Promise<string | null> {
-  const fromQuery = new URL(request.url).searchParams.get('userId')
-  if (fromQuery) return fromQuery
-  const cookieStore = await cookies()
-  return cookieStore.get('protagonist_user_id')?.value ?? null
-}
 
 export async function GET(
   request: Request,
@@ -61,6 +55,34 @@ export async function GET(
     .eq('quest_id', quest.id)
     .order('sort_order', { ascending: true })
 
+  const milestoneIds = (milestones ?? []).map((m) => m.id)
+  const { data: milestoneTasks } =
+    milestoneIds.length > 0
+      ? await supabase
+          .from('tasks')
+          .select('milestone_id, completed')
+          .in('milestone_id', milestoneIds)
+      : { data: [] }
+
+  const taskStatsByMilestone = new Map<string, { total: number; done: number }>()
+  for (const t of milestoneTasks ?? []) {
+    const mid = t.milestone_id as string
+    if (!mid) continue
+    const cur = taskStatsByMilestone.get(mid) ?? { total: 0, done: 0 }
+    cur.total++
+    if (t.completed) cur.done++
+    taskStatsByMilestone.set(mid, cur)
+  }
+
+  const enrichedMilestones = (milestones ?? []).map((m) => {
+    const stats = taskStatsByMilestone.get(m.id) ?? { total: 0, done: 0 }
+    const progress =
+      stats.total > 0 ? Math.round((stats.done / stats.total) * 100) : 0
+    return { ...m, progress_percent: progress, task_total: stats.total }
+  })
+
+  const bossStats = await getBossKillStats(userId, dimension)
+
   const thirtyDaysAgo = new Date()
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
   const since = thirtyDaysAgo.toISOString().split('T')[0]
@@ -84,9 +106,10 @@ export async function GET(
   return NextResponse.json({
     quest: {
       ...quest,
-      milestones: milestones ?? [],
+      milestones: enrichedMilestones,
       recent_tasks: tasks ?? [],
       xp: xpRow?.xp ?? 0,
+      bosses_slain: bossStats.slain,
     },
   })
 }

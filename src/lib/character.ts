@@ -21,6 +21,8 @@ export interface CharacterConfig {
   memoryId: string
   /** short description shown on Settings page */
   tagline: string
+  /** category pill on character page hero */
+  categoryLabel: string
 }
 
 export const CHARACTERS: Record<Dimension, CharacterConfig> = {
@@ -34,6 +36,7 @@ export const CHARACTERS: Record<Dimension, CharacterConfig> = {
     tierLabels: ['Apprentice Maker', 'Craftsman', 'Master Maker'],
     memoryId: 'create',
     tagline: 'Work, career & purpose',
+    categoryLabel: 'Career',
   },
   social: {
     name: 'Echo',
@@ -45,6 +48,7 @@ export const CHARACTERS: Record<Dimension, CharacterConfig> = {
     tierLabels: ['Newcomer', 'Connector', 'Community Sage'],
     memoryId: 'social',
     tagline: 'Friendships & community',
+    categoryLabel: 'Social',
   },
   wealth: {
     name: 'Vault',
@@ -56,6 +60,7 @@ export const CHARACTERS: Record<Dimension, CharacterConfig> = {
     tierLabels: ['Saver', 'Investor', 'Financially Free'],
     memoryId: 'wealth',
     tagline: 'Money, savings & growth',
+    categoryLabel: 'Wealth',
   },
   vitality: {
     name: 'Blaze',
@@ -67,6 +72,7 @@ export const CHARACTERS: Record<Dimension, CharacterConfig> = {
     tierLabels: ['Spark', 'Ember', 'Flame'],
     memoryId: 'vitality',
     tagline: 'Body, movement & energy',
+    categoryLabel: 'Vitality',
   },
   mind: {
     name: 'Sage',
@@ -78,6 +84,7 @@ export const CHARACTERS: Record<Dimension, CharacterConfig> = {
     tierLabels: ['Curious', 'Scholar', 'Illuminated'],
     memoryId: 'mind',
     tagline: 'Learning, focus & clarity',
+    categoryLabel: 'Mind',
   },
   love: {
     name: 'Sol',
@@ -89,6 +96,7 @@ export const CHARACTERS: Record<Dimension, CharacterConfig> = {
     tierLabels: ['Tender', 'Devoted', 'Radiant'],
     memoryId: 'love',
     tagline: 'Romance & intimacy',
+    categoryLabel: 'Love',
   },
   family: {
     name: 'Root',
@@ -100,6 +108,7 @@ export const CHARACTERS: Record<Dimension, CharacterConfig> = {
     tierLabels: ['Seedling', 'Grounded', 'Rooted'],
     memoryId: 'family',
     tagline: 'Family & home',
+    categoryLabel: 'Family',
   },
 }
 

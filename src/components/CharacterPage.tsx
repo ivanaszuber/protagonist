@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState, type ComponentType, type CSSProperties, type ReactNode } from 'react'
-import Link from 'next/link'
 import { StatBar } from '@/components/StatBar'
 import {
   BlazeCharacterLarge,
@@ -22,14 +21,18 @@ import {
   type XpToast,
 } from '@/components/XpToastOverlay'
 import { getUserId } from '@/lib/user'
+import { LegendCard } from '@/components/characters/LegendCard'
+import {
+  MainQuestsSection,
+  type MainQuestMilestone,
+} from '@/components/characters/MainQuestsSection'
+import { BossCard } from '@/components/characters/BossCard'
+import { HallOfKills } from '@/components/characters/HallOfKills'
+import { MedalsRow } from '@/components/characters/MedalsRow'
+import type { BossBattle, BossKillRow, BossTask } from '@/lib/bosses'
+import { MEDAL_DEFINITIONS } from '@/lib/medals'
 
-interface Milestone {
-  id: string
-  title: string
-  target_date: string | null
-  completed: boolean
-  sort_order: number
-}
+interface Milestone extends MainQuestMilestone {}
 
 interface Task {
   id: string
@@ -47,6 +50,7 @@ interface QuestData {
   milestones: Milestone[]
   recent_tasks: Task[]
   xp: number
+  bosses_slain?: number
 }
 
 interface OuraData {
@@ -138,6 +142,43 @@ export function CharacterPage({ dimension }: CharacterPageProps) {
   const [xpToast, setXpToast] = useState<XpToast | null>(null)
   const [levelUpToast, setLevelUpToast] = useState<LevelUpToast | null>(null)
   const [oracleMemories, setOracleMemories] = useState<string[]>([])
+  const [boss, setBoss] = useState<BossBattle | null>(null)
+  const [escapedBoss, setEscapedBoss] = useState<BossBattle | null>(null)
+  const [bossTasks, setBossTasks] = useState<BossTask[]>([])
+  const [bossKills, setBossKills] = useState<BossKillRow[]>([])
+  const [killStats, setKillStats] = useState({ slain: 0, escaped: 0 })
+  const [earnedMedals, setEarnedMedals] = useState<string[]>([])
+
+  async function loadBossAndMedals(uid: string) {
+    const [bossRes, killsRes, medalsRes] = await Promise.all([
+      fetch(
+        `/api/bosses/active?userId=${encodeURIComponent(uid)}&dimension=${encodeURIComponent(dimension)}`
+      ).then((r) => r.json()),
+      fetch(
+        `/api/bosses/kills?userId=${encodeURIComponent(uid)}&dimension=${encodeURIComponent(dimension)}`
+      ).then((r) => r.json()),
+      fetch(
+        `/api/medals/check?userId=${encodeURIComponent(uid)}&dimension=${encodeURIComponent(dimension)}`,
+        { method: 'POST' }
+      ).then((r) => r.json()),
+    ])
+    const bossData = bossRes as {
+      boss?: BossBattle | null
+      tasks?: BossTask[]
+      escapedBoss?: BossBattle | null
+    }
+    setBoss(bossData.boss ?? null)
+    setBossTasks(bossData.tasks ?? [])
+    setEscapedBoss(bossData.escapedBoss ?? null)
+    const killsData = killsRes as {
+      kills?: BossKillRow[]
+      stats?: { slain: number; escaped: number }
+    }
+    setBossKills(killsData.kills ?? [])
+    setKillStats(killsData.stats ?? { slain: 0, escaped: 0 })
+    const medalsData = medalsRes as { earned?: string[] }
+    setEarnedMedals(medalsData.earned ?? [])
+  }
 
   useEffect(() => {
     const uid = getUserId()
@@ -149,6 +190,7 @@ export function CharacterPage({ dimension }: CharacterPageProps) {
       fetch(
         `/api/memories?userId=${encodeURIComponent(uid)}&dimension=${encodeURIComponent(memoryDim)}&limit=3`
       ).then((r) => r.json()),
+      loadBossAndMedals(uid),
     ]
     if (dimension === 'vitality') {
       fetches.push(fetch(`/api/oura/sync?userId=${encodeURIComponent(uid)}`).then((r) => r.json()))
@@ -156,7 +198,7 @@ export function CharacterPage({ dimension }: CharacterPageProps) {
     Promise.allSettled(fetches).then((results) => {
       const questRes = results[0]
       const memoriesRes = results[1]
-      const ouraRes = dimension === 'vitality' ? results[2] : null
+      const ouraRes = dimension === 'vitality' ? results[3] : null
       if (questRes.status === 'fulfilled') {
         const val = questRes.value as { quest?: QuestData | null }
         setQuest(val.quest ?? null)
@@ -172,6 +214,43 @@ export function CharacterPage({ dimension }: CharacterPageProps) {
       setLoading(false)
     })
   }, [dimension])
+
+  async function handleBossTaskComplete(taskId: string, xpReward: number) {
+    const uid = getUserId()
+    const res = await fetch(`/api/quests/tasks/${taskId}/complete`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: uid }),
+    })
+    const data = (await res.json()) as {
+      xp_earned?: number
+      leveled_up?: boolean
+      new_level?: number
+      boss?: { slain: boolean; reward_xp?: number }
+    }
+    if (res.ok) {
+      const earned = data.xp_earned ?? xpReward
+      setQuest((prev) =>
+        prev ? { ...prev, xp: prev.xp + earned } : prev
+      )
+      showXpFeedback({ dimension }, data, setXpToast, setLevelUpToast)
+      return {
+        slain: data.boss?.slain,
+        reward_xp: data.boss?.reward_xp,
+      }
+    }
+    return {}
+  }
+
+  async function refreshAfterBossSlain() {
+    const uid = getUserId()
+    await loadBossAndMedals(uid)
+    const questRes = await fetch(
+      `/api/quests/character/${dimension}?userId=${encodeURIComponent(uid)}`
+    ).then((r) => r.json())
+    const val = questRes as { quest?: QuestData | null }
+    setQuest(val.quest ?? null)
+  }
 
   async function handleTaskToggle(taskId: string, xpReward: number) {
     const task = quest?.recent_tasks.find((t) => t.id === taskId)
@@ -249,7 +328,6 @@ export function CharacterPage({ dimension }: CharacterPageProps) {
   const xpInLevel = xp % 500
   const tierLabel = getTierName(level, characterSlug)
   const activeMilestone = quest?.milestones.find((m) => !m.completed) ?? null
-  const completedMilestones = quest?.milestones.filter((m) => m.completed) ?? []
   const todayStr = new Date().toISOString().split('T')[0]
   const todayTasks =
     quest?.recent_tasks.filter((t) => t.task_date === todayStr) ?? []
@@ -283,10 +361,6 @@ export function CharacterPage({ dimension }: CharacterPageProps) {
     )
   }
 
-  const questTitle = quest
-    ? `${quest.character_name} · ${quest.character_class}`
-    : ''
-
   return (
     <main className="dashboard-scroll" style={pageShellStyle}>
       <div style={{ maxWidth: 430, margin: '0 auto', padding: '0 16px' }}>
@@ -311,9 +385,21 @@ export function CharacterPage({ dimension }: CharacterPageProps) {
             <HeroArt />
           </div>
 
-          <span style={{ fontSize: 22, fontWeight: 500, color: '#E8E0F0', marginTop: 4 }}>
-            {char.name}
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+            <span style={{ fontSize: 22, fontWeight: 500, color: '#E8E0F0' }}>{char.name}</span>
+            <span
+              style={{
+                background: '#2A1800',
+                border: `0.5px solid ${accentColor}`,
+                borderRadius: 20,
+                padding: '2px 8px',
+                fontSize: 10,
+                color: accentColor,
+              }}
+            >
+              {char.categoryLabel}
+            </span>
+          </div>
 
           <span
             style={{
@@ -325,6 +411,21 @@ export function CharacterPage({ dimension }: CharacterPageProps) {
           >
             {tierLabel}
           </span>
+
+          <div
+            style={{
+              display: 'flex',
+              gap: 16,
+              marginTop: 4,
+              fontSize: 10,
+              color: '#6B5E8C',
+            }}
+          >
+            <span>
+              Bosses Slain{' '}
+              <strong style={{ color: accentColor }}>{quest?.bosses_slain ?? killStats.slain}</strong>
+            </span>
+          </div>
 
           <div
             style={{
@@ -388,144 +489,40 @@ export function CharacterPage({ dimension }: CharacterPageProps) {
           </LeftBorderCard>
         )}
 
-        {/* Active quest */}
-        {quest ? (
-          <LeftBorderCard accentColor={accentColor}>
-            <span
-              style={{
-                fontSize: 13,
-                fontWeight: 500,
-                color: '#E8E0F0',
-                display: 'block',
-                marginBottom: 4,
-              }}
-            >
-              {questTitle}
-            </span>
+        <LegendCard
+          characterName={char.name}
+          dimensionLabel={char.categoryLabel}
+          vision={quest?.vision ?? null}
+          accentColor={accentColor}
+        />
 
-            {quest.vision && (
-              <span
-                style={{
-                  fontSize: 10,
-                  color: '#5A4A7A',
-                  fontStyle: 'italic',
-                  display: 'block',
-                  marginBottom: 8,
-                }}
-              >
-                {quest.vision}
-              </span>
-            )}
-
-            {activeMilestone && (
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 5,
-                  marginBottom: 8,
-                }}
-              >
-                <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                  <path
-                    d="M2 1V9M2 1L8 4L2 7"
-                    stroke="#7A5FA0"
-                    strokeWidth="1.2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-                <span style={{ fontSize: 10, color: '#7A5FA0' }}>{activeMilestone.title}</span>
-                <span style={{ fontSize: 10, color: '#3D3358', marginLeft: 'auto' }}>
-                  {daysUntil(activeMilestone.target_date)}d left
-                </span>
-              </div>
-            )}
-
-            {focusTask && (
-              <div
-                role="button"
-                tabIndex={0}
-                onClick={() => void handleTaskToggle(focusTask.id, focusTask.xp_reward)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    void handleTaskToggle(focusTask.id, focusTask.xp_reward)
-                  }
-                }}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 7,
-                  background: '#1A0D35',
-                  borderRadius: 8,
-                  padding: '7px 10px',
-                  cursor: focusTask.completed ? 'default' : 'pointer',
-                  border: '0.5px solid #2D1B55',
-                }}
-              >
-                <div
-                  style={{
-                    width: 16,
-                    height: 16,
-                    borderRadius: '50%',
-                    flexShrink: 0,
-                    border: `1.5px solid ${focusTask.completed ? '#34d399' : accentColor}`,
-                    background: focusTask.completed ? '#34d399' : 'transparent',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  {completingId === focusTask.id && (
-                    <div
-                      style={{
-                        width: 8,
-                        height: 8,
-                        borderRadius: '50%',
-                        border: `1.5px solid ${accentColor}`,
-                        borderTopColor: 'transparent',
-                        animation: 'spin 0.6s linear infinite',
-                      }}
-                    />
-                  )}
-                </div>
-                <span
-                  style={{
-                    fontSize: 10,
-                    color: focusTask.completed ? '#5A4A7A' : '#C0B0E0',
-                    textDecoration: focusTask.completed ? 'line-through' : 'none',
-                    lineHeight: 1.4,
-                  }}
-                >
-                  {focusTask.title}
-                </span>
-              </div>
-            )}
-          </LeftBorderCard>
-        ) : (
-          <LeftBorderCard accentColor={accentColor}>
-            <span style={{ fontSize: 13, color: '#3D3358', display: 'block', marginBottom: 8 }}>
-              No active quest yet
-            </span>
-            <Link
-              href="/quests"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 5,
-                background: '#1E0D40',
-                border: '0.5px solid #3D2070',
-                borderRadius: 8,
-                padding: '6px 14px',
-                fontSize: 11,
-                color: '#7A5FA0',
-                textDecoration: 'none',
-              }}
-            >
-              + Add quest
-            </Link>
-          </LeftBorderCard>
+        {quest && (
+          <MainQuestsSection
+            characterName={char.name}
+            dimensionLabel={char.categoryLabel}
+            milestones={quest.milestones}
+            accentColor={accentColor}
+          />
         )}
+
+        <BossCard
+          characterName={char.name}
+          dimensionLabel={char.categoryLabel}
+          mainQuestTitle={activeMilestone?.title ?? quest?.vision ?? null}
+          boss={boss}
+          escapedBoss={escapedBoss}
+          tasks={bossTasks}
+          onTaskComplete={handleBossTaskComplete}
+          onBossSlain={() => void refreshAfterBossSlain()}
+        />
+
+        <HallOfKills kills={bossKills} stats={killStats} />
+
+        <MedalsRow
+          definitions={MEDAL_DEFINITIONS}
+          earned={earnedMedals}
+          accentColor={accentColor}
+        />
 
         {oracleMemories.length > 0 && (
           <div
@@ -593,63 +590,7 @@ export function CharacterPage({ dimension }: CharacterPageProps) {
           </div>
         )}
 
-        {/* Completed milestones */}
-        {completedMilestones.length > 0 && (
-          <div style={{ marginBottom: 8 }}>
-            <span
-              style={{
-                fontSize: 10,
-                color: '#3D3358',
-                display: 'block',
-                marginBottom: 6,
-                paddingLeft: 2,
-              }}
-            >
-              Completed milestones
-            </span>
-            {completedMilestones.map((m) => (
-              <div
-                key={m.id}
-                style={{
-                  background: '#140C28',
-                  borderRadius: 12,
-                  border: '0.5px solid #1E1040',
-                  padding: '10px 12px 10px 15px',
-                  marginBottom: 6,
-                  position: 'relative',
-                  overflow: 'hidden',
-                  opacity: 0.6,
-                }}
-              >
-                <div
-                  style={{
-                    position: 'absolute',
-                    left: 0,
-                    top: 0,
-                    bottom: 0,
-                    width: 3,
-                    background: '#2D1B55',
-                  }}
-                />
-                <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                    <circle cx="5" cy="5" r="4" stroke="#34d399" strokeWidth="1.2" />
-                    <path
-                      d="M3 5L4.5 6.5L7 3.5"
-                      stroke="#34d399"
-                      strokeWidth="1.2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                  <span style={{ fontSize: 10, color: '#7A5FA0' }}>{m.title}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Additional today's quests */}
+        {/* Today's quests */}
         {quest && (
           <LeftBorderCard accentColor={accentColor}>
             <div

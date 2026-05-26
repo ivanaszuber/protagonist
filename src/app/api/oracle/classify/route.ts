@@ -51,10 +51,12 @@ Today's date is ${today}.
 The user's active quests:
 ${questContext}
 
-Classify this input into one of three intents:
+Classify this input into one of these intents:
 1. TASK — ALWAYS use this if the message starts with or contains "add task", "add a task", "new task", "create task", "remind me to", "I need to", "don't forget", "book", "schedule", "prep", or any clear action item the user wants to track. When in doubt between TASK and CHAT, choose TASK.
 2. NOTE — user is journaling, reflecting, or sharing feelings (emotional, reflective, no clear action item)
-3. CHAT — ONLY use this for questions, requests for advice, or open-ended conversation with no action item to track. Never use CHAT if there's an action item present.
+3. LEGEND — user is defining or confirming their long-term Legend (one-sentence life vision) for a character dimension. Use when they confirm a final legend sentence or say "save this as my legend".
+4. BOSS — user wants to create or restart a boss battle (keywords: boss battle, boss fight, attack moves, slay the boss, hunt it down)
+5. CHAT — questions, advice, open conversation. Never use CHAT if there's a clear action item.
 
 For TASK, extract:
 - title: clean task title (remove filler words like "add task" or "remind me to")
@@ -72,9 +74,16 @@ For TASK, extract:
 - xpReward: 25 for tiny tasks, 50 for standard, 100 for hard/important ones
 - questId: the quest id if matched, otherwise null
 
+For LEGEND extract:
+- dimension: career | social | wealth | vitality | mind | love | family
+- vision: the single-sentence legend (only if user provided or confirmed a final sentence; otherwise null)
+
+For BOSS extract:
+- dimension: career | social | wealth | vitality | mind | love | family
+
 Respond ONLY with valid JSON, no explanation:
 {
-  "intent": "TASK" | "NOTE" | "CHAT",
+  "intent": "TASK" | "NOTE" | "LEGEND" | "BOSS" | "CHAT",
   "task": {
     "title": "...",
     "dimension": "career" | "social" | "wealth" | "vitality" | "mind" | "love" | "family" | null,
@@ -85,6 +94,13 @@ Respond ONLY with valid JSON, no explanation:
   } | null,
   "note": {
     "text": "..." 
+  } | null,
+  "legend": {
+    "dimension": "career" | "social" | "wealth" | "vitality" | "mind" | "love" | "family",
+    "vision": "..." | null
+  } | null,
+  "boss": {
+    "dimension": "career" | "social" | "wealth" | "vitality" | "mind" | "love" | "family"
   } | null,
   "oracleReply": "..."
 }`
