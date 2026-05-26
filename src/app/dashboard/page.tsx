@@ -897,25 +897,23 @@ export default function DashboardPage() {
           <p style={{ textAlign: 'center', fontSize: 11, color: '#34d399', margin: 0 }}>
             Checked in today ✓
           </p>
-          {process.env.NEXT_PUBLIC_SHOW_DEV_TOOLS === 'true' && (
-            <button
-              type="button"
-              onClick={() => void handleResetCheckin()}
-              title="Dev: reset today's check-in"
-              style={{
-                background: 'transparent',
-                border: '0.5px solid #2D1B55',
-                borderRadius: 6,
-                color: '#3D2D55',
-                fontSize: 10,
-                padding: '2px 6px',
-                cursor: 'pointer',
-                fontFamily: 'inherit',
-              }}
-            >
-              ↺
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => void handleResetCheckin()}
+            title="Reset today's check-in"
+            style={{
+              background: 'transparent',
+              border: '0.5px solid #2D1B55',
+              borderRadius: 6,
+              color: '#3D2D55',
+              fontSize: 10,
+              padding: '2px 6px',
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+            }}
+          >
+            ↺
+          </button>
         </div>
       ) : (
         <button
