@@ -37,13 +37,13 @@ export function MainQuestsSection({
 
   function handleAdd() {
     openOracle(
-      `I want to add a new main quest for ${characterName} — ${dimensionLabel}. Help me define it with a clear goal, milestone, and target date.`
+      `I want to add a new milestone for ${characterName} — ${dimensionLabel}. Help me define a clear, specific goal with a realistic target date.`
     )
   }
 
   function handleEdit(m: MainQuestMilestone) {
     openOracle(
-      `I want to edit my main quest for ${characterName} — ${dimensionLabel}. The current quest is: "${m.title}"${m.target_date ? ` (target: ${m.target_date})` : ''}. Help me update the title or target date.`
+      `I want to edit a milestone for ${characterName} — ${dimensionLabel}. The current milestone is: "${m.title}"${m.target_date ? ` (target: ${m.target_date})` : ''}. Help me update the title or target date.`
     )
   }
 
@@ -58,7 +58,7 @@ export function MainQuestsSection({
         }}
       >
         <span style={{ fontSize: 11, fontWeight: 600, color: '#9B8EC4', letterSpacing: '0.06em' }}>
-          Main Quests
+          Milestones
         </span>
         <button
           type="button"
@@ -77,7 +77,7 @@ export function MainQuestsSection({
       </div>
 
       {incomplete.length === 0 ? (
-        <p style={{ fontSize: 11, color: '#3D3358' }}>No main quests yet.</p>
+        <p style={{ fontSize: 11, color: '#3D3358' }}>No milestones yet.</p>
       ) : (
         incomplete.map((m) => {
           const isActive = m.id === activeId
