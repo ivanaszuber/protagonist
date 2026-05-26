@@ -1142,9 +1142,9 @@ export default function DashboardPage() {
                   position: 'relative',
                   overflow: 'hidden',
                   cursor: 'pointer',
-                  display: isRoot ? 'flex' : 'block',
-                  gap: isRoot ? 10 : undefined,
-                  alignItems: isRoot ? 'center' : undefined,
+                  display: 'flex',
+                  gap: 10,
+                  alignItems: 'flex-start',
                 }}
               >
                 <div
@@ -1178,7 +1178,7 @@ export default function DashboardPage() {
                     <Hero />
                   </div>
                 </div>
-                <div style={{ flex: 1, minWidth: 0, paddingRight: 4 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
                   {/* Dimension pill + Level badge on same row */}
                   <div
                     style={{

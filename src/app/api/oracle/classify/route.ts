@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
-import { supabase } from '@/lib/supabase'
+import { supabase, isSupabaseConfigured } from '@/lib/supabase'
 import { isQuestDbConfigured } from '@/lib/quest-db'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
@@ -16,6 +16,12 @@ function parseClassifyJson(raw: string): Record<string, unknown> {
     }
     throw new Error('Invalid JSON from classifier')
   }
+}
+
+function hasEventId(value: unknown): boolean {
+  if (!value || typeof value !== 'object') return false
+  const id = (value as { event_id?: string }).event_id
+  return typeof id === 'string' && id.length > 0
 }
 
 export async function POST(request: Request) {
@@ -43,6 +49,36 @@ export async function POST(request: Request) {
   }
 
   const today = new Date().toISOString().split('T')[0]
+  const tomorrow = new Date(Date.now() + 86_400_000).toISOString().split('T')[0]
+
+  let calendarContext = '(none)'
+  if (isSupabaseConfigured()) {
+    try {
+      const { data: events } = await supabase
+        .from('calendar_events')
+        .select('id, google_event_id, title, start_time, event_date')
+        .eq('user_id', userId)
+        .in('event_date', [today, tomorrow])
+        .order('start_time', { ascending: true })
+        .limit(20)
+
+      calendarContext =
+        (events ?? [])
+          .map((e) => {
+            const timeStr = e.start_time
+              ? new Date(e.start_time as string).toLocaleTimeString('en-GB', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })
+              : 'all day'
+            const dayStr = e.event_date === today ? 'today' : 'tomorrow'
+            return `- id:"${e.google_event_id}" "${e.title}" ${dayStr} at ${timeStr}`
+          })
+          .join('\n') || '(none)'
+    } catch {
+      calendarContext = '(none)'
+    }
+  }
 
   const prompt = `You are a smart assistant for the Protagonist app. The user spoke or typed: "${text}"
 
@@ -51,13 +87,18 @@ Today's date is ${today}.
 The user's active quests:
 ${questContext}
 
+The user's calendar events (today + tomorrow):
+${calendarContext}
+
 Classify this input into one of these intents:
 1. TASK — ALWAYS use this if the message starts with or contains "add task", "add a task", "new task", "create task", "remind me to", "I need to", "don't forget", "book", "schedule", "prep", or any clear action item the user wants to track. When in doubt between TASK and CHAT, choose TASK.
 2. NOTE — user is journaling, reflecting, or sharing feelings (emotional, reflective, no clear action item)
 3. LEGEND — user is defining or confirming their long-term Legend (one-sentence life vision) for a character dimension. Use when they confirm a final legend sentence or say "save this as my legend".
 4. BOSS — user wants to create or restart a boss battle (keywords: boss battle, boss fight, attack moves, slay the boss, hunt it down)
 5. CALENDAR_CREATE — user wants to create, schedule, block, or add a new calendar event or appointment. Keywords: "block", "schedule", "add to calendar", "book time", "create event", "put in my calendar", "add a meeting", "add an appointment". Only when clearly creating a new event, not viewing existing ones.
-6. CHAT — questions, advice, open conversation. Never use CHAT if there's a clear action item.
+6. CALENDAR_UPDATE — user wants to reschedule, move, or change the time/date of an existing calendar event. Keywords: "move", "reschedule", "push", "change time", "shift", "postpone". Only use when clearly referring to an existing event that appears in the calendar context above.
+7. CALENDAR_DELETE — user wants to cancel or delete an existing calendar event. Keywords: "cancel", "delete", "remove", "drop", "skip". Only use when clearly referring to an existing event that appears in the calendar context above.
+8. CHAT — questions, advice, open conversation. Never use CHAT if there's a clear action item. Use CHAT if the user wants to update/delete an event but no matching event exists in the calendar context.
 
 For TASK, extract:
 - title: clean task title (remove filler words like "add task" or "remind me to")
@@ -90,9 +131,24 @@ For CALENDAR_CREATE, extract:
 - description: extra context or null
 - location: explicit location or null
 
+For CALENDAR_UPDATE, extract:
+- event_id: the id from the calendar context that best matches what the user described (match by title + approximate time). Must be an id from the list above. If no match, set intent to CHAT instead.
+- event_title: the matched event title (as it appears in the calendar context)
+- current_date: the event's current date (YYYY-MM-DD)
+- current_time: the event's current start time (HH:MM) or null if all-day
+- new_date: the new date the user wants (interpret "tomorrow", "Saturday", "next Monday" relative to today ${today})
+- new_start_time: the new start time in HH:MM 24h format, or null if unchanged
+- new_duration_minutes: duration in minutes, default 60, or unchanged if not mentioned
+
+For CALENDAR_DELETE, extract:
+- event_id: the id from the calendar context that best matches. Must be an id from the list above. If no match, set intent to CHAT instead.
+- event_title: the matched event title
+- event_date: the event's date (YYYY-MM-DD)
+- event_time: the event's start time (HH:MM) or null
+
 Respond ONLY with valid JSON, no explanation:
 {
-  "intent": "TASK" | "NOTE" | "LEGEND" | "BOSS" | "CALENDAR_CREATE" | "CHAT",
+  "intent": "TASK" | "NOTE" | "LEGEND" | "BOSS" | "CALENDAR_CREATE" | "CALENDAR_UPDATE" | "CALENDAR_DELETE" | "CHAT",
   "task": {
     "title": "...",
     "dimension": "career" | "social" | "wealth" | "vitality" | "mind" | "love" | "family" | null,
@@ -119,6 +175,21 @@ Respond ONLY with valid JSON, no explanation:
     "description": "..." | null,
     "location": "..." | null
   } | null,
+  "calendar_update": {
+    "event_id": "...",
+    "event_title": "...",
+    "current_time": "HH:MM" | null,
+    "current_date": "YYYY-MM-DD",
+    "new_date": "YYYY-MM-DD",
+    "new_start_time": "HH:MM" | null,
+    "new_duration_minutes": 60
+  } | null,
+  "calendar_delete": {
+    "event_id": "...",
+    "event_title": "...",
+    "event_time": "HH:MM" | null,
+    "event_date": "YYYY-MM-DD"
+  } | null,
   "oracleReply": "..."
 }`
 
@@ -131,6 +202,16 @@ Respond ONLY with valid JSON, no explanation:
 
     const raw = message.content[0].type === 'text' ? message.content[0].text : '{}'
     const parsed = parseClassifyJson(raw)
+
+    if (parsed.intent === 'CALENDAR_UPDATE' && !hasEventId(parsed.calendar_update)) {
+      parsed.intent = 'CHAT'
+      parsed.calendar_update = null
+    }
+    if (parsed.intent === 'CALENDAR_DELETE' && !hasEventId(parsed.calendar_delete)) {
+      parsed.intent = 'CHAT'
+      parsed.calendar_delete = null
+    }
+
     return NextResponse.json(parsed)
   } catch (error) {
     console.error('Oracle classify error:', error)

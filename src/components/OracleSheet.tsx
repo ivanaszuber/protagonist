@@ -13,6 +13,9 @@ type SheetState =
   | 'task-done'
   | 'note-done'
   | 'calendar-confirm'
+  | 'calendar-update-confirm'
+  | 'calendar-delete-confirm'
+  | 'calendar-manage-done'
   | 'calendar-done'
   | 'chat'
   | 'checkin-loading'
@@ -62,13 +65,40 @@ interface ParsedTask {
   xpReward: number
 }
 
+interface CalendarUpdateInput {
+  event_id: string
+  event_title: string
+  current_date: string
+  current_time: string | null
+  new_date: string
+  new_start_time: string | null
+  new_duration_minutes: number
+}
+
+interface CalendarDeleteInput {
+  event_id: string
+  event_title: string
+  event_date: string
+  event_time: string | null
+}
+
 interface ClassifyResult {
-  intent: 'TASK' | 'NOTE' | 'LEGEND' | 'BOSS' | 'CALENDAR_CREATE' | 'CHAT'
+  intent:
+    | 'TASK'
+    | 'NOTE'
+    | 'LEGEND'
+    | 'BOSS'
+    | 'CALENDAR_CREATE'
+    | 'CALENDAR_UPDATE'
+    | 'CALENDAR_DELETE'
+    | 'CHAT'
   task: ParsedTask | null
   note: { text: string } | null
   legend?: { dimension: string; vision: string | null } | null
   boss?: { dimension: string } | null
   calendar_event?: CalendarEventInput | null
+  calendar_update?: CalendarUpdateInput | null
+  calendar_delete?: CalendarDeleteInput | null
   oracleReply: string | null
 }
 
@@ -120,6 +150,11 @@ export function OracleSheet() {
   )
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [calendarCreating, setCalendarCreating] = useState(false)
+  const [calendarManaging, setCalendarManaging] = useState(false)
+  const [calendarManageAction, setCalendarManageAction] = useState<'update' | 'delete' | null>(
+    null
+  )
+  const [calendarManageDoneMsg, setCalendarManageDoneMsg] = useState('')
   const [calendarInsufficientScope, setCalendarInsufficientScope] = useState(false)
   const [calendarDoneTitle, setCalendarDoneTitle] = useState('')
   const [morningContext, setMorningContext] = useState<MorningContext | null>(null)
@@ -182,6 +217,9 @@ export function OracleSheet() {
     setChatMessages([])
     setCalendarInsufficientScope(false)
     setCalendarDoneTitle('')
+    setCalendarManaging(false)
+    setCalendarManageAction(null)
+    setCalendarManageDoneMsg('')
     setMorningContext(null)
     setCheckinResult(null)
     if (recognitionRef.current) {
@@ -232,6 +270,69 @@ export function OracleSheet() {
     },
     [userId]
   )
+
+  const handleCalendarUpdate = useCallback(async () => {
+    if (!result?.calendar_update) return
+    const { event_id, event_title, new_date, new_start_time, new_duration_minutes } =
+      result.calendar_update
+    setCalendarManaging(true)
+    try {
+      const res = await fetch('/api/calendar/update', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId,
+          eventId: event_id,
+          newDate: new_date,
+          newStartTime: new_start_time ?? undefined,
+          newDurationMinutes: new_duration_minutes ?? 60,
+        }),
+      })
+      const data = (await res.json()) as { error?: string }
+
+      if (res.status === 403 && data.error === 'insufficient_scope') {
+        setCalendarInsufficientScope(true)
+        setState('calendar-done')
+      } else if (res.ok) {
+        setCalendarManageDoneMsg(`✅ Updated — ${event_title} rescheduled.`)
+        setState('calendar-manage-done')
+        window.dispatchEvent(new CustomEvent('protagonist:calendar-updated'))
+      } else {
+        setCalendarManageDoneMsg("⚠️ Couldn't update the event — try again.")
+        setState('calendar-manage-done')
+      }
+    } finally {
+      setCalendarManaging(false)
+    }
+  }, [result, userId])
+
+  const handleCalendarDelete = useCallback(async () => {
+    if (!result?.calendar_delete) return
+    const { event_id, event_title } = result.calendar_delete
+    setCalendarManaging(true)
+    try {
+      const res = await fetch('/api/calendar/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, eventId: event_id }),
+      })
+      const data = (await res.json()) as { error?: string }
+
+      if (res.status === 403 && data.error === 'insufficient_scope') {
+        setCalendarInsufficientScope(true)
+        setState('calendar-done')
+      } else if (res.ok) {
+        setCalendarManageDoneMsg(`🗑 Cancelled — ${event_title} removed from your calendar.`)
+        setState('calendar-manage-done')
+        window.dispatchEvent(new CustomEvent('protagonist:calendar-updated'))
+      } else {
+        setCalendarManageDoneMsg("⚠️ Couldn't cancel the event — try again.")
+        setState('calendar-manage-done')
+      }
+    } finally {
+      setCalendarManaging(false)
+    }
+  }, [result, userId])
 
   const startVoice = useCallback(() => {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition
@@ -375,6 +476,14 @@ export function OracleSheet() {
       } else if (data.intent === 'CALENDAR_CREATE' && data.calendar_event) {
         setResult(data)
         setState('calendar-confirm')
+      } else if (data.intent === 'CALENDAR_UPDATE' && data.calendar_update?.event_id) {
+        setResult(data)
+        setCalendarManageAction('update')
+        setState('calendar-update-confirm')
+      } else if (data.intent === 'CALENDAR_DELETE' && data.calendar_delete?.event_id) {
+        setResult(data)
+        setCalendarManageAction('delete')
+        setState('calendar-delete-confirm')
       } else if (data.intent === 'BOSS' && data.boss?.dimension) {
         const genRes = await fetch('/api/bosses/generate', {
           method: 'POST',
@@ -508,9 +617,15 @@ export function OracleSheet() {
                     ? 'reflecting on your note...'
                     : state === 'calendar-confirm'
                       ? 'confirm calendar event'
-                      : state === 'calendar-done'
-                        ? 'calendar updated'
-                        : 'speak, type, or drop an image'
+                      : state === 'calendar-update-confirm'
+                        ? 'confirm reschedule'
+                        : state === 'calendar-delete-confirm'
+                          ? 'confirm cancellation'
+                          : state === 'calendar-manage-done'
+                            ? 'calendar updated'
+                            : state === 'calendar-done'
+                              ? 'calendar updated'
+                              : 'speak, type, or drop an image'
 
   return (
     <>
@@ -590,11 +705,19 @@ export function OracleSheet() {
                           ? 'Task added'
                           : state === 'calendar-confirm'
                             ? 'Calendar event'
-                            : state === 'calendar-done'
-                              ? calendarInsufficientScope
-                                ? 'Reconnect needed'
-                                : 'Event added'
-                              : 'Oracle'}
+                            : state === 'calendar-update-confirm'
+                              ? 'Reschedule event'
+                              : state === 'calendar-delete-confirm'
+                                ? 'Cancel event'
+                                : state === 'calendar-manage-done'
+                                  ? calendarManageAction === 'delete'
+                                    ? 'Event cancelled'
+                                    : 'Event rescheduled'
+                                  : state === 'calendar-done'
+                                    ? calendarInsufficientScope
+                                      ? 'Reconnect needed'
+                                      : 'Event added'
+                                    : 'Oracle'}
               </div>
               <div
                 style={{
@@ -608,9 +731,14 @@ export function OracleSheet() {
                           ? '#34d399'
                           : state === 'note-done'
                             ? '#C084FC'
-                            : state === 'calendar-confirm' || state === 'calendar-done'
+                            : state === 'calendar-confirm' ||
+                                state === 'calendar-update-confirm' ||
+                                state === 'calendar-manage-done' ||
+                                state === 'calendar-done'
                               ? '#60a5fa'
-                              : '#5A4A7A',
+                              : state === 'calendar-delete-confirm'
+                                ? '#ef4444'
+                                : '#5A4A7A',
                 }}
               >
                 {subtitle}
@@ -1122,6 +1250,223 @@ export function OracleSheet() {
             </>
           )}
 
+          {state === 'calendar-update-confirm' && result?.calendar_update && (
+            <>
+              <div
+                style={{
+                  background: '#0D0820',
+                  borderRadius: 12,
+                  border: '0.5px solid #3D2070',
+                  padding: '12px',
+                  marginBottom: 10,
+                  fontSize: 12,
+                  color: '#C0B0E0',
+                  lineHeight: 1.6,
+                }}
+              >
+                <div style={{ fontSize: 10, color: '#5A4A7A', marginBottom: 8 }}>
+                  📅 Reschedule event
+                </div>
+                <div style={{ fontWeight: 500, marginBottom: 4 }}>
+                  {result.calendar_update.event_title}
+                </div>
+                <div
+                  style={{
+                    color: '#5A4A7A',
+                    textDecoration: 'line-through',
+                    fontSize: 11,
+                  }}
+                >
+                  {result.calendar_update.current_date}
+                  {result.calendar_update.current_time
+                    ? ` · ${result.calendar_update.current_time}`
+                    : ''}
+                </div>
+                <div style={{ color: '#60a5fa', fontSize: 11, marginTop: 2 }}>
+                  → {result.calendar_update.new_date}
+                  {result.calendar_update.new_start_time
+                    ? ` · ${result.calendar_update.new_start_time}`
+                    : ''}
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setResult(null)
+                    setState('idle')
+                  }}
+                  disabled={calendarManaging}
+                  style={{
+                    flex: 1,
+                    height: 44,
+                    borderRadius: 10,
+                    background: '#1E0D40',
+                    border: '0.5px solid #2D1B55',
+                    color: '#7A5FA0',
+                    fontSize: 12,
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleCalendarUpdate()}
+                  disabled={calendarManaging}
+                  style={{
+                    flex: 2,
+                    height: 44,
+                    borderRadius: 10,
+                    background: '#9333EA',
+                    border: 'none',
+                    color: 'white',
+                    fontSize: 12,
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                    opacity: calendarManaging ? 0.6 : 1,
+                    fontFamily: 'inherit',
+                  }}
+                >
+                  {calendarManaging ? 'Updating...' : 'Reschedule ✓'}
+                </button>
+              </div>
+            </>
+          )}
+
+          {state === 'calendar-delete-confirm' && result?.calendar_delete && (
+            <>
+              <div
+                style={{
+                  background: '#0D0820',
+                  borderRadius: 12,
+                  border: '0.5px solid #6B1A1A',
+                  padding: '12px',
+                  marginBottom: 10,
+                  fontSize: 12,
+                  color: '#C0B0E0',
+                  lineHeight: 1.6,
+                }}
+              >
+                <div style={{ fontSize: 10, color: '#5A4A7A', marginBottom: 8 }}>
+                  🗑 Cancel event
+                </div>
+                <div style={{ fontWeight: 500 }}>{result.calendar_delete.event_title}</div>
+                {result.calendar_delete.event_time && (
+                  <div style={{ color: '#5A4A7A', fontSize: 11, marginTop: 2 }}>
+                    {result.calendar_delete.event_date} · {result.calendar_delete.event_time}
+                  </div>
+                )}
+                <div style={{ color: '#ef4444', fontSize: 11, marginTop: 8 }}>
+                  This will remove it from Google Calendar.
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setResult(null)
+                    setState('idle')
+                  }}
+                  disabled={calendarManaging}
+                  style={{
+                    flex: 1,
+                    height: 44,
+                    borderRadius: 10,
+                    background: '#1E0D40',
+                    border: '0.5px solid #2D1B55',
+                    color: '#7A5FA0',
+                    fontSize: 12,
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                  }}
+                >
+                  Keep it
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleCalendarDelete()}
+                  disabled={calendarManaging}
+                  style={{
+                    flex: 2,
+                    height: 44,
+                    borderRadius: 10,
+                    background: calendarManaging ? '#3B0010' : '#7F1D1D',
+                    border: '0.5px solid #ef4444',
+                    color: '#fca5a5',
+                    fontSize: 12,
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                    opacity: calendarManaging ? 0.6 : 1,
+                    fontFamily: 'inherit',
+                  }}
+                >
+                  {calendarManaging ? 'Cancelling...' : 'Yes, cancel it'}
+                </button>
+              </div>
+            </>
+          )}
+
+          {state === 'calendar-manage-done' && (
+            <>
+              <div
+                style={{
+                  background: '#0D0820',
+                  borderRadius: 12,
+                  border: '0.5px solid #2D1B55',
+                  padding: '12px',
+                  marginBottom: 10,
+                  fontSize: 12,
+                  color: '#C0B0E0',
+                  lineHeight: 1.55,
+                }}
+              >
+                {calendarManageDoneMsg}
+              </div>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setResult(null)
+                    setState('idle')
+                  }}
+                  style={{
+                    flex: 1,
+                    height: 44,
+                    borderRadius: 10,
+                    background: '#1E0D40',
+                    border: '0.5px solid #2D1B55',
+                    color: '#7A5FA0',
+                    fontSize: 12,
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                  }}
+                >
+                  Do more
+                </button>
+                <button
+                  type="button"
+                  onClick={close}
+                  style={{
+                    flex: 2,
+                    height: 44,
+                    borderRadius: 10,
+                    background: '#9333EA',
+                    border: 'none',
+                    color: 'white',
+                    fontSize: 12,
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                  }}
+                >
+                  Done
+                </button>
+              </div>
+            </>
+          )}
+
           {state === 'calendar-done' && (
             <>
               <div
@@ -1138,7 +1483,7 @@ export function OracleSheet() {
               >
                 {calendarInsufficientScope ? (
                   <>
-                    🔐 To create events, reconnect Google Calendar with updated permissions.
+                    🔐 To manage events, reconnect Google Calendar with updated permissions.
                   </>
                 ) : (
                   <>✅ Added! {calendarDoneTitle} is in your calendar.</>

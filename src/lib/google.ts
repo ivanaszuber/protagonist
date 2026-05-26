@@ -315,6 +315,145 @@ export async function createCalendarEvent(
   }
 }
 
+export interface UpdateEventInput {
+  date: string
+  startTime?: string
+  durationMinutes?: number
+}
+
+async function parse403(res: Response): Promise<CreateEventResult | null> {
+  if (res.status !== 403) return null
+  try {
+    const data = (await res.json()) as { error?: { message?: string } }
+    const msg = data.error?.message ?? ''
+    if (msg.toLowerCase().includes('insufficient')) {
+      return { success: false, error: 'insufficient_scope' }
+    }
+  } catch {
+    /* ignore */
+  }
+  return null
+}
+
+export async function updateCalendarEvent(
+  accessToken: string,
+  eventId: string,
+  input: UpdateEventInput
+): Promise<CreateEventResult> {
+  const existingRes = await fetch(
+    `${CALENDAR_BASE}/calendars/primary/events/${encodeURIComponent(eventId)}`,
+    { headers: { Authorization: `Bearer ${accessToken}` } }
+  )
+
+  if (!existingRes.ok) {
+    return { success: false, error: 'api_error', errorMessage: 'Event not found' }
+  }
+
+  const existing = (await existingRes.json()) as {
+    start?: { dateTime?: string; date?: string }
+    end?: { dateTime?: string; date?: string }
+  }
+
+  let patchBody: Record<string, unknown>
+
+  if (input.startTime) {
+    const startIso = formatLocalDateTime(input.date, input.startTime)
+    const endParts = addMinutesToLocalDateTime(
+      input.date,
+      input.startTime,
+      input.durationMinutes ?? 60
+    )
+    const endIso = formatLocalDateTime(endParts.date, endParts.time)
+    patchBody = {
+      start: { dateTime: startIso, timeZone: CALENDAR_TIMEZONE },
+      end: { dateTime: endIso, timeZone: CALENDAR_TIMEZONE },
+    }
+  } else {
+    const existingStart = existing.start?.dateTime ?? existing.start?.date
+    const existingEnd = existing.end?.dateTime ?? existing.end?.date
+    if (existingStart && existingStart.includes('T')) {
+      const startTimePart = existingStart.split('T')[1]?.slice(0, 5) ?? '09:00'
+      const endTimePart =
+        existingEnd && existingEnd.includes('T')
+          ? existingEnd.split('T')[1]?.slice(0, 5) ?? startTimePart
+          : startTimePart
+      patchBody = {
+        start: {
+          dateTime: formatLocalDateTime(input.date, startTimePart),
+          timeZone: CALENDAR_TIMEZONE,
+        },
+        end: {
+          dateTime: formatLocalDateTime(input.date, endTimePart),
+          timeZone: CALENDAR_TIMEZONE,
+        },
+      }
+    } else {
+      patchBody = {
+        start: { date: input.date },
+        end: { date: input.date },
+      }
+    }
+  }
+
+  const res = await fetch(
+    `${CALENDAR_BASE}/calendars/primary/events/${encodeURIComponent(eventId)}`,
+    {
+      method: 'PATCH',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(patchBody),
+    }
+  )
+
+  const insufficient = await parse403(res)
+  if (insufficient) return insufficient
+
+  if (!res.ok) {
+    return {
+      success: false,
+      error: 'api_error',
+      errorMessage: await res.text().catch(() => ''),
+    }
+  }
+
+  const updated = (await res.json()) as { id?: string; htmlLink?: string }
+  return {
+    success: true,
+    eventId: updated.id,
+    htmlLink: updated.htmlLink,
+  }
+}
+
+export async function deleteCalendarEvent(
+  accessToken: string,
+  eventId: string
+): Promise<{ success: boolean; error?: 'insufficient_scope' | 'api_error'; errorMessage?: string }> {
+  const res = await fetch(
+    `${CALENDAR_BASE}/calendars/primary/events/${encodeURIComponent(eventId)}`,
+    {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${accessToken}` },
+    }
+  )
+
+  if (res.status === 204 || res.status === 200) {
+    return { success: true }
+  }
+
+  const insufficient = await parse403(res)
+  if (insufficient?.error === 'insufficient_scope') {
+    return { success: false, error: 'insufficient_scope' }
+  }
+
+  return {
+    success: false,
+    error: 'api_error',
+    errorMessage: await res.text().catch(() => ''),
+  }
+}
+
 export function buildCalendarContext(events: CalendarEvent[], date: string): string {
   const todayEvents = events.filter((e) => e.event_date === date)
 
