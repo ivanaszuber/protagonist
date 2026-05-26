@@ -2,12 +2,13 @@
 
 import { useEffect, useState } from 'react'
 import { BossSvg } from '@/components/characters/BossSvg'
-import { openOracle } from '@/lib/oracle-events'
+import { getUserId } from '@/lib/user'
 import type { BossBattle, BossTask } from '@/lib/bosses'
 
 interface BossCardProps {
   characterName: string
   dimensionLabel: string
+  dimension: string
   mainQuestTitle: string | null
   boss: BossBattle | null
   escapedBoss: BossBattle | null
@@ -40,6 +41,7 @@ function formatDeadline(dateStr: string): string {
 export function BossCard({
   characterName,
   dimensionLabel,
+  dimension,
   mainQuestTitle,
   boss,
   escapedBoss,
@@ -51,6 +53,8 @@ export function BossCard({
   const [localTasks, setLocalTasks] = useState(tasks)
   const [completingId, setCompletingId] = useState<string | null>(null)
   const [victory, setVictory] = useState<{ name: string; rewardXp: number } | null>(null)
+  const [generating, setGenerating] = useState(false)
+  const [generateError, setGenerateError] = useState<string | null>(null)
 
   useEffect(() => {
     setLocalBoss(boss)
@@ -92,16 +96,60 @@ export function BossCard({
     }
   }
 
-  function handleStartBoss() {
-    openOracle(
-      `I need a new boss battle for ${characterName} — my ${dimensionLabel} character. My current main quest is: ${mainQuestTitle ?? 'not set yet'}. Generate a boss name, set HP to 10, create 10 attack move tasks spread over the next 30 days, and assign HP damage (1–3) to each based on difficulty.`
-    )
+  async function handleStartBoss() {
+    if (generating) return
+    setGenerating(true)
+    setGenerateError(null)
+    const uid = getUserId()
+    try {
+      const res = await fetch('/api/bosses/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: uid,
+          dimension,
+          userMessage: `Generate a boss battle for ${characterName}. Main quest: ${mainQuestTitle ?? 'not set yet'}.`,
+        }),
+      })
+      const data = await res.json() as { boss?: { name: string }; error?: string }
+      if (!res.ok) {
+        setGenerateError(data.error ?? 'Generation failed — try again.')
+      } else {
+        onBossSlain() // reuses the refresh callback
+      }
+    } catch {
+      setGenerateError('Network error — try again.')
+    } finally {
+      setGenerating(false)
+    }
   }
 
-  function handleHuntEscaped(name: string) {
-    openOracle(
-      `My boss ${name} escaped before I could slay it. I lost 50 XP. Help me restart the challenge — same boss name, new deadline 30 days from today, fresh set of attack tasks.`
-    )
+  async function handleHuntEscaped(name: string) {
+    if (generating) return
+    setGenerating(true)
+    setGenerateError(null)
+    const uid = getUserId()
+    try {
+      const res = await fetch('/api/bosses/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: uid,
+          dimension,
+          userMessage: `Hunt the escaped boss "${name}". Same boss name, new 30-day deadline, fresh attack tasks.`,
+        }),
+      })
+      const data = await res.json() as { boss?: { name: string }; error?: string }
+      if (!res.ok) {
+        setGenerateError(data.error ?? 'Generation failed — try again.')
+      } else {
+        onBossSlain()
+      }
+    } catch {
+      setGenerateError('Network error — try again.')
+    } finally {
+      setGenerating(false)
+    }
   }
 
   const sectionLabel = (
@@ -194,27 +242,40 @@ export function BossCard({
             padding: 16,
           }}
         >
-          <p style={{ fontSize: 12, color: '#7A5FA0', margin: '0 0 10px' }}>
-            No active boss. Oracle will generate your next challenge.
-          </p>
-          <button
-            type="button"
-            onClick={handleStartBoss}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-              background: '#1E0D40',
-              border: '0.5px solid #6B1A1A',
-              borderRadius: 8,
-              padding: '8px 12px',
-              fontSize: 11,
-              color: '#ef4444',
-              cursor: 'pointer',
-            }}
-          >
-            🔮 Start a new Boss Battle ↗
-          </button>
+          {generating ? (
+            <p style={{ fontSize: 12, color: '#7A5FA0', margin: 0, fontStyle: 'italic' }}>
+              Summoning your nemesis...
+            </p>
+          ) : (
+            <>
+              <p style={{ fontSize: 12, color: '#7A5FA0', margin: '0 0 10px' }}>
+                No active boss. Generate your next challenge.
+              </p>
+              {generateError && (
+                <p style={{ fontSize: 11, color: '#ef4444', margin: '0 0 8px' }}>
+                  {generateError}
+                </p>
+              )}
+              <button
+                type="button"
+                onClick={() => void handleStartBoss()}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  background: '#1E0D40',
+                  border: '0.5px solid #6B1A1A',
+                  borderRadius: 8,
+                  padding: '8px 12px',
+                  fontSize: 11,
+                  color: '#ef4444',
+                  cursor: 'pointer',
+                }}
+              >
+                ⚔ Start a new Boss Battle
+              </button>
+            </>
+          )}
         </div>
       </section>
     )

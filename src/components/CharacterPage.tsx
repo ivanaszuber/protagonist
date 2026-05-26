@@ -541,6 +541,7 @@ export function CharacterPage({ dimension }: CharacterPageProps) {
         <BossCard
           characterName={char.name}
           dimensionLabel={char.categoryLabel}
+          dimension={dimension}
           mainQuestTitle={activeMilestone?.title ?? quest?.vision ?? null}
           boss={boss}
           escapedBoss={escapedBoss}
