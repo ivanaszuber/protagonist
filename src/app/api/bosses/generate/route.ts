@@ -77,16 +77,16 @@ export async function POST(request: Request) {
         .maybeSingle()
     : { data: null }
 
-  const prompt = `You are creating a 30-day challenge sprint for the ${dimension} dimension of someone's life.
-Current main quest vision: ${quest?.vision ?? 'none'}
+  const prompt = `You are creating a focused challenge sprint for the ${dimension} dimension of someone's life.
+Current quest: ${quest?.vision ?? 'none'}
 Current milestone: ${milestone?.title ?? 'none'} (due ${milestone?.target_date ?? 'n/a'})
 Today: ${today}
 User request: ${userMessage ?? 'Create a new challenge'}
 
 Generate:
 1. A compelling challenge name — something to master or achieve (not an enemy to fight)
-2. Exactly 10 specific, actionable tasks to complete it
-3. Each task has a weight of 1, 2, or 3 — total weights must equal exactly 10
+2. Exactly 5 to 7 specific, actionable tasks to complete it (no more, no less — keep it focused)
+3. Each task has a weight of 1 or 2 — total weights must equal exactly 7
 4. Spread tasks logically across the next 30 days
 5. Deadline ${deadlineStr}
 
@@ -94,7 +94,7 @@ Respond ONLY with JSON:
 {
   "boss_name": "...",
   "deadline": "${deadlineStr}",
-  "hp_total": 10,
+  "hp_total": 7,
   "tasks": [
     { "title": "...", "due_date": "YYYY-MM-DD", "hp_damage": 1 }
   ]
@@ -117,7 +117,7 @@ Respond ONLY with JSON:
     const boss = await createBoss(userId, dimension, {
       name: String(parsed.boss_name ?? 'The Unknown Boss'),
       deadline: String(parsed.deadline ?? deadlineStr),
-      hp_total: 10,
+      hp_total: (parsed.hp_total as number) ?? 7,
       quest_id: quest?.id ?? null,
       tasks: tasks.map((t) => ({
         title: t.title,

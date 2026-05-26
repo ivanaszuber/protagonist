@@ -33,17 +33,22 @@ export async function PATCH(request: Request) {
 
   const { data, error } = await supabase
     .from('main_quests')
-    .update({ vision: vision.trim() })
-    .eq('user_id', userId)
-    .eq('dimension', dimension)
+    .upsert(
+      {
+        user_id: userId,
+        dimension,
+        vision: vision.trim(),
+        character_name: dimension,
+        character_class: 'Adventurer',
+        active: true,
+      },
+      { onConflict: 'user_id,dimension' }
+    )
     .select()
     .maybeSingle()
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
-  }
-  if (!data) {
-    return NextResponse.json({ error: 'Quest not found' }, { status: 404 })
   }
 
   if (vision.trim()) {

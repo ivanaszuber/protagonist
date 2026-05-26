@@ -17,7 +17,7 @@ export function LegendCard({
   vision,
   accentColor,
 }: LegendCardProps) {
-  const hasLegend = Boolean(vision?.trim())
+  const hasQuest = Boolean(vision?.trim())
 
   function handleDefine() {
     openOracle(undefined, `legend:${dimension}`)
@@ -38,11 +38,11 @@ export function LegendCard({
         position: 'relative',
       }}
     >
-      {hasLegend && (
+      {hasQuest && (
         <button
           type="button"
           onClick={handleEdit}
-          aria-label="Edit legend"
+          aria-label="Edit quest"
           style={{
             position: 'absolute',
             top: 10,
@@ -88,11 +88,11 @@ export function LegendCard({
             color: accentColor,
           }}
         >
-          {hasLegend ? 'The Legend' : 'No Legend yet'}
+          {hasQuest ? 'The Quest' : 'No Quest yet'}
         </span>
       </div>
 
-      {hasLegend ? (
+      {hasQuest ? (
         <>
           <p
             style={{
@@ -107,13 +107,13 @@ export function LegendCard({
             &ldquo;{vision}&rdquo;
           </p>
           <p style={{ fontSize: 10, color: '#7A5A2A', margin: 0 }}>
-            The mountain you&apos;re climbing. Everything else serves this.
+            Your defining quest. Everything else serves this.
           </p>
         </>
       ) : (
         <>
           <p style={{ fontSize: 11, color: '#7A5FA0', margin: '0 0 10px', lineHeight: 1.5 }}>
-            Oracle will help you define your ultimate vision for {dimensionLabel}.
+            Oracle will help you define your long-term quest for {dimensionLabel}.
           </p>
           <button
             type="button"
@@ -132,7 +132,7 @@ export function LegendCard({
             }}
           >
             <span>🔮</span>
-            Define your Legend with Oracle ↗
+            Define your Quest with Oracle ↗
           </button>
         </>
       )}

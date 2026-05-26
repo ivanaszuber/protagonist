@@ -192,7 +192,7 @@ export function CharacterPage({ dimension }: CharacterPageProps) {
     }
   }
 
-  useEffect(() => {
+  function loadQuestData() {
     const uid = getUserId()
     const memoryDim = CHARACTERS[dimension].memoryId
     const fetches: Promise<unknown>[] = [
@@ -239,6 +239,14 @@ export function CharacterPage({ dimension }: CharacterPageProps) {
       }
       setLoading(false)
     })
+  }
+
+  useEffect(() => {
+    loadQuestData()
+    const onQuestUpdated = () => loadQuestData()
+    window.addEventListener('protagonist:quest-updated', onQuestUpdated)
+    return () => window.removeEventListener('protagonist:quest-updated', onQuestUpdated)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dimension])
 
   async function handleBossTaskComplete(taskId: string, xpReward: number) {

@@ -551,7 +551,7 @@ export function OracleSheet() {
           task: null,
           note: null,
           legend: { dimension: legendDimension, vision: text },
-          oracleReply: `Your Legend is set, ${charName}: "${text}" — that's the mountain you're climbing.`,
+          oracleReply: `Quest locked in for ${charName}: "${text}" — that's where you're going.`,
         })
         setLegendDimension(null)
         window.dispatchEvent(new CustomEvent('protagonist:quest-updated'))
@@ -1125,12 +1125,12 @@ export function OracleSheet() {
                   }}
                 >
                   <div style={{ fontSize: 10, color: '#9333EA', marginBottom: 3, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-                    🔮 Define your Legend
+                    🔮 Define your Quest
                   </div>
                   <div style={{ fontSize: 12, color: '#C084FC', lineHeight: 1.5 }}>
                     {CHARACTERS[legendDimension as Dimension]
-                      ? `Who will ${CHARACTERS[legendDimension as Dimension].name} become? Write your vision in one powerful sentence.`
-                      : 'Write your vision in one powerful sentence.'}
+                      ? `Where is ${CHARACTERS[legendDimension as Dimension].name} going? Write your long-term quest in one powerful sentence.`
+                      : 'Write your long-term quest in one powerful sentence.'}
                   </div>
                 </div>
               )}
