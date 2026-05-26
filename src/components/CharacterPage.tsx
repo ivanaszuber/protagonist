@@ -312,19 +312,20 @@ export function CharacterPage({ dimension }: CharacterPageProps) {
     <main className="dashboard-scroll" style={pageShellStyle}>
       <TopNav streakDays={quest?.streak_days ?? 0} />
       <div style={{ maxWidth: 430, margin: '0 auto', padding: '44px 16px 0' }}>
-        {/* Hero */}
+        {/* Hero — Option D: robot left, info right */}
         <div
           style={{
             display: 'flex',
-            flexDirection: 'column',
             alignItems: 'center',
+            gap: 12,
             paddingTop: 16,
-            paddingBottom: 24,
-            gap: 8,
+            paddingBottom: 20,
           }}
         >
+          {/* Character art */}
           <div
             style={{
+              flexShrink: 0,
               animation: 'protagonist-float 3.2s ease-in-out infinite',
               animationDelay: floatDelay,
               transformOrigin: 'center bottom',
@@ -333,87 +334,90 @@ export function CharacterPage({ dimension }: CharacterPageProps) {
             <HeroArt />
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
-            <span style={{ fontSize: 22, fontWeight: 500, color: '#E8E0F0' }}>{char.name}</span>
-            <span
-              style={{
-                background: '#2A1800',
-                border: `0.5px solid ${accentColor}`,
-                borderRadius: 20,
-                padding: '2px 8px',
-                fontSize: 10,
-                color: accentColor,
-              }}
-            >
-              {char.categoryLabel}
-            </span>
-          </div>
-
-          <span
-            style={{
-              fontSize: 11,
-              color: accentColor,
-              letterSpacing: '0.08em',
-              textTransform: 'uppercase',
-            }}
-          >
-            {tierLabel}
-          </span>
-
-          <div
-            style={{
-              display: 'flex',
-              gap: 16,
-              marginTop: 4,
-              fontSize: 10,
-              color: '#6B5E8C',
-            }}
-          >
-            <span>
-              Challenges Conquered{' '}
-              <strong style={{ color: accentColor }}>{quest?.bosses_slain ?? killStats.slain}</strong>
-            </span>
-          </div>
-
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              background: '#1E0D40',
-              borderRadius: 20,
-              padding: '4px 12px',
-              border: '0.5px solid #3D2070',
-            }}
-          >
-            <span style={{ fontSize: 11, color: '#7A5FA0' }}>Level</span>
-            <span style={{ fontSize: 13, fontWeight: 500, color: accentColor }}>
-              {level}
-            </span>
-          </div>
-
-          <div style={{ width: '60%', marginTop: 4 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
-              <span style={{ fontSize: 9, color: '#5A4A7A' }}>{xpInLevel} XP</span>
-              <span style={{ fontSize: 9, color: '#5A4A7A' }}>500</span>
+          {/* Info column */}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            {/* Row 1: name + category badge */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+              <span style={{ fontSize: 22, fontWeight: 500, color: '#E8E0F0' }}>{char.name}</span>
+              <span
+                style={{
+                  background: '#2A1800',
+                  border: `0.5px solid ${accentColor}`,
+                  borderRadius: 20,
+                  padding: '2px 8px',
+                  fontSize: 10,
+                  color: accentColor,
+                  flexShrink: 0,
+                }}
+              >
+                {char.categoryLabel}
+              </span>
             </div>
+
+            {/* Row 2: tier · level pill · challenges — all inline */}
             <div
               style={{
-                height: 4,
-                background: '#1E0D40',
-                borderRadius: 2,
-                overflow: 'hidden',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                marginBottom: 10,
+                flexWrap: 'wrap',
               }}
             >
+              <span
+                style={{
+                  fontSize: 11,
+                  color: accentColor,
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                }}
+              >
+                {tierLabel}
+              </span>
               <div
                 style={{
-                  height: '100%',
-                  width: `${Math.round((xpInLevel / 500) * 100)}%`,
-                  background: accentColor,
-                  borderRadius: 2,
-                  transition: 'width 1s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  background: '#1E0D40',
+                  borderRadius: 20,
+                  padding: '3px 10px',
+                  border: '0.5px solid #3D2070',
                 }}
-              />
+              >
+                <span style={{ fontSize: 10, color: '#7A5FA0' }}>Lv</span>
+                <span style={{ fontSize: 12, fontWeight: 500, color: accentColor }}>{level}</span>
+              </div>
+              <span style={{ fontSize: 10, color: '#6B5E8C' }}>
+                <strong style={{ color: accentColor }}>{quest?.bosses_slain ?? killStats.slain}</strong> won
+              </span>
+            </div>
+
+            {/* Row 3: XP bar full width */}
+            <div>
+              <div
+                style={{
+                  height: 5,
+                  background: '#1E0D40',
+                  borderRadius: 3,
+                  overflow: 'hidden',
+                  marginBottom: 3,
+                }}
+              >
+                <div
+                  style={{
+                    height: '100%',
+                    width: `${Math.round((xpInLevel / 500) * 100)}%`,
+                    background: accentColor,
+                    borderRadius: 3,
+                    transition: 'width 1s ease',
+                  }}
+                />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: 9, color: '#5A4A7A' }}>{xpInLevel} XP</span>
+                <span style={{ fontSize: 9, color: '#5A4A7A' }}>500 to Level {level + 1}</span>
+              </div>
             </div>
           </div>
         </div>
