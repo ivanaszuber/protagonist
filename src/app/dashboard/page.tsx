@@ -343,6 +343,7 @@ export default function DashboardPage() {
   const [justCompletedIds, setJustCompletedIds] = useState<Set<string>>(new Set())
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null)
   const [reschedulingTaskId, setReschedulingTaskId] = useState<string | null>(null)
+  const [pickerTaskId, setPickerTaskId] = useState<string | null>(null)
   const todayDate = useMemo(() => new Date(), [])
   const todayStr = useMemo(() => toDateStr(todayDate), [todayDate])
   const [selectedDate, setSelectedDate] = useState<Date>(todayDate)
@@ -619,9 +620,7 @@ export default function DashboardPage() {
         if (!a.time && b.time) return 1
         return 0
       }
-      // Both tasks: uncompleted first, completed sink to bottom
-      if (!a.completed && b.completed) return -1
-      if (a.completed && !b.completed) return 1
+      // Both tasks: preserve original order (don't sink completed to bottom mid-session)
       return 0
     })
 
@@ -1413,6 +1412,8 @@ export default function DashboardPage() {
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation()
+                          setExpandedTaskId(null)
+                          setPickerTaskId(null)
                           void handleCompleteTask(item)
                         }}
                         disabled={item.completed}
@@ -1497,101 +1498,118 @@ export default function DashboardPage() {
                     {isExpanded && (
                       <div
                         style={{
-                          display: 'flex',
-                          gap: 6,
-                          paddingLeft: 88,
+                          paddingLeft: 104,
                           paddingBottom: 8,
                           paddingTop: 2,
                         }}
                       >
-                        {/* Tomorrow */}
-                        <button
-                          type="button"
-                          disabled={reschedulingTaskId === item.id}
-                          onClick={() => void handleRescheduleTask(item.id, getTomorrowStr())}
-                          style={{
-                            padding: '5px 11px',
-                            borderRadius: 20,
-                            border: `0.5px solid ${item.color}60`,
-                            background: `${item.color}12`,
-                            color: item.color,
-                            fontSize: 10,
-                            fontWeight: 500,
-                            cursor: 'pointer',
-                            fontFamily: 'inherit',
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          → Tomorrow
-                        </button>
-                        {/* Pick date */}
-                        <label
-                          style={{
-                            padding: '5px 11px',
-                            borderRadius: 20,
-                            border: '0.5px solid #2D1B55',
-                            background: 'transparent',
-                            color: '#7A6090',
-                            fontSize: 10,
-                            fontWeight: 500,
-                            cursor: 'pointer',
-                            whiteSpace: 'nowrap',
-                            position: 'relative',
-                          }}
-                        >
-                          📅 Pick date
+                        {/* Buttons row */}
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                          {/* Tomorrow */}
+                          <button
+                            type="button"
+                            disabled={reschedulingTaskId === item.id}
+                            onClick={() => void handleRescheduleTask(item.id, getTomorrowStr())}
+                            style={{
+                              padding: '5px 10px',
+                              borderRadius: 20,
+                              border: `0.5px solid ${item.color}60`,
+                              background: `${item.color}12`,
+                              color: item.color,
+                              fontSize: 10,
+                              fontWeight: 500,
+                              cursor: 'pointer',
+                              fontFamily: 'inherit',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            → Tomorrow
+                          </button>
+                          {/* Pick date toggle */}
+                          <button
+                            type="button"
+                            onClick={() => setPickerTaskId(pickerTaskId === item.id ? null : item.id)}
+                            style={{
+                              padding: '5px 10px',
+                              borderRadius: 20,
+                              border: pickerTaskId === item.id ? `0.5px solid ${item.color}60` : '0.5px solid #2D1B55',
+                              background: pickerTaskId === item.id ? `${item.color}12` : 'transparent',
+                              color: pickerTaskId === item.id ? item.color : '#7A6090',
+                              fontSize: 10,
+                              fontWeight: 500,
+                              cursor: 'pointer',
+                              fontFamily: 'inherit',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            📅 Pick date
+                          </button>
+                          {/* Someday */}
+                          <button
+                            type="button"
+                            disabled={reschedulingTaskId === item.id}
+                            onClick={() => void handleRescheduleTask(item.id, null)}
+                            style={{
+                              padding: '5px 10px',
+                              borderRadius: 20,
+                              border: '0.5px solid #2D1B55',
+                              background: 'transparent',
+                              color: '#5A4A7A',
+                              fontSize: 10,
+                              cursor: 'pointer',
+                              fontFamily: 'inherit',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            Someday
+                          </button>
+                          {/* Delete */}
+                          <button
+                            type="button"
+                            onClick={() => void handleDeleteTask(item.id)}
+                            style={{
+                              padding: '5px 10px',
+                              borderRadius: 20,
+                              border: '0.5px solid rgba(239,68,68,0.3)',
+                              background: 'rgba(239,68,68,0.06)',
+                              color: '#ef4444',
+                              fontSize: 10,
+                              cursor: 'pointer',
+                              fontFamily: 'inherit',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                        {/* Real date input — shown when picker toggled */}
+                        {pickerTaskId === item.id && (
                           <input
                             type="date"
+                            autoFocus
                             min={getTomorrowStr()}
                             onChange={(e) => {
-                              if (e.target.value) void handleRescheduleTask(item.id, e.target.value)
+                              if (e.target.value) {
+                                setPickerTaskId(null)
+                                void handleRescheduleTask(item.id, e.target.value)
+                              }
                             }}
                             style={{
-                              position: 'absolute',
-                              inset: 0,
-                              opacity: 0,
-                              cursor: 'pointer',
+                              marginTop: 8,
                               width: '100%',
+                              background: '#0D0820',
+                              border: '0.5px solid #2D1B55',
+                              borderRadius: 8,
+                              padding: '7px 10px',
+                              fontSize: 12,
+                              color: '#E8E0F0',
+                              outline: 'none',
+                              fontFamily: 'inherit',
+                              colorScheme: 'dark',
+                              boxSizing: 'border-box',
                             }}
                           />
-                        </label>
-                        {/* Someday */}
-                        <button
-                          type="button"
-                          disabled={reschedulingTaskId === item.id}
-                          onClick={() => void handleRescheduleTask(item.id, null)}
-                          style={{
-                            padding: '5px 11px',
-                            borderRadius: 20,
-                            border: '0.5px solid #2D1B55',
-                            background: 'transparent',
-                            color: '#5A4A7A',
-                            fontSize: 10,
-                            cursor: 'pointer',
-                            fontFamily: 'inherit',
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          Someday
-                        </button>
-                        {/* Delete */}
-                        <button
-                          type="button"
-                          onClick={() => void handleDeleteTask(item.id)}
-                          style={{
-                            padding: '5px 11px',
-                            borderRadius: 20,
-                            border: '0.5px solid rgba(239,68,68,0.25)',
-                            background: 'transparent',
-                            color: '#ef4444',
-                            fontSize: 10,
-                            cursor: 'pointer',
-                            fontFamily: 'inherit',
-                            opacity: 0.7,
-                          }}
-                        >
-                          Delete
-                        </button>
+                        )}
                       </div>
                     )}
                   </div>
@@ -1772,7 +1790,7 @@ export default function DashboardPage() {
                   </div>
                 </div>
 
-                {/* Right: level badge + streak */}
+                {/* Right: category pill + level badge + streak */}
                 <div
                   style={{
                     display: 'flex',
@@ -1783,6 +1801,20 @@ export default function DashboardPage() {
                     paddingLeft: 4,
                   }}
                 >
+                  <span
+                    style={{
+                      background: 'transparent',
+                      border: `0.5px solid ${char.color}`,
+                      borderRadius: 20,
+                      padding: '2px 7px',
+                      fontSize: 8,
+                      color: char.color,
+                      whiteSpace: 'nowrap',
+                      letterSpacing: '0.04em',
+                    }}
+                  >
+                    {char.categoryLabel}
+                  </span>
                   <span
                     style={{
                       background: '#1E0D40',
