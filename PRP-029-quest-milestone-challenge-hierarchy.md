@@ -112,15 +112,25 @@ Oracle prompt update: include milestone context more prominently so generated ta
 
 ---
 
+## Design Decision (approved)
+
+**Model 2 — One challenge, tasks distributed across milestones**
+- One active challenge per dimension at a time (unchanged)
+- Oracle fetches ALL active milestones and creates 2–3 tasks per milestone
+- Each task has a `milestone_id` FK pointing to the milestone it serves
+- Milestone progress = (completed tasks for that milestone) / (total tasks for it)
+- Optional `focusMilestoneId` in the generate request pins all tasks to one milestone
+- **Challenge duration changed from 30 days → 7 days** (weekly sprints, more engaging)
+
 ## Implementation Order
 
-1. DB migration: add `milestone_id` to `bosses`
-2. Update `/api/bosses/generate` to assign `milestone_id`
-3. Update `QuestData` type + `/api/quests/character/[dimension]` to include milestone challenge counts
-4. Update BossCard UI to show milestone link
-5. Update MilestonesSection to show challenge progress per milestone
+1. ~~DB migration: add `milestone_id` to `bosses`~~ — Not needed for Model 2; `tasks.milestone_id` already existed in schema
+2. ✅ Update `/api/bosses/generate` to assign `milestone_id` per task + 7-day deadline
+3. Update `QuestData` type + `/api/quests/character/[dimension]` to include per-milestone task counts
+4. Update BossCard UI to show "In service of: [Milestone]" tag per task
+5. Update MilestonesSection to show task-based progress bar per milestone
 6. Update QuestCard (LegendCard) to show overall quest progress
-7. Update Oracle challenge-creation confirmation message to mention milestone
+7. Add focus-milestone picker to Oracle challenge-creation flow
 
 ---
 
@@ -129,8 +139,12 @@ Oracle prompt update: include milestone context more prominently so generated ta
 - ✅ Legend renamed to Quest in all UI labels (LegendCard, OracleSheet)
 - ✅ Vision route upserted (creates main_quest record if none exists)
 - ✅ CharacterPage auto-refreshes after Oracle saves quest
-- ✅ Challenge tasks capped at 5–7 (was 10)
+- ✅ Challenge changed to 7-day weekly sprints (was 30 days)
+- ✅ Tasks distributed across all active milestones (2–3 per milestone, cap 7)
+- ✅ Each task saved with `milestone_id` FK
+- ✅ Optional `focusMilestoneId` param in POST /api/bosses/generate
 - ✅ Oracle quest-definition mode: clean input, guided prompt, saves on submit
+- ✅ Inline milestone creation form (no Oracle required)
 
 ---
 

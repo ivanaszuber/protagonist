@@ -355,6 +355,7 @@ export interface CreateBossPayload {
     due_date: string
     hp_damage: number
     xp_reward?: number
+    milestone_id?: string | null
   }>
 }
 
@@ -374,7 +375,7 @@ export async function createBoss(
       hp_remaining: payload.hp_total,
       deadline: payload.deadline,
       status: 'active',
-      reward_xp: payload.reward_xp ?? 300,
+      reward_xp: payload.reward_xp ?? 150,
     })
     .select()
     .single()
@@ -390,6 +391,7 @@ export async function createBoss(
       hp_damage: task.hp_damage,
       xp_reward: task.xp_reward ?? 50,
       boss_battle_id: boss.id,
+      milestone_id: task.milestone_id ?? null,
     })
   }
 
