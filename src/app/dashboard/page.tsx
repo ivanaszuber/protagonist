@@ -102,64 +102,52 @@ const MOOD_LABELS: Record<number, { text: string; color: string }> = {
   5: { text: 'Energised', color: '#a855f7' },
 }
 
-const BIO_CIRCUMFERENCE = 2 * Math.PI * 13  // r=13, inside a 32px circle
-
-function BiometricRing({
+function BiometricBar({
   value,
   color,
-  bg,
   label,
   loading,
 }: {
   value: number | null | undefined
   color: string
-  bg: string
   label: string
   loading: boolean
 }) {
-  const score = value ?? 0
-  const offset = loading || value == null ? BIO_CIRCUMFERENCE : BIO_CIRCUMFERENCE * (1 - score / 100)
+  const pct = loading || value == null ? 0 : value
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-      <div style={{ position: 'relative', width: 32, height: 32, flexShrink: 0 }}>
-        <svg
-          width="32"
-          height="32"
-          viewBox="0 0 32 32"
-          style={{ transform: 'rotate(-90deg)' }}
-        >
-          {/* track */}
-          <circle cx="16" cy="16" r="13" fill={bg} stroke="rgba(255,255,255,0.06)" strokeWidth="3" />
-          {/* progress arc */}
-          <circle
-            cx="16"
-            cy="16"
-            r="13"
-            fill="none"
-            stroke={color}
-            strokeWidth="3"
-            strokeDasharray={BIO_CIRCUMFERENCE}
-            strokeDashoffset={offset}
-            strokeLinecap="round"
-            style={{ transition: 'stroke-dashoffset 0.6s ease-out' }}
-          />
-        </svg>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+      <span style={{ fontSize: 9, color: '#5A4A7A', width: 32, flexShrink: 0 }}>{label}</span>
+      <div
+        style={{
+          flex: 1,
+          height: 5,
+          background: 'rgba(255,255,255,0.07)',
+          borderRadius: 3,
+          overflow: 'hidden',
+        }}
+      >
         <div
           style={{
-            position: 'absolute',
-            inset: 0,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: loading || value == null ? 8 : 9,
-            fontWeight: 700,
-            color: loading || value == null ? '#5A4A7A' : color,
+            width: `${pct}%`,
+            height: '100%',
+            background: color,
+            borderRadius: 3,
+            transition: 'width 0.6s ease-out',
           }}
-        >
-          {loading ? '--' : value != null ? value : '--'}
-        </div>
+        />
       </div>
-      <span style={{ fontSize: 9, color: '#5A4A7A' }}>{label}</span>
+      <span
+        style={{
+          fontSize: 9,
+          fontWeight: 700,
+          color: loading || value == null ? '#5A4A7A' : color,
+          width: 22,
+          textAlign: 'right',
+          flexShrink: 0,
+        }}
+      >
+        {loading ? '--' : value != null ? value : '--'}
+      </span>
     </div>
   )
 }
@@ -663,10 +651,10 @@ export default function DashboardPage() {
         </div>
 
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <BiometricRing label="Ready" value={vitality?.readiness_score} color="#34d399" bg="#16523A" loading={vitalityLoading} />
-            <BiometricRing label="Sleep" value={vitality?.sleep_score} color="#60a5fa" bg="#1A2E4A" loading={vitalityLoading} />
-            <BiometricRing label="Move" value={vitality?.activity_score} color="#fb923c" bg="#3B1A0A" loading={vitalityLoading} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <BiometricBar label="Ready" value={vitality?.readiness_score} color="#34d399" loading={vitalityLoading} />
+            <BiometricBar label="Sleep" value={vitality?.sleep_score} color="#60a5fa" loading={vitalityLoading} />
+            <BiometricBar label="Move" value={vitality?.activity_score} color="#fb923c" loading={vitalityLoading} />
           </div>
           {cycleLabel && (
             <div
