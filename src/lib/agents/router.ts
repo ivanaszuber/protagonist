@@ -201,6 +201,23 @@ export function isCheckIn(message: string): boolean {
     'starting my day',
     'just woke',
     'energy today',
+    // "tell me about myself / give me context" — user wants a full cross-dimension overview
+    'what do you know about me',
+    'tell me about me',
+    'tell me about myself',
+    'give me context',
+    'context on me',
+    'overview of me',
+    'across all',
+    'all dimensions',
+    'all categories',
+    'how am i doing',
+    'where am i at',
+    'summary of my',
+    'my progress',
+    'update on me',
+    'fill me in',
+    'catch me up',
   ]
   return checkInSignals.some((s) => lower.includes(s))
 }

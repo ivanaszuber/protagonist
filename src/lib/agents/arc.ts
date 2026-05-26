@@ -176,6 +176,14 @@ async function loadCalendarContextForUser(userId: string): Promise<{
   }
 }
 
+/**
+ * Arc uses 'create' as the DimensionId for the career/work dimension,
+ * but the app stores everything under 'career'. Map when reading/writing memories.
+ */
+function toPersistenceId(dim: DimensionId): string {
+  return dim === 'create' ? 'career' : dim
+}
+
 export async function consultArc(input: ArcInput): Promise<ArcOutput> {
   const { userMessage, userId, checkInData } = input
 
@@ -208,7 +216,7 @@ export async function consultArc(input: ArcInput): Promise<ArcOutput> {
   const memoriesByDimension = await Promise.all(
     allDimensions.map(async (dim) => ({
       dim,
-      memories: await getDimensionMemories(dim, 8, userId),
+      memories: await getDimensionMemories(toPersistenceId(dim), 8, userId),
     }))
   )
   const memoryMap = Object.fromEntries(
@@ -289,7 +297,7 @@ No specialist insights were available. Respond as Arc with warmth and specificit
   const memoryPromises = activeResults
     .filter((r) => r.memoryToStore.trim().length > 0)
     .map((r) =>
-      saveDimensionMemory(r.dimensionId, r.memoryToStore, 'conversation', 6, userId)
+      saveDimensionMemory(toPersistenceId(r.dimensionId), r.memoryToStore, 'conversation', 6, userId)
     )
   await Promise.allSettled(memoryPromises)
 

@@ -11,6 +11,7 @@ type SheetState =
   | 'recording'
   | 'thinking'
   | 'task-done'
+  | 'activity-done'
   | 'note-done'
   | 'calendar-confirm'
   | 'calendar-update-confirm'
@@ -85,6 +86,7 @@ interface CalendarDeleteInput {
 interface ClassifyResult {
   intent:
     | 'TASK'
+    | 'COMPLETED_ACTIVITY'
     | 'NOTE'
     | 'LEGEND'
     | 'BOSS'
@@ -93,6 +95,12 @@ interface ClassifyResult {
     | 'CALENDAR_DELETE'
     | 'CHAT'
   task: ParsedTask | null
+  completed_task?: {
+    title: string
+    dimension: string | null
+    date: string | null
+    xpReward: number
+  } | null
   note: { text: string } | null
   legend?: { dimension: string; vision: string | null } | null
   boss?: { dimension: string } | null
@@ -118,6 +126,16 @@ function dimensionLabel(dim: string): string {
 
 function dimensionColor(dim: string): string {
   return CHARACTERS[dim as Dimension]?.color ?? '#9333EA'
+}
+
+/** Render basic markdown (bold, italic, inline code) as safe HTML for Oracle responses */
+function renderMarkdown(text: string): string {
+  return text
+    .replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/`(.+?)`/g, '<code style="font-family:monospace;background:rgba(147,51,234,0.15);padding:1px 4px;border-radius:3px;font-size:0.9em">$1</code>')
+    .replace(/\n/g, '<br/>')
 }
 
 function OracleEye({ size = 16, pulse = false }: { size?: number; pulse?: boolean }) {
@@ -442,7 +460,45 @@ export function OracleSheet() {
       const data = (await res.json()) as ClassifyResult
       setResult(data)
 
-      if (data.intent === 'TASK' && data.task) {
+      if (data.intent === 'COMPLETED_ACTIVITY' && data.completed_task) {
+        const ct = data.completed_task
+        // Create task
+        const createRes = await fetch('/api/quests/tasks', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId,
+            dimension: ct.dimension ?? 'vitality',
+            title: ct.title,
+            xpReward: ct.xpReward ?? 50,
+            taskDate: ct.date,
+          }),
+        })
+        const created = (await createRes.json()) as { task?: { id: string } }
+        const taskId = created.task?.id
+        if (taskId) {
+          // Immediately mark complete to award XP
+          await fetch(`/api/quests/tasks/${taskId}/complete`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId }),
+          })
+        }
+        // Reuse task-done state, but put the completed_task into result.task shape
+        setResult({
+          ...data,
+          task: {
+            title: ct.title,
+            dimension: ct.dimension,
+            date: ct.date,
+            questId: null,
+            milestoneId: null,
+            xpReward: ct.xpReward ?? 50,
+          },
+        })
+        window.dispatchEvent(new CustomEvent('protagonist:task-added'))
+        setState('activity-done')
+      } else if (data.intent === 'TASK' && data.task) {
         const taskRes = await fetch('/api/quests/tasks', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -613,19 +669,21 @@ export function OracleSheet() {
                 ? 'morning briefing ready'
                 : state === 'task-done'
                   ? `saved · ${result?.task?.dimension ? dimensionLabel(result.task.dimension) : ''}`
-                  : state === 'note-done'
-                    ? 'reflecting on your note...'
-                    : state === 'calendar-confirm'
-                      ? 'confirm calendar event'
-                      : state === 'calendar-update-confirm'
-                        ? 'confirm reschedule'
-                        : state === 'calendar-delete-confirm'
-                          ? 'confirm cancellation'
-                          : state === 'calendar-manage-done'
-                            ? 'calendar updated'
-                            : state === 'calendar-done'
+                  : state === 'activity-done'
+                    ? `logged & +${result?.task?.xpReward ?? 50} XP`
+                    : state === 'note-done'
+                      ? 'reflecting on your note...'
+                      : state === 'calendar-confirm'
+                        ? 'confirm calendar event'
+                        : state === 'calendar-update-confirm'
+                          ? 'confirm reschedule'
+                          : state === 'calendar-delete-confirm'
+                            ? 'confirm cancellation'
+                            : state === 'calendar-manage-done'
                               ? 'calendar updated'
-                              : 'speak, type, or drop an image'
+                              : state === 'calendar-done'
+                                ? 'calendar updated'
+                                : 'speak, type, or drop an image'
 
   return (
     <>
@@ -703,7 +761,9 @@ export function OracleSheet() {
                         ? 'Check-in complete'
                         : state === 'task-done'
                           ? 'Task added'
-                          : state === 'calendar-confirm'
+                          : state === 'activity-done'
+                            ? 'Activity logged ✓'
+                            : state === 'calendar-confirm'
                             ? 'Calendar event'
                             : state === 'calendar-update-confirm'
                               ? 'Reschedule event'
@@ -727,7 +787,7 @@ export function OracleSheet() {
                       ? '#9333EA'
                       : state === 'thinking' || state === 'checkin-thinking'
                         ? '#5A4A7A'
-                        : state === 'task-done'
+                        : state === 'task-done' || state === 'activity-done'
                           ? '#34d399'
                           : state === 'note-done'
                             ? '#C084FC'
@@ -1182,6 +1242,136 @@ export function OracleSheet() {
                   }}
                 >
                   Add another
+                </button>
+              </div>
+            </>
+          )}
+
+          {state === 'activity-done' && result?.task && (
+            <>
+              <div
+                style={{
+                  background: '#0D0820',
+                  borderRadius: 12,
+                  border: '0.5px solid #1A3A28',
+                  padding: '12px',
+                  marginBottom: 10,
+                }}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    marginBottom: 10,
+                  }}
+                >
+                  <span style={{ fontSize: 16 }}>✓</span>
+                  <div style={{ fontSize: 13, color: '#C0B0E0', fontWeight: 500 }}>
+                    {result.task.title}
+                  </div>
+                </div>
+                <div style={{ height: '0.5px', background: '#1E1040', marginBottom: 10 }} />
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                  {result.task.dimension && (
+                    <span
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 4,
+                        padding: '3px 8px',
+                        borderRadius: 6,
+                        fontSize: 10,
+                        background: `${dimensionColor(result.task.dimension)}1a`,
+                        border: `0.5px solid ${dimensionColor(result.task.dimension)}4d`,
+                        color: dimensionColor(result.task.dimension),
+                      }}
+                    >
+                      {dimensionLabel(result.task.dimension)}
+                    </span>
+                  )}
+                  <span
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 4,
+                      padding: '3px 8px',
+                      borderRadius: 6,
+                      fontSize: 10,
+                      background: 'rgba(52,211,153,.12)',
+                      border: '0.5px solid rgba(52,211,153,.3)',
+                      color: '#34d399',
+                      fontWeight: 600,
+                    }}
+                  >
+                    +{result.task.xpReward} XP earned
+                  </span>
+                </div>
+              </div>
+              {result.oracleReply && (
+                <div
+                  style={{
+                    background: '#1A0D35',
+                    border: '0.5px solid #2D1B55',
+                    borderLeft: '3px solid #9333EA',
+                    padding: '10px 12px',
+                    marginBottom: 8,
+                    borderRadius: '0 10px 10px 10px',
+                  }}
+                >
+                  <div style={{ fontSize: 10, color: '#9333EA', marginBottom: 4 }}>Oracle</div>
+                  <div
+                    style={{
+                      fontSize: 12,
+                      color: '#A090C0',
+                      fontStyle: 'italic',
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    {result.oracleReply}
+                  </div>
+                </div>
+              )}
+              <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setInputText('')
+                    setResult(null)
+                    setState('idle')
+                    setTimeout(() => inputRef.current?.focus(), 100)
+                  }}
+                  style={{
+                    flex: 1,
+                    height: 44,
+                    borderRadius: 10,
+                    background: '#1E0D40',
+                    border: '0.5px solid #2D1B55',
+                    color: '#7A5FA0',
+                    fontSize: 12,
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                  }}
+                >
+                  Log another
+                </button>
+                <button
+                  type="button"
+                  onClick={close}
+                  style={{
+                    flex: 2,
+                    height: 44,
+                    borderRadius: 10,
+                    background: '#9333EA',
+                    border: 'none',
+                    color: 'white',
+                    fontSize: 12,
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                  }}
+                >
+                  Keep going ›
                 </button>
               </div>
             </>
@@ -1653,9 +1843,8 @@ export function OracleSheet() {
                       fontStyle: 'italic',
                       lineHeight: 1.5,
                     }}
-                  >
-                    {checkinResult.oracle_message}
-                  </div>
+                    dangerouslySetInnerHTML={{ __html: renderMarkdown(checkinResult.oracle_message) }}
+                  />
                 </div>
               </div>
 
@@ -1779,9 +1968,8 @@ export function OracleSheet() {
                       fontStyle: 'italic',
                       lineHeight: 1.5,
                     }}
-                  >
-                    {result.oracleReply}
-                  </div>
+                    dangerouslySetInnerHTML={{ __html: renderMarkdown(result.oracleReply) }}
+                  />
                 </div>
               )}
               <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
@@ -1863,8 +2051,13 @@ export function OracleSheet() {
                         color: '#E8E0F0',
                         lineHeight: 1.55,
                       }}
+                      dangerouslySetInnerHTML={
+                        msg.role === 'oracle'
+                          ? { __html: renderMarkdown(msg.text) }
+                          : undefined
+                      }
                     >
-                      {msg.text}
+                      {msg.role === 'user' ? msg.text : null}
                     </div>
                   </div>
                 ))}

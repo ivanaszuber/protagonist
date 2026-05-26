@@ -91,14 +91,22 @@ The user's calendar events (today + tomorrow):
 ${calendarContext}
 
 Classify this input into one of these intents:
-1. TASK — ALWAYS use this if the message starts with or contains "add task", "add a task", "new task", "create task", "remind me to", "I need to", "don't forget", "book", "schedule", "prep", or any clear action item the user wants to track. When in doubt between TASK and CHAT, choose TASK.
-2. NOTE — user is journaling, reflecting, or sharing feelings (emotional, reflective, no clear action item)
-3. LEGEND — user is defining or confirming their long-term Legend (one-sentence life vision) for a character dimension. Use when they confirm a final legend sentence or say "save this as my legend".
-4. BOSS — user wants to create or restart a boss battle (keywords: boss battle, boss fight, attack moves, slay the boss, hunt it down)
-5. CALENDAR_CREATE — user wants to create, schedule, block, or add a new calendar event or appointment. Keywords: "block", "schedule", "add to calendar", "book time", "create event", "put in my calendar", "add a meeting", "add an appointment". Only when clearly creating a new event, not viewing existing ones.
-6. CALENDAR_UPDATE — user wants to reschedule, move, or change the time/date of an existing calendar event. Keywords: "move", "reschedule", "push", "change time", "shift", "postpone". Only use when clearly referring to an existing event that appears in the calendar context above.
-7. CALENDAR_DELETE — user wants to cancel or delete an existing calendar event. Keywords: "cancel", "delete", "remove", "drop", "skip". Only use when clearly referring to an existing event that appears in the calendar context above.
-8. CHAT — questions, advice, open conversation. Never use CHAT if there's a clear action item. Use CHAT if the user wants to update/delete an event but no matching event exists in the calendar context.
+1. TASK — ALWAYS use this if the message starts with or contains "add task", "add a task", "new task", "create task", "remind me to", "I need to", "don't forget", "book", "schedule", "prep", or any clear action item the user WANTS TO DO in the future. When in doubt between TASK and CHAT, choose TASK.
+2. COMPLETED_ACTIVITY — user is reporting something they ALREADY DID. Keywords: "I just", "I did", "I went", "I had", "I finished", "I completed", "I got", "just done", "just had", "already did", "did my", "went for", "went to", "trained", "ran", "walked", "ate", "cooked", "read", "meditated", "worked on". The activity has ALREADY HAPPENED — use this instead of TASK. Do NOT use COMPLETED_ACTIVITY if the user says "remind me" or "I need to" (those are future tasks).
+3. NOTE — user is journaling, reflecting, or sharing feelings (emotional, reflective, no clear action item and no concrete activity completed)
+4. LEGEND — user is defining or confirming their long-term Legend (one-sentence life vision) for a character dimension. Use when they confirm a final legend sentence or say "save this as my legend".
+5. BOSS — user wants to create or restart a boss battle (keywords: boss battle, boss fight, attack moves, slay the boss, hunt it down)
+6. CALENDAR_CREATE — user wants to create, schedule, block, or add a new calendar event or appointment. Keywords: "block", "schedule", "add to calendar", "book time", "create event", "put in my calendar", "add a meeting", "add an appointment". Only when clearly creating a new event, not viewing existing ones.
+7. CALENDAR_UPDATE — user wants to reschedule, move, or change the time/date of an existing calendar event. Keywords: "move", "reschedule", "push", "change time", "shift", "postpone". Only use when clearly referring to an existing event that appears in the calendar context above.
+8. CALENDAR_DELETE — user wants to cancel or delete an existing calendar event. Keywords: "cancel", "delete", "remove", "drop", "skip". Only use when clearly referring to an existing event that appears in the calendar context above.
+9. CHAT — questions, advice, open conversation. Never use CHAT if there's a clear action item. Use CHAT if the user wants to update/delete an event but no matching event exists in the calendar context.
+
+For COMPLETED_ACTIVITY, extract the same fields as TASK but put them in "completed_task":
+- title: clean activity title (e.g. "20 minute walk", "Gym session", "Read 30 minutes")
+- dimension: one of "career", "social", "wealth", "vitality", "mind", "love", "family" — infer from context (walks/gym/food → vitality, reading/study → mind, etc.)
+- date: today "${today}" always (it was done today)
+- xpReward: 25 for tiny/quick, 50 for standard, 100 for hard/long efforts
+The oracleReply should celebrate the win, be warm and brief (1-2 sentences).
 
 For TASK, extract:
 - title: clean task title (remove filler words like "add task" or "remind me to")
@@ -148,7 +156,13 @@ For CALENDAR_DELETE, extract:
 
 Respond ONLY with valid JSON, no explanation:
 {
-  "intent": "TASK" | "NOTE" | "LEGEND" | "BOSS" | "CALENDAR_CREATE" | "CALENDAR_UPDATE" | "CALENDAR_DELETE" | "CHAT",
+  "intent": "TASK" | "COMPLETED_ACTIVITY" | "NOTE" | "LEGEND" | "BOSS" | "CALENDAR_CREATE" | "CALENDAR_UPDATE" | "CALENDAR_DELETE" | "CHAT",
+  "completed_task": {
+    "title": "...",
+    "dimension": "career" | "social" | "wealth" | "vitality" | "mind" | "love" | "family" | null,
+    "date": "YYYY-MM-DD",
+    "xpReward": 50
+  } | null,
   "task": {
     "title": "...",
     "dimension": "career" | "social" | "wealth" | "vitality" | "mind" | "love" | "family" | null,
