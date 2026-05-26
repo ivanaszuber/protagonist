@@ -543,6 +543,7 @@ export function CharacterPage({ dimension }: CharacterPageProps) {
         <LegendCard
           characterName={char.name}
           dimensionLabel={char.categoryLabel}
+          dimension={dimension}
           vision={quest?.vision ?? null}
           accentColor={accentColor}
         />

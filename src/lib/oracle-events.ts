@@ -1,6 +1,6 @@
 export function openOracle(
   prefill?: string,
-  context?: 'morning_checkin'
+  context?: string
 ): void {
   window.dispatchEvent(
     new CustomEvent('protagonist:open-oracle', {

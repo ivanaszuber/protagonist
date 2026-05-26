@@ -187,9 +187,12 @@ export function OracleSheet() {
   const [vaultUpdatedTotal, setVaultUpdatedTotal] = useState<number | null>(null)
   const [morningContext, setMorningContext] = useState<MorningContext | null>(null)
   const [checkinResult, setCheckinResult] = useState<MorningCheckinResult | null>(null)
+  const [legendDimension, setLegendDimension] = useState<string | null>(null)
+  const [chatVoiceActive, setChatVoiceActive] = useState(false)
   const recognitionRef = useRef<SpeechRecognition | null>(null)
   const checkinModeRef = useRef(false)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const chatEndRef = useRef<HTMLDivElement>(null)
 
   const hideFab = pathname === '/oracle'
   const prevStateRef = useRef<SheetState>('closed')
@@ -222,12 +225,28 @@ export function OracleSheet() {
       const detail = (e as CustomEvent<{ prefill?: string; context?: string }>).detail
       setCheckinResult(null)
       setMorningContext(null)
-      setInputText(detail?.prefill ?? '')
+      setChatVoiceActive(false)
       if (detail?.context === 'morning_checkin') {
+        setInputText(detail?.prefill ?? '')
+        setLegendDimension(null)
         checkinModeRef.current = true
         setState('checkin-loading')
         void loadMorningContext()
+      } else if (
+        detail?.context?.startsWith('legend:') ||
+        detail?.context?.startsWith('legend-edit:')
+      ) {
+        // Legend creation/edit mode — bypass classify, save vision directly
+        const parts = detail.context.split(':')
+        const dim = parts[1] ?? ''
+        setLegendDimension(dim)
+        setInputText('')
+        checkinModeRef.current = false
+        setState('idle')
+        setTimeout(() => inputRef.current?.focus(), 100)
       } else {
+        setInputText(detail?.prefill ?? '')
+        setLegendDimension(null)
         checkinModeRef.current = false
         setState('idle')
         setTimeout(() => inputRef.current?.focus(), 100)
@@ -243,6 +262,8 @@ export function OracleSheet() {
     setInputText('')
     setResult(null)
     setChatMessages([])
+    setLegendDimension(null)
+    setChatVoiceActive(false)
     setCalendarInsufficientScope(false)
     setCalendarDoneTitle('')
     setCalendarManaging(false)
@@ -413,6 +434,59 @@ export function OracleSheet() {
     recognitionRef.current = null
   }, [])
 
+  const startChatVoice = useCallback(() => {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition
+    if (!SR) return
+    const rec = new SR()
+    rec.continuous = true
+    rec.interimResults = true
+    rec.lang = 'en-GB'
+    recognitionRef.current = rec
+    setChatVoiceActive(true)
+    setInputText('')
+
+    rec.onresult = (e: SpeechRecognitionEvent) => {
+      let transcript = ''
+      for (let i = 0; i < e.results.length; i++) {
+        transcript += e.results[i][0].transcript
+      }
+      setInputText(transcript)
+    }
+
+    rec.onerror = () => {
+      setChatVoiceActive(false)
+    }
+
+    rec.onend = () => {
+      setChatVoiceActive((active) => {
+        if (active) {
+          try {
+            rec.start()
+          } catch {
+            return false
+          }
+          return true
+        }
+        return false
+      })
+    }
+
+    rec.start()
+  }, [])
+
+  const stopChatVoice = useCallback(() => {
+    setChatVoiceActive(false)
+    recognitionRef.current?.stop()
+    recognitionRef.current = null
+  }, [])
+
+  // Auto-scroll chat to bottom when new messages arrive
+  useEffect(() => {
+    if (state === 'chat') {
+      setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
+    }
+  }, [chatMessages, state])
+
   const handleCheckinSubmit = useCallback(async () => {
     const text = inputText.trim()
     if (!text) return
@@ -456,6 +530,37 @@ export function OracleSheet() {
   const handleSubmit = useCallback(async () => {
     const text = inputText.trim()
     if (!text || isSubmitting) return
+
+    // Clear input immediately so it doesn't linger while Oracle thinks
+    setInputText('')
+
+    // Legend mode: skip classify, save vision directly
+    if (legendDimension) {
+      setIsSubmitting(true)
+      setState('thinking')
+      try {
+        await fetch('/api/quests/vision', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, dimension: legendDimension, vision: text }),
+        })
+        const dimChar = CHARACTERS[legendDimension as Dimension]
+        const charName = dimChar?.name ?? legendDimension
+        setResult({
+          intent: 'LEGEND',
+          task: null,
+          note: null,
+          legend: { dimension: legendDimension, vision: text },
+          oracleReply: `Your Legend is set, ${charName}: "${text}" — that's the mountain you're climbing.`,
+        })
+        setLegendDimension(null)
+        window.dispatchEvent(new CustomEvent('protagonist:quest-updated'))
+        setState('note-done')
+      } finally {
+        setIsSubmitting(false)
+      }
+      return
+    }
 
     const inChat = state === 'chat'
     setIsSubmitting(true)
@@ -617,13 +722,11 @@ export function OracleSheet() {
         // CHAT intent — works whether starting fresh or already mid-conversation
         if (inChat) {
           setChatMessages((prev) => [...prev, { role: 'user', text }])
-          setInputText('')
           const reply = await sendChatToArc(text)
           setChatMessages((prev) => [...prev, { role: 'oracle', text: reply }])
         } else {
           const reply = data.oracleReply ?? (await sendChatToArc(text))
           setChatMessages([{ role: 'user', text }, { role: 'oracle', text: reply }])
-          setInputText('')
           setState('chat')
         }
       }
@@ -632,7 +735,7 @@ export function OracleSheet() {
     } finally {
       setIsSubmitting(false)
     }
-  }, [inputText, userId, state, sendChatToArc, isSubmitting])
+  }, [inputText, legendDimension, userId, state, sendChatToArc, isSubmitting])
 
   if (state === 'closed') {
     if (hideFab) return null
@@ -1011,6 +1114,26 @@ export function OracleSheet() {
 
           {(state === 'idle' || state === 'recording' || state === 'thinking') && (
             <>
+              {legendDimension && (
+                <div
+                  style={{
+                    background: 'rgba(147,51,234,0.08)',
+                    border: '0.5px solid rgba(147,51,234,0.3)',
+                    borderRadius: 10,
+                    padding: '10px 12px',
+                    marginBottom: 10,
+                  }}
+                >
+                  <div style={{ fontSize: 10, color: '#9333EA', marginBottom: 3, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                    🔮 Define your Legend
+                  </div>
+                  <div style={{ fontSize: 12, color: '#C084FC', lineHeight: 1.5 }}>
+                    {CHARACTERS[legendDimension as Dimension]
+                      ? `Who will ${CHARACTERS[legendDimension as Dimension].name} become? Write your vision in one powerful sentence.`
+                      : 'Write your vision in one powerful sentence.'}
+                  </div>
+                </div>
+              )}
               <div
                 style={{
                   background: '#0D0820',
@@ -2127,7 +2250,7 @@ export function OracleSheet() {
             <>
               <div
                 style={{
-                  maxHeight: 240,
+                  maxHeight: '52vh',
                   overflowY: 'auto',
                   marginBottom: 8,
                   display: 'flex',
@@ -2165,8 +2288,83 @@ export function OracleSheet() {
                     </div>
                   </div>
                 ))}
+                <div ref={chatEndRef} />
               </div>
+              {chatVoiceActive && (
+                <div
+                  style={{
+                    background: '#0D0820',
+                    border: '0.5px solid #9333EA',
+                    borderRadius: 10,
+                    padding: '8px 12px',
+                    marginBottom: 6,
+                    fontSize: 12,
+                    color: inputText ? '#C0B0E0' : '#5A4A7A',
+                    fontStyle: inputText ? 'normal' : 'italic',
+                    minHeight: 32,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                  }}
+                >
+                  <span
+                    style={{
+                      width: 6,
+                      height: 6,
+                      borderRadius: '50%',
+                      background: '#9333EA',
+                      flexShrink: 0,
+                      animation: 'oracle-cursor-blink 1s step-end infinite',
+                    }}
+                  />
+                  {inputText || 'Listening...'}
+                </div>
+              )}
               <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+                <button
+                  type="button"
+                  onClick={chatVoiceActive ? stopChatVoice : startChatVoice}
+                  style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: '50%',
+                    background: chatVoiceActive ? '#9333EA' : '#1E0D40',
+                    border: `0.5px solid ${chatVoiceActive ? '#9333EA' : '#2D1B55'}`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    flexShrink: 0,
+                  }}
+                  aria-label={chatVoiceActive ? 'Stop recording' : 'Voice input'}
+                >
+                  <svg width="16" height="16" viewBox="0 0 14 14" fill="none">
+                    <rect
+                      x="4.5"
+                      y="1"
+                      width="5"
+                      height="8"
+                      rx="2.5"
+                      stroke={chatVoiceActive ? 'white' : '#9333EA'}
+                      strokeWidth="1.2"
+                    />
+                    <path
+                      d="M2 7.5c0 2.8 2.2 5 5 5s5-2.2 5-5"
+                      stroke={chatVoiceActive ? 'white' : '#9333EA'}
+                      strokeWidth="1.2"
+                      strokeLinecap="round"
+                    />
+                    <line
+                      x1="7"
+                      y1="12.5"
+                      x2="7"
+                      y2="14"
+                      stroke={chatVoiceActive ? 'white' : '#9333EA'}
+                      strokeWidth="1.2"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                </button>
                 <textarea
                   value={inputText}
                   onChange={(e) => setInputText(e.target.value)}

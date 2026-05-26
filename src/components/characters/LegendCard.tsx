@@ -5,6 +5,7 @@ import { openOracle } from '@/lib/oracle-events'
 interface LegendCardProps {
   characterName: string
   dimensionLabel: string
+  dimension: string
   vision: string | null
   accentColor: string
 }
@@ -12,21 +13,18 @@ interface LegendCardProps {
 export function LegendCard({
   characterName,
   dimensionLabel,
+  dimension,
   vision,
   accentColor,
 }: LegendCardProps) {
   const hasLegend = Boolean(vision?.trim())
 
   function handleDefine() {
-    openOracle(
-      `Let's define my Legend for ${characterName}. This is my long-term vision for ${dimensionLabel} — who I want to become. Ask me questions and help me write a one-sentence legend.`
-    )
+    openOracle(undefined, `legend:${dimension}`)
   }
 
   function handleEdit() {
-    openOracle(
-      `I want to update my Legend for ${characterName}. Currently it says: ${vision ?? ''}. Help me refine it.`
-    )
+    openOracle(undefined, `legend-edit:${dimension}`)
   }
 
   return (
