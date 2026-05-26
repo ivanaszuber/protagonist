@@ -308,6 +308,13 @@ export default function DashboardPage() {
     const uid = userIdRef.current
     setVitalityLoading(true)
 
+    // Sync Oura first so vitality reads fresh data (cycle phase, scores)
+    await fetch('/api/oura/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: uid }),
+    }).catch(() => {/* not connected or failed — continue anyway */})
+
     const [vitalityRes, questsRes, calRes, checkInRes] = await Promise.allSettled([
       fetch(`/api/dashboard/vitality?userId=${encodeURIComponent(uid)}`).then((r) => r.json()),
       fetch(`/api/quests/main?userId=${encodeURIComponent(uid)}`).then((r) => r.json()),

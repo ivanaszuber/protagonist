@@ -72,6 +72,16 @@ function MenuDrawer({ open, onClose }: MenuDrawerProps) {
       onClick: () => {
         if (!ouraConnected) {
           window.location.href = `/api/oura/connect?userId=${encodeURIComponent(userId)}`
+        } else {
+          // Trigger a fresh sync and close the drawer
+          void fetch('/api/oura/sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId }),
+          }).then(() => {
+            onClose()
+            window.dispatchEvent(new CustomEvent('protagonist:oracle-closed'))
+          })
         }
       },
       right:
@@ -87,7 +97,7 @@ function MenuDrawer({ open, onClose }: MenuDrawerProps) {
               borderRadius: 6,
             }}
           >
-            Connected ✓
+            Sync ↺
           </span>
         ) : (
           <span

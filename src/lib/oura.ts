@@ -331,6 +331,36 @@ export async function fetchOuraDailyData(
     }
   }
 
+  // Oura may not have today's cycle phase yet — look back up to 7 days
+  if (result.cycle_phase === null) {
+    try {
+      const weekAgo = new Date(Date.now() - 7 * 86_400_000).toISOString().split('T')[0]
+      const yesterday = new Date(Date.now() - 86_400_000).toISOString().split('T')[0]
+      const cycleRangeRes = await fetch(
+        `${OURA_BASE}/usercollection/daily_cycle_insights?start_date=${weekAgo}&end_date=${yesterday}`,
+        { headers }
+      )
+      if (cycleRangeRes.ok) {
+        const rangeData = await cycleRangeRes.json()
+        const entries = (rangeData.data ?? []) as Array<{
+          cycle_day?: number | null
+          current_phase?: string | null
+          cycle_phase?: string | null
+        }>
+        // Most recent entry first
+        const recent = [...entries].reverse().find(
+          (e) => (e.current_phase ?? e.cycle_phase) != null
+        )
+        if (recent) {
+          result.cycle_day = recent.cycle_day ?? null
+          result.cycle_phase = recent.current_phase ?? recent.cycle_phase ?? null
+        }
+      }
+    } catch {
+      // fallback failed — leave as null
+    }
+  }
+
   return result
 }
 
