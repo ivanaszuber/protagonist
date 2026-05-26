@@ -450,6 +450,18 @@ export function MainQuestsSection({
                             >
                               ⚡ Focused
                             </span>
+                          ) : m.task_total > 0 ? (
+                            <span
+                              style={{
+                                fontSize: 9,
+                                padding: '2px 6px',
+                                borderRadius: 4,
+                                background: 'rgba(52,211,153,0.12)',
+                                color: '#34d399',
+                              }}
+                            >
+                              In Progress
+                            </span>
                           ) : (
                             <span
                               style={{
