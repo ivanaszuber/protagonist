@@ -1,6 +1,6 @@
 'use client'
 
-import { openOracle } from '@/lib/oracle-events'
+import { useState } from 'react'
 
 export interface MainQuestMilestone {
   id: string
@@ -17,6 +17,9 @@ interface MainQuestsSectionProps {
   dimensionLabel: string
   milestones: MainQuestMilestone[]
   accentColor: string
+  questId?: string
+  userId?: string
+  onAdd?: (m: MainQuestMilestone) => void
   onDelete?: (milestoneId: string) => void
 }
 
@@ -26,25 +29,45 @@ function daysUntil(dateStr: string | null): number {
 }
 
 export function MainQuestsSection({
-  characterName,
-  dimensionLabel,
   milestones,
   accentColor,
+  questId,
+  userId,
+  onAdd,
   onDelete,
 }: MainQuestsSectionProps) {
+  const [showForm, setShowForm] = useState(false)
+  const [formTitle, setFormTitle] = useState('')
+  const [formDate, setFormDate] = useState('')
+  const [saving, setSaving] = useState(false)
+
   const incomplete = milestones.filter((m) => !m.completed)
   const activeId = incomplete[0]?.id
 
-  function handleAdd() {
-    openOracle(
-      `I want to add a new milestone for ${characterName} — ${dimensionLabel}. Help me define a clear, specific goal with a realistic target date.`
-    )
+  function closeForm() {
+    setShowForm(false)
+    setFormTitle('')
+    setFormDate('')
   }
 
-  function handleEdit(m: MainQuestMilestone) {
-    openOracle(
-      `I want to edit a milestone for ${characterName} — ${dimensionLabel}. The current milestone is: "${m.title}"${m.target_date ? ` (target: ${m.target_date})` : ''}. Help me update the title or target date.`
-    )
+  async function handleSave() {
+    const title = formTitle.trim()
+    if (!title || !questId || !userId || saving) return
+    setSaving(true)
+    try {
+      const res = await fetch('/api/quests/milestones', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, questId, title, targetDate: formDate || null }),
+      })
+      const data = (await res.json()) as { milestone?: MainQuestMilestone }
+      if (res.ok && data.milestone) {
+        onAdd?.({ ...data.milestone, progress_percent: 0, task_total: 0 })
+        closeForm()
+      }
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -60,23 +83,118 @@ export function MainQuestsSection({
         <span style={{ fontSize: 11, fontWeight: 600, color: '#9B8EC4', letterSpacing: '0.06em' }}>
           Milestones
         </span>
-        <button
-          type="button"
-          onClick={handleAdd}
-          style={{
-            background: 'transparent',
-            border: 'none',
-            fontSize: 11,
-            color: accentColor,
-            cursor: 'pointer',
-            padding: 0,
-          }}
-        >
-          + Add ↗
-        </button>
+        {!showForm && (
+          <button
+            type="button"
+            onClick={() => setShowForm(true)}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              fontSize: 11,
+              color: accentColor,
+              cursor: 'pointer',
+              padding: 0,
+            }}
+          >
+            + Add
+          </button>
+        )}
       </div>
 
-      {incomplete.length === 0 ? (
+      {/* Inline add form */}
+      {showForm && (
+        <div
+          style={{
+            background: '#140C28',
+            borderRadius: 12,
+            border: `0.5px solid ${accentColor}55`,
+            padding: '12px 14px',
+            marginBottom: 10,
+          }}
+        >
+          <input
+            autoFocus
+            type="text"
+            placeholder="e.g. Build £50k portfolio by Aug 2026"
+            value={formTitle}
+            onChange={(e) => setFormTitle(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') void handleSave()
+              if (e.key === 'Escape') closeForm()
+            }}
+            style={{
+              width: '100%',
+              background: '#0D0820',
+              border: '0.5px solid #2D1B55',
+              borderRadius: 8,
+              padding: '8px 10px',
+              fontSize: 13,
+              color: '#E8E0F0',
+              outline: 'none',
+              marginBottom: 8,
+              boxSizing: 'border-box',
+              fontFamily: 'inherit',
+            }}
+          />
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <input
+              type="date"
+              value={formDate}
+              onChange={(e) => setFormDate(e.target.value)}
+              style={{
+                flex: 1,
+                background: '#0D0820',
+                border: '0.5px solid #2D1B55',
+                borderRadius: 8,
+                padding: '7px 10px',
+                fontSize: 12,
+                color: formDate ? '#E8E0F0' : '#5A4A7A',
+                outline: 'none',
+                fontFamily: 'inherit',
+                colorScheme: 'dark',
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => void handleSave()}
+              disabled={!formTitle.trim() || saving}
+              style={{
+                background: accentColor,
+                border: 'none',
+                borderRadius: 8,
+                padding: '7px 18px',
+                fontSize: 12,
+                fontWeight: 600,
+                color: '#0D0820',
+                cursor: formTitle.trim() && !saving ? 'pointer' : 'default',
+                opacity: formTitle.trim() && !saving ? 1 : 0.4,
+                fontFamily: 'inherit',
+                flexShrink: 0,
+              }}
+            >
+              {saving ? '…' : 'Save'}
+            </button>
+            <button
+              type="button"
+              onClick={closeForm}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                fontSize: 18,
+                color: '#3D2878',
+                cursor: 'pointer',
+                padding: '0 2px',
+                lineHeight: 1,
+                flexShrink: 0,
+              }}
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
+
+      {incomplete.length === 0 && !showForm ? (
         <p style={{ fontSize: 11, color: '#3D3358' }}>No milestones yet.</p>
       ) : (
         incomplete.map((m) => {
@@ -168,42 +286,25 @@ export function MainQuestsSection({
                   )}
                 </div>
 
-                {/* Edit + Delete actions */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                {onDelete && (
                   <button
                     type="button"
-                    onClick={() => handleEdit(m)}
-                    aria-label="Edit quest"
+                    onClick={() => onDelete(m.id)}
+                    aria-label="Delete milestone"
                     style={{
                       background: 'transparent',
                       border: 'none',
-                      fontSize: 10,
-                      color: '#3D2878',
+                      color: '#2D1B55',
+                      fontSize: 16,
+                      lineHeight: 1,
                       cursor: 'pointer',
-                      padding: '2px 4px',
+                      padding: '0 2px',
+                      flexShrink: 0,
                     }}
                   >
-                    Edit ↗
+                    ×
                   </button>
-                  {onDelete && (
-                    <button
-                      type="button"
-                      onClick={() => onDelete(m.id)}
-                      aria-label="Delete quest"
-                      style={{
-                        background: 'transparent',
-                        border: 'none',
-                        color: '#2D1B55',
-                        fontSize: 16,
-                        lineHeight: 1,
-                        cursor: 'pointer',
-                        padding: '0 2px',
-                      }}
-                    >
-                      ×
-                    </button>
-                  )}
-                </div>
+                )}
               </div>
             </div>
           )

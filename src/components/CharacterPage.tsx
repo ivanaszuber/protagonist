@@ -562,6 +562,13 @@ export function CharacterPage({ dimension }: CharacterPageProps) {
             dimensionLabel={char.categoryLabel}
             milestones={quest.milestones}
             accentColor={accentColor}
+            questId={quest.id}
+            userId={getUserId()}
+            onAdd={(m) =>
+              setQuest((prev) =>
+                prev ? { ...prev, milestones: [...prev.milestones, m] } : prev
+              )
+            }
             onDelete={(id) => void deleteMilestone(id)}
           />
         )}
