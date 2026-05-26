@@ -25,7 +25,8 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  const today = new Date().toISOString().split('T')[0]
+  const dateParam = searchParams.get('date')
+  const today = dateParam ?? new Date().toISOString().split('T')[0]
 
   const enriched = await Promise.all(
     (quests ?? []).map(async (quest) => {

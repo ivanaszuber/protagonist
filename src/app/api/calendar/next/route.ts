@@ -14,7 +14,8 @@ export async function GET(request: Request) {
     return limitParam ? NextResponse.json({ events: [] }) : NextResponse.json({ event: null })
   }
 
-  const today = new Date().toISOString().split('T')[0]
+  const dateParam = searchParams.get('date')
+  const today = dateParam ?? new Date().toISOString().split('T')[0]
 
   if (limitParam) {
     const rows = await getCalendarEvents(userId, today)
@@ -23,6 +24,7 @@ export async function GET(request: Request) {
       id: String(row.id ?? row.google_event_id ?? row.title),
       title: String(row.title ?? 'Event'),
       start: String(row.start_time ?? ''),
+      end: String(row.end_time ?? ''),
     }))
     return NextResponse.json({ events })
   }

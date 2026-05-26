@@ -59,6 +59,7 @@ interface CalendarEventRow {
   id: string
   title: string
   start: string
+  end: string
 }
 
 interface TodayItem {
@@ -66,6 +67,7 @@ interface TodayItem {
   type: 'task' | 'event'
   title: string
   time: string | null
+  timeEnd: string | null
   dimension: Dimension | null
   completed: boolean
   xp_reward: number
@@ -195,6 +197,24 @@ function formatTimeFromIso(iso: string): string {
   return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
 }
 
+function formatTimeRange(start: string, end: string): string {
+  const s = formatTimeFromIso(start)
+  const e = formatTimeFromIso(end)
+  if (!s) return ''
+  if (!e || e === s) return s
+  return `${s}–${e}`
+}
+
+function toDateStr(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+function getWeekStart(d: Date): Date {
+  const day = new Date(d)
+  day.setDate(d.getDate() - d.getDay()) // Sunday
+  return day
+}
+
 function formatMoodTimestamp(iso: string): string {
   const logged = new Date(iso)
   const now = new Date()
@@ -268,6 +288,7 @@ const ghostButtonStyle: CSSProperties = {
 export default function DashboardPage() {
   const router = useRouter()
   const userIdRef = useRef(getUserId())
+  const selectedDateRef = useRef(new Date())
 
   const [vitalityLoading, setVitalityLoading] = useState(true)
   const [vitality, setVitality] = useState<VitalityData | null>(null)
@@ -284,6 +305,15 @@ export default function DashboardPage() {
   const [levelUpToast, setLevelUpToast] = useState<LevelUpToast | null>(null)
   const [completingTaskId, setCompletingTaskId] = useState<string | null>(null)
   const [justCompletedIds, setJustCompletedIds] = useState<Set<string>>(new Set())
+  const todayDate = useMemo(() => new Date(), [])
+  const todayStr = useMemo(() => toDateStr(todayDate), [todayDate])
+  const [selectedDate, setSelectedDate] = useState<Date>(todayDate)
+  const [weekStart, setWeekStart] = useState<Date>(() => getWeekStart(new Date()))
+
+  const selectDate = useCallback((d: Date) => {
+    selectedDateRef.current = d
+    setSelectedDate(d)
+  }, [])
   const [verdictKey, setVerdictKey] = useState(0)
   const [showQuickAdd, setShowQuickAdd] = useState(false)
   const [quickAddTitle, setQuickAddTitle] = useState('')
@@ -295,7 +325,7 @@ export default function DashboardPage() {
   const [quickAddError, setQuickAddError] = useState('')
   const [quickAddLoading, setQuickAddLoading] = useState(false)
 
-  const refreshCalendarEvents = useCallback(async () => {
+  const refreshCalendarEvents = useCallback(async (dateStr?: string) => {
     const uid = userIdRef.current
     try {
       await fetch('/api/calendar/sync', {
@@ -303,8 +333,9 @@ export default function DashboardPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: uid }),
       })
+      const date = dateStr ?? toDateStr(new Date())
       const r = await fetch(
-        `/api/calendar/next?userId=${encodeURIComponent(uid)}&limit=10`
+        `/api/calendar/next?userId=${encodeURIComponent(uid)}&limit=20&date=${encodeURIComponent(date)}`
       )
       const d = (await r.json()) as { events?: CalendarEventRow[] }
       if (d.events) setEvents(d.events)
@@ -313,7 +344,7 @@ export default function DashboardPage() {
     }
   }, [])
 
-  const loadDashboard = useCallback(async () => {
+  const loadDashboard = useCallback(async (dateOverride?: string) => {
     const uid = userIdRef.current
     setVitalityLoading(true)
 
@@ -324,10 +355,12 @@ export default function DashboardPage() {
       body: JSON.stringify({ userId: uid }),
     }).catch(() => {/* not connected or failed — continue anyway */})
 
+    const dateStr = dateOverride ?? toDateStr(new Date())
+
     const [vitalityRes, questsRes, calRes, checkInRes] = await Promise.allSettled([
       fetch(`/api/dashboard/vitality?userId=${encodeURIComponent(uid)}`).then((r) => r.json()),
-      fetch(`/api/quests/main?userId=${encodeURIComponent(uid)}`).then((r) => r.json()),
-      fetch(`/api/calendar/next?userId=${encodeURIComponent(uid)}&limit=10`).then((r) =>
+      fetch(`/api/quests/main?userId=${encodeURIComponent(uid)}&date=${encodeURIComponent(dateStr)}`).then((r) => r.json()),
+      fetch(`/api/calendar/next?userId=${encodeURIComponent(uid)}&limit=20&date=${encodeURIComponent(dateStr)}`).then((r) =>
         r.json()
       ),
       fetch(`/api/checkin/today?userId=${encodeURIComponent(uid)}`).then((r) => r.json()),
@@ -371,8 +404,8 @@ export default function DashboardPage() {
   }, [])
 
   useEffect(() => {
-    void loadDashboard()
-  }, [loadDashboard])
+    void loadDashboard(toDateStr(selectedDate))
+  }, [loadDashboard, selectedDate])
 
   useEffect(() => {
     function onOracleClose() {
@@ -380,7 +413,7 @@ export default function DashboardPage() {
         .then((r) => r.json())
         .then((d: { hasCheckIn?: boolean }) => {
           setHasCheckedInToday(Boolean(d.hasCheckIn))
-          void loadDashboard()
+          void loadDashboard(toDateStr(selectedDateRef.current))
         })
     }
     window.addEventListener('protagonist:oracle-closed', onOracleClose)
@@ -453,7 +486,7 @@ export default function DashboardPage() {
       setQuickAddTime('')
       setQuickAddDuration(60)
       setShowQuickAdd(false)
-      void refreshCalendarEvents()
+      void refreshCalendarEvents(selectedDateStr)
     }
     setQuickAddLoading(false)
   }
@@ -490,6 +523,9 @@ export default function DashboardPage() {
   const hpTier = hpValue != null ? getHpTier(hpValue) : null
   const cycleLabel = formatCyclePhase(vitality?.cycle_phase ?? null, vitality?.cycle_day ?? null)
 
+  const selectedDateStr = useMemo(() => toDateStr(selectedDate), [selectedDate])
+  const isToday = selectedDateStr === todayStr
+
   const todayItems = useMemo(() => {
     const items: TodayItem[] = []
 
@@ -500,6 +536,7 @@ export default function DashboardPage() {
           type: 'task',
           title: task.title,
           time: null,
+          timeEnd: null,
           dimension: quest.dimension,
           completed: task.completed,
           xp_reward: task.xp_reward ?? 50,
@@ -514,6 +551,7 @@ export default function DashboardPage() {
         type: 'event',
         title: ev.title,
         time: formatTimeFromIso(ev.start),
+        timeEnd: formatTimeFromIso(ev.end),
         dimension: null,
         completed: false,
         xp_reward: 0,
@@ -960,43 +998,137 @@ export default function DashboardPage() {
 
       {/* Today */}
       <div style={{ marginBottom: 16 }}>
+        {/* Row 1: label + add button */}
         <div
           style={{
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            marginBottom: 10,
+            marginBottom: 8,
           }}
         >
-          <span style={{ fontSize: 13, fontWeight: 500, color: '#E8E0F0' }}>Today</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 11, color: '#5A4A7A' }}>
-              {new Date().toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric' })}
+          <span style={{ fontSize: 13, fontWeight: 500, color: '#E8E0F0' }}>
+            {isToday ? 'Today' : selectedDate.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' })}
+            <span style={{ fontSize: 10, fontWeight: 400, color: '#5A4A7A', marginLeft: 6 }}>
+              {isToday
+                ? selectedDate.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })
+                : ''}
             </span>
-            <button
-              type="button"
-              onClick={() => setShowQuickAdd((v) => !v)}
-              style={{
-                width: 24,
-                height: 24,
-                borderRadius: '50%',
-                background: '#1A0D40',
-                border: '0.5px solid #4A2080',
-                color: '#C084FC',
-                fontSize: 16,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-                lineHeight: 1,
-                padding: 0,
-                fontFamily: 'inherit',
-              }}
-              aria-label="Add calendar event"
-            >
-              +
-            </button>
+          </span>
+          <button
+            type="button"
+            onClick={() => setShowQuickAdd((v) => !v)}
+            style={{
+              width: 24,
+              height: 24,
+              borderRadius: '50%',
+              background: '#1A0D40',
+              border: '0.5px solid #4A2080',
+              color: '#C084FC',
+              fontSize: 16,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              lineHeight: 1,
+              padding: 0,
+              fontFamily: 'inherit',
+            }}
+            aria-label="Add calendar event"
+          >
+            +
+          </button>
+        </div>
+
+        {/* Row 2: ‹ week strip › */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 10 }}>
+          <button
+            type="button"
+            onClick={() => {
+              const prev = new Date(weekStart)
+              prev.setDate(prev.getDate() - 7)
+              setWeekStart(prev)
+            }}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: '#5A4A7A',
+              fontSize: 20,
+              cursor: 'pointer',
+              padding: '0 4px',
+              lineHeight: 1,
+              fontFamily: 'inherit',
+            }}
+            aria-label="Previous week"
+          >
+            ‹
+          </button>
+
+          <div style={{ display: 'flex', flex: 1, gap: 2 }}>
+            {Array.from({ length: 7 }, (_, i) => {
+              const d = new Date(weekStart)
+              d.setDate(d.getDate() + i)
+              const dStr = toDateStr(d)
+              const isSelected = dStr === selectedDateStr
+              const isTodayDay = dStr === todayStr
+              const dayLetter = d.toLocaleDateString('en-GB', { weekday: 'narrow' })
+              const dayNum = d.getDate()
+              return (
+                <button
+                  key={dStr}
+                  type="button"
+                  onClick={() => selectDate(new Date(d))}
+                  style={{
+                    flex: 1,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: 3,
+                    padding: '5px 0 6px',
+                    borderRadius: 8,
+                    background: isSelected ? '#2A1460' : 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                  }}
+                  aria-label={d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
+                  aria-pressed={isSelected}
+                >
+                  <span style={{ fontSize: 9, color: isSelected ? '#C084FC' : isTodayDay ? '#7A5FA0' : '#3D2878' }}>
+                    {dayLetter}
+                  </span>
+                  <span style={{ fontSize: 11, fontWeight: isSelected ? 500 : 400, color: isSelected ? '#E8E0F0' : isTodayDay ? '#7A5FA0' : '#5A4A7A' }}>
+                    {dayNum}
+                  </span>
+                  {isTodayDay && (
+                    <div style={{ width: 4, height: 4, borderRadius: '50%', background: isSelected ? '#A78BFA' : '#3D2070' }} />
+                  )}
+                </button>
+              )
+            })}
           </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              const next = new Date(weekStart)
+              next.setDate(next.getDate() + 7)
+              setWeekStart(next)
+            }}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: '#5A4A7A',
+              fontSize: 20,
+              cursor: 'pointer',
+              padding: '0 4px',
+              lineHeight: 1,
+              fontFamily: 'inherit',
+            }}
+            aria-label="Next week"
+          >
+            ›
+          </button>
         </div>
 
         {showQuickAdd && (
@@ -1148,14 +1280,17 @@ export default function DashboardPage() {
                 >
                   <span
                     style={{
-                      width: 34,
+                      width: 80,
                       flexShrink: 0,
                       fontSize: 9,
                       color: '#5A4A7A',
                       textAlign: 'right',
+                      whiteSpace: 'nowrap',
                     }}
                   >
-                    {item.time}
+                    {item.time && item.timeEnd && item.timeEnd !== item.time
+                      ? `${item.time}–${item.timeEnd}`
+                      : item.time}
                   </span>
                   <div
                     style={{
@@ -1212,7 +1347,7 @@ export default function DashboardPage() {
                     opacity: item.completed ? 0.4 : 1,
                   }}
                 >
-                  <span style={{ width: 34, flexShrink: 0 }} />
+                  <span style={{ width: 80, flexShrink: 0 }} />
                   <button
                     type="button"
                     onClick={(e) => {
