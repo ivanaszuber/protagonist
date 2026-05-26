@@ -90,7 +90,7 @@ const MOOD_OPTIONS = [
   { value: 1, border: '#ef4444', bg: '#3B0010' },
   { value: 2, border: '#fb923c', bg: '#3B1A0A' },
   { value: 3, border: '#fbbf24', bg: '#2A2500' },
-  { value: 4, border: '#4ade80', bg: '#0D2A10' },
+  { value: 4, border: '#34d399', bg: '#0D2A10' },
   { value: 5, border: '#a855f7', bg: '#1A0830' },
 ] as const
 
@@ -98,7 +98,7 @@ const MOOD_LABELS: Record<number, { text: string; color: string }> = {
   1: { text: 'Rough', color: '#ef4444' },
   2: { text: 'Low', color: '#fb923c' },
   3: { text: 'Okay', color: '#fbbf24' },
-  4: { text: 'Good', color: '#4ade80' },
+  4: { text: 'Good', color: '#34d399' },
   5: { text: 'Energised', color: '#a855f7' },
 }
 
@@ -684,40 +684,157 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Oracle verdict */}
-      <button
-        type="button"
-        onClick={() =>
-          openOracle('How should I approach today based on my readiness?')
-        }
+      {/* Oracle + Mood + Check-in unified card */}
+      <div
         style={{
-          width: '100%',
-          textAlign: 'left',
-          background: '#160C30',
-          border: '0.5px solid #3D2070',
-          borderRadius: 10,
-          padding: '10px 12px',
+          background: '#110828',
+          border: '0.5px solid #2D1B55',
+          borderRadius: 12,
+          overflow: 'hidden',
           marginBottom: 12,
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'flex-start',
-          gap: 8,
         }}
       >
-        <span style={{ fontSize: 14, flexShrink: 0 }}>🔮</span>
-        <span
-          key={verdictKey}
+        {/* Verdict row */}
+        <button
+          type="button"
+          onClick={() => openOracle('How should I approach today based on my readiness?')}
           style={{
-            fontSize: 12,
-            fontStyle: 'italic',
-            color: verdict.color,
-            lineHeight: 1.55,
-            animation: 'verdict-flash 0.3s ease-out',
+            width: '100%',
+            textAlign: 'left',
+            background: 'transparent',
+            border: 'none',
+            borderBottom: '0.5px solid #1E1040',
+            padding: '12px 14px',
+            cursor: 'pointer',
+            fontFamily: 'inherit',
           }}
         >
-          {verdict.text}
-        </span>
-      </button>
+          <div
+            style={{
+              fontSize: 8,
+              letterSpacing: '0.1em',
+              textTransform: 'uppercase',
+              color: '#3D2878',
+              fontWeight: 600,
+              marginBottom: 5,
+            }}
+          >
+            Today
+          </div>
+          <span
+            key={verdictKey}
+            style={{
+              fontSize: 12,
+              fontStyle: 'italic',
+              color: verdict.color,
+              lineHeight: 1.55,
+              animation: 'verdict-flash 0.3s ease-out',
+            }}
+          >
+            {verdict.text}
+          </span>
+        </button>
+
+        {/* Mood + Check-in row */}
+        <div style={{ padding: '11px 14px', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 10, color: '#5A4A7A', flexShrink: 0 }}>Mood</span>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            {MOOD_OPTIONS.map((m) => {
+              const selected = moodScore === m.value
+              return (
+                <button
+                  key={m.value}
+                  type="button"
+                  onClick={() => void handleMoodSelect(m.value)}
+                  style={{
+                    width: 26,
+                    height: 26,
+                    borderRadius: '50%',
+                    border: `1.5px solid ${m.border}`,
+                    background: m.bg,
+                    cursor: 'pointer',
+                    transform: selected ? 'scale(1.2)' : 'scale(1)',
+                    opacity: moodScore != null && !selected ? 0.4 : 1,
+                    boxShadow: selected ? `0 0 0 3px ${m.border}33` : 'none',
+                    transition: 'transform 0.15s, opacity 0.15s, box-shadow 0.15s',
+                    padding: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 9,
+                    fontWeight: 600,
+                    color: m.border,
+                    fontFamily: 'inherit',
+                  }}
+                  aria-label={`Mood ${m.value}`}
+                >
+                  {m.value}
+                </button>
+              )
+            })}
+          </div>
+          {moodScore != null && MOOD_LABELS[moodScore] && (
+            <span
+              key={moodScore}
+              style={{
+                fontSize: 10,
+                color: MOOD_LABELS[moodScore].color,
+                whiteSpace: 'nowrap',
+                animation: 'verdict-flash 0.3s ease-out',
+              }}
+            >
+              {MOOD_LABELS[moodScore].text}
+              {moodLoggedAt && (
+                <span style={{ color: '#3D2D55' }}> · {formatMoodTimestamp(moodLoggedAt)}</span>
+              )}
+            </span>
+          )}
+          {hasCheckedInToday ? (
+            <button
+              type="button"
+              onClick={() => void handleResetCheckin()}
+              title="Reset today's check-in"
+              style={{
+                marginLeft: 'auto',
+                padding: '6px 11px',
+                background: 'transparent',
+                border: '0.5px solid #2D1B55',
+                borderRadius: 20,
+                color: '#3D2878',
+                fontSize: 10,
+                fontWeight: 500,
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
+              }}
+            >
+              Checked in ✓
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => openOracle('Good morning', 'morning_checkin')}
+              style={{
+                marginLeft: 'auto',
+                padding: '6px 11px',
+                background: '#1A0D40',
+                border: '0.5px solid #4A2080',
+                borderRadius: 20,
+                color: '#A78BFA',
+                fontSize: 10,
+                fontWeight: 500,
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
+              }}
+            >
+              Check in
+            </button>
+          )}
+        </div>
+      </div>
 
       {witnessInsight && !witnessDismissed && (
         <div
@@ -803,133 +920,6 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Mood */}
-      <div style={{ marginBottom: 12 }}>
-        <span
-          style={{
-            fontSize: 10,
-            color: '#5A4A7A',
-            display: 'block',
-            marginBottom: 8,
-          }}
-        >
-          How do you feel?
-        </span>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          {MOOD_OPTIONS.map((m) => {
-            const selected = moodScore === m.value
-            return (
-              <button
-                key={m.value}
-                type="button"
-                onClick={() => void handleMoodSelect(m.value)}
-                style={{
-                  width: 28,
-                  height: 28,
-                  borderRadius: '50%',
-                  border: `2px solid ${m.border}`,
-                  background: m.bg,
-                  cursor: 'pointer',
-                  transform: selected ? 'scale(1.2)' : 'scale(1)',
-                  opacity: moodScore != null && !selected ? 0.45 : 1,
-                  boxShadow: selected ? `0 0 0 3px ${m.border}44` : 'none',
-                  transition: 'transform 0.15s, opacity 0.15s, box-shadow 0.15s',
-                  padding: 0,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: 10,
-                  fontWeight: 600,
-                  color: m.border,
-                  fontFamily: 'inherit',
-                }}
-                aria-label={`Mood ${m.value}`}
-              >
-                {m.value}
-              </button>
-            )
-          })}
-          {moodScore != null && MOOD_LABELS[moodScore] && (
-            <span
-              key={moodScore}
-              style={{
-                fontSize: 11,
-                fontWeight: 500,
-                color: MOOD_LABELS[moodScore].color,
-                marginLeft: 4,
-                animation: 'verdict-flash 0.3s ease-out',
-              }}
-            >
-              {MOOD_LABELS[moodScore].text}
-            </span>
-          )}
-          {moodLoggedAt && (
-            <span
-              style={{
-                marginLeft: 'auto',
-                fontSize: 9,
-                color: '#3D2D55',
-                flexShrink: 0,
-              }}
-            >
-              {formatMoodTimestamp(moodLoggedAt)}
-            </span>
-          )}
-        </div>
-      </div>
-
-      {/* Check-in */}
-      {hasCheckedInToday ? (
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 8,
-            marginBottom: 16,
-          }}
-        >
-          <p style={{ textAlign: 'center', fontSize: 11, color: '#34d399', margin: 0 }}>
-            Checked in today ✓
-          </p>
-          <button
-            type="button"
-            onClick={() => void handleResetCheckin()}
-            title="Reset today's check-in"
-            style={{
-              background: 'transparent',
-              border: '0.5px solid #2D1B55',
-              borderRadius: 6,
-              color: '#3D2D55',
-              fontSize: 10,
-              padding: '2px 6px',
-              cursor: 'pointer',
-              fontFamily: 'inherit',
-            }}
-          >
-            ↺
-          </button>
-        </div>
-      ) : (
-        <button
-          type="button"
-          onClick={() => openOracle('Good morning', 'morning_checkin')}
-          style={{
-            width: '100%',
-            padding: '12px 14px',
-            background: '#1A0D40',
-            border: '0.5px solid #4A2080',
-            borderRadius: 12,
-            color: '#C084FC',
-            fontSize: 13,
-            cursor: 'pointer',
-            marginBottom: 16,
-            fontFamily: 'inherit',
-          }}
-        >
-          🌅 Good morning — check in with Oracle
-        </button>
-      )}
 
       <div
         style={{
