@@ -110,12 +110,66 @@ export async function GET(
     .eq('dimension', dimension)
     .maybeSingle()
 
+  let computedXp = (xpRow?.xp as number) ?? 0
+
+  // Fallback: if quest_dimension_xp has no entry (or 0), sum from xp_log
+  // This handles users who completed tasks before quest_dimension_xp was wired up
+  if (computedXp === 0) {
+    const { data: logRows } = await supabase
+      .from('xp_log')
+      .select('xp_amount')
+      .eq('user_id', userId)
+      .eq('dimension', dimension)
+    const logTotal = (logRows ?? []).reduce(
+      (sum: number, r: { xp_amount: number }) => sum + ((r.xp_amount as number) ?? 0),
+      0
+    )
+    // Also add boss kill XP from boss_kills table (not in xp_log)
+    const { data: bossKillRows } = await supabase
+      .from('boss_kills')
+      .select('xp_awarded')
+      .eq('user_id', userId)
+      .eq('dimension', dimension)
+      .eq('outcome', 'slain')
+    const bossXp = (bossKillRows ?? []).reduce(
+      (sum: number, r: { xp_awarded: number }) => sum + ((r.xp_awarded as number) ?? 0),
+      0
+    )
+    // Also sum reward_xp from slain boss_battles not in boss_kills (legacy)
+    const { data: legacyBosses } = await supabase
+      .from('boss_battles')
+      .select('reward_xp, id')
+      .eq('user_id', userId)
+      .eq('dimension', dimension)
+      .eq('status', 'slain')
+    const bossKillIds = new Set((bossKillRows ?? []).map((r: { xp_awarded: number } & { boss_battle_id?: string }) => (r as unknown as { boss_battle_id?: string }).boss_battle_id).filter(Boolean))
+    const legacyBossXp = (legacyBosses ?? []).reduce(
+      (sum: number, r: { reward_xp: number; id: string }) =>
+        bossKillIds.has(r.id) ? sum : sum + ((r.reward_xp as number) ?? 0),
+      0
+    )
+    const totalFromLogs = logTotal + bossXp + legacyBossXp
+    if (totalFromLogs > 0) {
+      computedXp = totalFromLogs
+      // Backfill quest_dimension_xp so future reads are fast
+      void supabase.from(QUEST_XP_TABLE).upsert(
+        {
+          user_id: userId,
+          dimension,
+          xp: totalFromLogs,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'user_id,dimension' }
+      )
+    }
+  }
+
   return NextResponse.json({
     quest: {
       ...quest,
       milestones: enrichedMilestones,
       recent_tasks: tasks ?? [],
-      xp: xpRow?.xp ?? 0,
+      xp: computedXp,
       bosses_slain: bossStats.slain,
       streak_days,
     },

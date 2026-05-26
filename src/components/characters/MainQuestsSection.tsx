@@ -138,7 +138,7 @@ export function MainQuestsSection({
                       {days > 0 ? `${days}d left` : days === 0 ? 'Due today' : `${Math.abs(days)}d overdue`}
                     </p>
                   )}
-                  {isActive && m.progress_percent > 0 && (
+                  {isActive && (m.task_total > 0 || m.progress_percent > 0) && (
                     <>
                       <div
                         style={{
@@ -160,7 +160,9 @@ export function MainQuestsSection({
                         />
                       </div>
                       <span style={{ fontSize: 9, color: '#5A4A7A', marginTop: 4, display: 'block' }}>
-                        {m.progress_percent}% complete
+                        {m.task_total > 0
+                          ? `${m.progress_percent}% complete`
+                          : `${m.progress_percent}% · based on challenges conquered`}
                       </span>
                     </>
                   )}
