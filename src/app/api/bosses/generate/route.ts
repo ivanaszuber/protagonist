@@ -77,17 +77,17 @@ export async function POST(request: Request) {
         .maybeSingle()
     : { data: null }
 
-  const prompt = `You are creating a boss battle for the ${dimension} dimension.
+  const prompt = `You are creating a 30-day challenge sprint for the ${dimension} dimension of someone's life.
 Current main quest vision: ${quest?.vision ?? 'none'}
 Current milestone: ${milestone?.title ?? 'none'} (due ${milestone?.target_date ?? 'n/a'})
 Today: ${today}
-User request: ${userMessage ?? 'Create a new boss battle'}
+User request: ${userMessage ?? 'Create a new challenge'}
 
 Generate:
-1. A dramatic boss name
-2. Exactly 10 attack move tasks — specific, actionable
-3. HP damage per task: 1, 2, or 3 — total must equal 10
-4. Spread tasks across the next 30 days
+1. A compelling challenge name — something to master or achieve (not an enemy to fight)
+2. Exactly 10 specific, actionable tasks to complete it
+3. Each task has a weight of 1, 2, or 3 — total weights must equal exactly 10
+4. Spread tasks logically across the next 30 days
 5. Deadline ${deadlineStr}
 
 Respond ONLY with JSON:

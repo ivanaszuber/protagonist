@@ -25,10 +25,10 @@ export function HallOfKills({ kills, stats }: HallOfKillsProps) {
         }}
       >
         <span style={{ fontSize: 11, fontWeight: 600, color: '#9B8EC4', letterSpacing: '0.06em' }}>
-          Hall of Kills
+          Hall of Victories
         </span>
         <span style={{ fontSize: 10, color: '#6B5E8C' }}>
-          {stats.slain} slain · {stats.escaped} escaped
+          {stats.slain} conquered · {stats.escaped} abandoned
         </span>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -45,19 +45,19 @@ export function HallOfKills({ kills, stats }: HallOfKillsProps) {
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 12 }}>{slain ? '⚔' : '☠'}</span>
+                <span style={{ fontSize: 12 }}>{slain ? '★' : '○'}</span>
                 <span
                   style={{
                     fontSize: 12,
-                    color: slain ? '#9B8EC4' : '#9f4a4a',
+                    color: slain ? '#9B8EC4' : '#6B5E8C',
                     flex: 1,
                   }}
                 >
                   {kill.boss_name}
                 </span>
                 <span style={{ fontSize: 10, color: '#6B5E8C' }}>
-                  {slain ? 'Slain' : 'Escaped'}
-                  {slain && kill.days_taken != null ? ` · ${kill.days_taken} days` : ''}
+                  {slain ? 'Conquered' : 'Abandoned'}
+                  {slain && kill.days_taken != null ? ` · ${kill.days_taken}d` : ''}
                   {' · '}
                   {formatMonth(kill.killed_at)}
                 </span>

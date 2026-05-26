@@ -24,11 +24,11 @@ function daysUntil(dateStr: string): number {
   return Math.ceil((new Date(dateStr).getTime() - Date.now()) / 86400000)
 }
 
-function hpFillColor(remaining: number, total: number): string {
-  const pct = total > 0 ? remaining / total : 0
-  if (pct <= 0.2) return '#fbbf24'
-  if (pct <= 0.4) return '#fb923c'
-  return '#ef4444'
+function progressFillColor(completed: number, total: number): string {
+  const pct = total > 0 ? completed / total : 0
+  if (pct >= 0.8) return '#34d399'
+  if (pct >= 0.5) return '#818cf8'
+  return '#9B8EC4'
 }
 
 function formatDeadline(dateStr: string): string {
@@ -154,9 +154,8 @@ export function BossCard({
 
   const sectionLabel = (
     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
-      <span style={{ fontSize: 12 }}>⚔</span>
       <span style={{ fontSize: 11, fontWeight: 600, color: '#9B8EC4', letterSpacing: '0.06em' }}>
-        Boss Battle
+        Challenge
       </span>
     </div>
   )
@@ -167,21 +166,21 @@ export function BossCard({
         {sectionLabel}
         <div
           style={{
-            background: '#1A0A12',
-            border: '0.5px solid #ef4444',
+            background: '#0D1A12',
+            border: '0.5px solid #34d399',
             borderRadius: 14,
             padding: 20,
             textAlign: 'center',
           }}
         >
-          <p style={{ fontSize: 14, fontWeight: 600, color: '#ef4444', margin: '0 0 8px' }}>
-            ⚔ Boss Slain!
+          <p style={{ fontSize: 14, fontWeight: 600, color: '#34d399', margin: '0 0 8px' }}>
+            Challenge Conquered!
           </p>
           <p style={{ fontSize: 12, color: '#E8E0F0', margin: '0 0 12px' }}>
-            {victory.name} has been defeated.
+            {victory.name} — complete.
           </p>
           <p style={{ fontSize: 11, color: '#fbbf24', margin: 0 }}>
-            +{victory.rewardXp} XP · Added to Hall of Kills
+            +{victory.rewardXp} XP · Added to your victories
           </p>
         </div>
       </section>
@@ -201,11 +200,10 @@ export function BossCard({
           }}
         >
           <p style={{ fontSize: 13, fontWeight: 500, color: '#ef4444', margin: '0 0 6px' }}>
-            {escapedBoss.name} — ESCAPED
+            {escapedBoss.name} — ABANDONED
           </p>
           <p style={{ fontSize: 11, color: '#9B8EC4', margin: '0 0 12px', lineHeight: 1.5 }}>
-            It dealt -50 XP before fleeing. The threat level resets but the boss is still out
-            there.
+            Challenge expired. -50 XP penalty applied. Ready to take it on again?
           </p>
           <button
             type="button"
@@ -223,7 +221,7 @@ export function BossCard({
               cursor: 'pointer',
             }}
           >
-            🔮 Hunt it down again ↗
+            Retry this challenge ↗
           </button>
         </div>
       </section>
@@ -244,12 +242,12 @@ export function BossCard({
         >
           {generating ? (
             <p style={{ fontSize: 12, color: '#7A5FA0', margin: 0, fontStyle: 'italic' }}>
-              Summoning your nemesis...
+              Creating your challenge...
             </p>
           ) : (
             <>
               <p style={{ fontSize: 12, color: '#7A5FA0', margin: '0 0 10px' }}>
-                No active boss. Generate your next challenge.
+                No active challenge. Start your next one.
               </p>
               {generateError && (
                 <p style={{ fontSize: 11, color: '#ef4444', margin: '0 0 8px' }}>
@@ -264,15 +262,15 @@ export function BossCard({
                   alignItems: 'center',
                   gap: 6,
                   background: '#1E0D40',
-                  border: '0.5px solid #6B1A1A',
+                  border: '0.5px solid #4A2080',
                   borderRadius: 8,
                   padding: '8px 12px',
                   fontSize: 11,
-                  color: '#ef4444',
+                  color: '#A78BFA',
                   cursor: 'pointer',
                 }}
               >
-                ⚔ Start a new Boss Battle
+                Start a new Challenge
               </button>
             </>
           )}
@@ -285,17 +283,18 @@ export function BossCard({
     localBoss.hp_total > 0
       ? Math.round((localBoss.hp_remaining / localBoss.hp_total) * 100)
       : 0
-  const hitsLeft = localBoss.hp_remaining
+  const tasksLeft = localBoss.hp_remaining
+  const tasksDone = localBoss.hp_total - localBoss.hp_remaining
   const days = daysUntil(localBoss.deadline)
-  const fill = hpFillColor(localBoss.hp_remaining, localBoss.hp_total)
+  const fill = progressFillColor(tasksDone, localBoss.hp_total)
 
   return (
     <section style={{ marginBottom: 20 }}>
       {sectionLabel}
       <div
         style={{
-          background: '#1A0808',
-          border: '0.5px solid #6B1A1A',
+          background: '#0E0E1A',
+          border: '0.5px solid #2D1B55',
           borderRadius: 14,
           padding: 16,
         }}
@@ -307,7 +306,7 @@ export function BossCard({
               {localBoss.name}
             </p>
             <p style={{ fontSize: 10, color: '#9B8EC4', margin: 0 }}>
-              Slay before {formatDeadline(localBoss.deadline)} · {days}d left
+              Complete by {formatDeadline(localBoss.deadline)} · {days}d left
             </p>
           </div>
         </div>
@@ -322,15 +321,15 @@ export function BossCard({
               marginBottom: 4,
             }}
           >
-            <span>HP</span>
+            <span>Progress</span>
             <span>
-              {localBoss.hp_remaining}/{localBoss.hp_total}
+              {localBoss.hp_total - localBoss.hp_remaining}/{localBoss.hp_total} tasks done
             </span>
           </div>
           <div
             style={{
               height: 8,
-              background: '#2A0808',
+              background: '#1E1040',
               borderRadius: 4,
               overflow: 'hidden',
             }}
@@ -338,7 +337,7 @@ export function BossCard({
             <div
               style={{
                 height: '100%',
-                width: `${hpPct}%`,
+                width: `${100 - hpPct}%`,
                 background: fill,
                 borderRadius: 4,
                 transition: 'width 0.5s ease, background 0.3s ease',
@@ -347,7 +346,7 @@ export function BossCard({
           </div>
         </div>
         <p style={{ fontSize: 10, color: '#6B5E8C', margin: '0 0 14px' }}>
-          {hitsLeft} hit{hitsLeft === 1 ? '' : 's'} to defeat · reward: +{localBoss.reward_xp} XP
+          {tasksLeft} task{tasksLeft === 1 ? '' : 's'} remaining · reward: +{localBoss.reward_xp} XP
         </p>
 
         <p
@@ -355,11 +354,11 @@ export function BossCard({
             fontSize: 9,
             fontWeight: 600,
             letterSpacing: '0.1em',
-            color: '#6B1A1A',
+            color: '#4A2878',
             margin: '0 0 8px',
           }}
         >
-          ATTACK MOVES
+          CHALLENGE TASKS
         </p>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {localTasks.map((task) => (
@@ -403,9 +402,11 @@ export function BossCard({
               >
                 {task.title}
               </span>
-              <span style={{ fontSize: 10, color: '#ef4444', flexShrink: 0 }}>
-                -{task.hp_damage}HP
-              </span>
+              {!task.completed && (
+                <span style={{ fontSize: 10, color: '#6B5E8C', flexShrink: 0 }}>
+                  +{task.xp_reward} XP
+                </span>
+              )}
               {completingId === task.id && (
                 <span style={{ fontSize: 9, color: '#7A5FA0' }}>...</span>
               )}

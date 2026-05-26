@@ -152,34 +152,41 @@ export function CharacterPage({ dimension }: CharacterPageProps) {
   const [earnedMedals, setEarnedMedals] = useState<string[]>([])
 
   async function loadBossAndMedals(uid: string) {
-    const [bossRes, killsRes, medalsRes] = await Promise.all([
+    const [bossRes, killsRes, medalsRes] = await Promise.allSettled([
       fetch(
         `/api/bosses/active?userId=${encodeURIComponent(uid)}&dimension=${encodeURIComponent(dimension)}`
       ).then((r) => r.json()),
       fetch(
         `/api/bosses/kills?userId=${encodeURIComponent(uid)}&dimension=${encodeURIComponent(dimension)}`
       ).then((r) => r.json()),
-      fetch(
-        `/api/medals/check?userId=${encodeURIComponent(uid)}&dimension=${encodeURIComponent(dimension)}`,
-        { method: 'POST' }
-      ).then((r) => r.json()),
+      fetch(`/api/medals/check`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: uid, dimension }),
+      }).then((r) => r.json()),
     ])
-    const bossData = bossRes as {
-      boss?: BossBattle | null
-      tasks?: BossTask[]
-      escapedBoss?: BossBattle | null
+    if (bossRes.status === 'fulfilled') {
+      const bossData = bossRes.value as {
+        boss?: BossBattle | null
+        tasks?: BossTask[]
+        escapedBoss?: BossBattle | null
+      }
+      setBoss(bossData.boss ?? null)
+      setBossTasks(bossData.tasks ?? [])
+      setEscapedBoss(bossData.escapedBoss ?? null)
     }
-    setBoss(bossData.boss ?? null)
-    setBossTasks(bossData.tasks ?? [])
-    setEscapedBoss(bossData.escapedBoss ?? null)
-    const killsData = killsRes as {
-      kills?: BossKillRow[]
-      stats?: { slain: number; escaped: number }
+    if (killsRes.status === 'fulfilled') {
+      const killsData = killsRes.value as {
+        kills?: BossKillRow[]
+        stats?: { slain: number; escaped: number }
+      }
+      setBossKills(killsData.kills ?? [])
+      setKillStats(killsData.stats ?? { slain: 0, escaped: 0 })
     }
-    setBossKills(killsData.kills ?? [])
-    setKillStats(killsData.stats ?? { slain: 0, escaped: 0 })
-    const medalsData = medalsRes as { earned?: string[] }
-    setEarnedMedals(medalsData.earned ?? [])
+    if (medalsRes.status === 'fulfilled') {
+      const medalsData = medalsRes.value as { earned?: string[] }
+      setEarnedMedals(medalsData.earned ?? [])
+    }
   }
 
   useEffect(() => {
@@ -454,7 +461,7 @@ export function CharacterPage({ dimension }: CharacterPageProps) {
             }}
           >
             <span>
-              Bosses Slain{' '}
+              Challenges Conquered{' '}
               <strong style={{ color: accentColor }}>{quest?.bosses_slain ?? killStats.slain}</strong>
             </span>
           </div>
