@@ -387,3 +387,111 @@ export function ouraToArcPayload(data: OuraDailyData): {
     hrv: data.hrv_balance ?? undefined,
   }
 }
+
+export interface OracleVerdictOuraInput {
+  readiness_score: number | null
+  sleep_score: number | null
+  cycle_phase: string | null
+}
+
+export function computeHp(scores: {
+  readiness_score: number | null
+  sleep_score: number | null
+  activity_score: number | null
+}): number {
+  return Math.round(
+    (scores.readiness_score ?? 50) * 0.4 +
+      (scores.sleep_score ?? 50) * 0.3 +
+      (scores.activity_score ?? 50) * 0.3
+  )
+}
+
+export function getHpTier(hp: number): { color: string; label: string } {
+  if (hp >= 85) return { color: '#34d399', label: 'Peak' }
+  if (hp >= 70) return { color: '#a3e635', label: 'Ready' }
+  if (hp >= 55) return { color: '#fb923c', label: 'Fair' }
+  if (hp >= 40) return { color: '#f87171', label: 'Low' }
+  return { color: '#ef4444', label: 'Drained' }
+}
+
+export function formatCyclePhase(phase: string | null, day: number | null): string {
+  if (!phase) return ''
+  const label = phase.charAt(0).toUpperCase() + phase.slice(1)
+  return day ? `${label} · Day ${day}` : label
+}
+
+export function getOracleVerdict(
+  oura: OracleVerdictOuraInput,
+  moodScore: number | null
+): { text: string; color: string } {
+  const r = oura.readiness_score ?? 0
+  const s = oura.sleep_score ?? 0
+  const phase = oura.cycle_phase?.toLowerCase() ?? ''
+
+  if (moodScore !== null && moodScore <= 2 && r >= 70) {
+    return {
+      color: '#fb923c',
+      text: `Your body is recovered but you logged ${moodScore === 1 ? 'Depleted' : 'Drained'}. Rest your mind today — slow Forge tasks only.`,
+    }
+  }
+
+  if (moodScore === 5) {
+    return {
+      color: '#a855f7',
+      text: 'Transcendent mood — rare. Whatever you set out to do today, do it now.',
+    }
+  }
+
+  if (phase === 'menstrual') {
+    return {
+      color: '#f472b6',
+      text: 'Menstrual phase — rest is the mission today. Let Forge and Echo wait.',
+    }
+  }
+  if (phase === 'ovulatory') {
+    if (r >= 85 && s >= 75) {
+      return {
+        color: '#34d399',
+        text: 'Ovulatory peak — your best window for interviews, negotiations, and big asks.',
+      }
+    }
+    return {
+      color: '#34d399',
+      text: 'Ovulatory phase — high social energy. Push Echo quests and connect boldly.',
+    }
+  }
+  if (phase === 'luteal') {
+    if (r < 70) {
+      return {
+        color: '#fb923c',
+        text: 'Luteal phase + low readiness — deep focus work only. Skip social heavy-lifting.',
+      }
+    }
+    return {
+      color: '#fb923c',
+      text: 'Luteal phase — channel your detail focus into Forge prep work today.',
+    }
+  }
+  if (r >= 85 && s >= 80) {
+    return {
+      color: '#34d399',
+      text: 'All systems optimal. This is a high-leverage day — go after the hard things.',
+    }
+  }
+  if (r >= 75) {
+    return {
+      color: '#34d399',
+      text: 'Follicular phase — energy building. Push hard in your interviews today.',
+    }
+  }
+  if (r >= 60) {
+    return {
+      color: '#fb923c',
+      text: 'Moderate readiness. Prioritise Forge tasks, keep social energy for tomorrow.',
+    }
+  }
+  return {
+    color: '#f472b6',
+    text: 'Low readiness — protect your energy. One focused task per character.',
+  }
+}
