@@ -42,6 +42,32 @@ export async function GET(request: Request) {
   return NextResponse.json({ tasks: data ?? [] })
 }
 
+export async function DELETE(request: Request) {
+  const { searchParams } = new URL(request.url)
+  const taskId = searchParams.get('taskId')
+  const userId = searchParams.get('userId')
+
+  if (!taskId || !userId) {
+    return NextResponse.json({ error: 'taskId and userId required' }, { status: 400 })
+  }
+
+  if (!isQuestDbConfigured()) {
+    return NextResponse.json({ error: 'Database not configured' }, { status: 503 })
+  }
+
+  const { error } = await supabase
+    .from('tasks')
+    .delete()
+    .eq('id', taskId)
+    .eq('user_id', userId)
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
+  return NextResponse.json({ success: true })
+}
+
 export async function POST(request: Request) {
   const body = await request.json()
   const { userId, dimension, title, xpReward = 50, taskDate, milestoneId } = body

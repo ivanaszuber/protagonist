@@ -291,6 +291,34 @@ export function CharacterPage({ dimension }: CharacterPageProps) {
     }
   }
 
+  async function deleteMilestone(milestoneId: string) {
+    const uid = getUserId()
+    const res = await fetch(
+      `/api/quests/milestones?milestoneId=${encodeURIComponent(milestoneId)}&userId=${encodeURIComponent(uid)}`,
+      { method: 'DELETE' }
+    )
+    if (res.ok) {
+      setQuest((prev) =>
+        prev
+          ? { ...prev, milestones: prev.milestones.filter((m) => m.id !== milestoneId) }
+          : prev
+      )
+    }
+  }
+
+  async function deleteTask(taskId: string) {
+    const uid = getUserId()
+    const res = await fetch(
+      `/api/quests/tasks?taskId=${encodeURIComponent(taskId)}&userId=${encodeURIComponent(uid)}`,
+      { method: 'DELETE' }
+    )
+    if (res.ok) {
+      setQuest((prev) =>
+        prev ? { ...prev, recent_tasks: prev.recent_tasks.filter((t) => t.id !== taskId) } : prev
+      )
+    }
+  }
+
   async function addTask() {
     if (!newTaskTitle.trim() || !quest) return
     const today = new Date().toISOString().split('T')[0]
@@ -367,7 +395,7 @@ export function CharacterPage({ dimension }: CharacterPageProps) {
   return (
     <main className="dashboard-scroll" style={pageShellStyle}>
       <TopNav streakDays={quest?.streak_days ?? 0} />
-      <div style={{ maxWidth: 430, margin: '0 auto', padding: '0 16px' }}>
+      <div style={{ maxWidth: 430, margin: '0 auto', padding: '44px 16px 0' }}>
         {/* Hero */}
         <div
           style={{
@@ -506,6 +534,7 @@ export function CharacterPage({ dimension }: CharacterPageProps) {
             dimensionLabel={char.categoryLabel}
             milestones={quest.milestones}
             accentColor={accentColor}
+            onDelete={(id) => void deleteMilestone(id)}
           />
         )}
 
@@ -605,7 +634,7 @@ export function CharacterPage({ dimension }: CharacterPageProps) {
                 marginBottom: 10,
               }}
             >
-              <span style={{ fontSize: 11, color: '#5A4A7A' }}>Today&apos;s quests</span>
+              <span style={{ fontSize: 11, color: '#5A4A7A' }}>Today&apos;s tasks</span>
               <button
                 type="button"
                 onClick={() => setAddingTask(!addingTask)}
@@ -629,7 +658,7 @@ export function CharacterPage({ dimension }: CharacterPageProps) {
                   value={newTaskTitle}
                   onChange={(e) => setNewTaskTitle(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && void addTask()}
-                  placeholder="What's the quest?"
+                  placeholder="What's the task?"
                   autoFocus
                   style={{
                     width: '100%',
@@ -681,7 +710,7 @@ export function CharacterPage({ dimension }: CharacterPageProps) {
                       cursor: 'pointer',
                     }}
                   >
-                    Add quest
+                    Add task
                   </button>
                   <button
                     type="button"
@@ -713,14 +742,6 @@ export function CharacterPage({ dimension }: CharacterPageProps) {
               .map((task) => (
                 <div
                   key={task.id}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => void handleTaskToggle(task.id, task.xp_reward)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      void handleTaskToggle(task.id, task.xp_reward)
-                    }
-                  }}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -729,11 +750,18 @@ export function CharacterPage({ dimension }: CharacterPageProps) {
                     borderRadius: 8,
                     padding: '7px 10px',
                     marginBottom: 6,
-                    cursor: task.completed ? 'default' : 'pointer',
                     border: '0.5px solid #2D1B55',
                   }}
                 >
                   <div
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => void handleTaskToggle(task.id, task.xp_reward)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        void handleTaskToggle(task.id, task.xp_reward)
+                      }
+                    }}
                     style={{
                       width: 14,
                       height: 14,
@@ -741,14 +769,24 @@ export function CharacterPage({ dimension }: CharacterPageProps) {
                       flexShrink: 0,
                       border: `1.5px solid ${task.completed ? '#34d399' : accentColor}`,
                       background: task.completed ? '#34d399' : 'transparent',
+                      cursor: task.completed ? 'default' : 'pointer',
                     }}
                   />
                   <span
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => void handleTaskToggle(task.id, task.xp_reward)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        void handleTaskToggle(task.id, task.xp_reward)
+                      }
+                    }}
                     style={{
                       fontSize: 10,
                       color: task.completed ? '#5A4A7A' : '#C0B0E0',
                       textDecoration: task.completed ? 'line-through' : 'none',
                       flex: 1,
+                      cursor: task.completed ? 'default' : 'pointer',
                     }}
                   >
                     {task.title}
@@ -756,6 +794,23 @@ export function CharacterPage({ dimension }: CharacterPageProps) {
                   {!task.completed && (
                     <span style={{ fontSize: 9, color: '#3D3358' }}>+{task.xp_reward} XP</span>
                   )}
+                  <button
+                    type="button"
+                    onClick={() => void deleteTask(task.id)}
+                    aria-label="Delete task"
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      color: '#2D1B55',
+                      fontSize: 14,
+                      lineHeight: 1,
+                      cursor: 'pointer',
+                      padding: '0 2px',
+                      flexShrink: 0,
+                    }}
+                  >
+                    ×
+                  </button>
                 </div>
               ))}
           </LeftBorderCard>

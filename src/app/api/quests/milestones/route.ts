@@ -32,6 +32,32 @@ export async function POST(request: Request) {
   return NextResponse.json({ milestone: data })
 }
 
+export async function DELETE(request: Request) {
+  const { searchParams } = new URL(request.url)
+  const milestoneId = searchParams.get('milestoneId')
+  const userId = searchParams.get('userId')
+
+  if (!milestoneId || !userId) {
+    return NextResponse.json({ error: 'milestoneId and userId required' }, { status: 400 })
+  }
+
+  if (!isQuestDbConfigured()) {
+    return NextResponse.json({ error: 'Database not configured' }, { status: 503 })
+  }
+
+  const { error } = await supabase
+    .from('milestones')
+    .delete()
+    .eq('id', milestoneId)
+    .eq('user_id', userId)
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
+  return NextResponse.json({ success: true })
+}
+
 export async function PATCH(request: Request) {
   const body = await request.json()
   const { milestoneId, completed } = body

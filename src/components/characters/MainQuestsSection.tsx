@@ -17,6 +17,7 @@ interface MainQuestsSectionProps {
   dimensionLabel: string
   milestones: MainQuestMilestone[]
   accentColor: string
+  onDelete?: (milestoneId: string) => void
 }
 
 function daysUntil(dateStr: string | null): number {
@@ -29,6 +30,7 @@ export function MainQuestsSection({
   dimensionLabel,
   milestones,
   accentColor,
+  onDelete,
 }: MainQuestsSectionProps) {
   const incomplete = milestones.filter((m) => !m.completed)
   const activeId = incomplete[0]?.id
@@ -36,6 +38,12 @@ export function MainQuestsSection({
   function handleAdd() {
     openOracle(
       `I want to add a new main quest for ${characterName} — ${dimensionLabel}. Help me define it with a clear goal, milestone, and target date.`
+    )
+  }
+
+  function handleEdit(m: MainQuestMilestone) {
+    openOracle(
+      `I want to edit my main quest for ${characterName} — ${dimensionLabel}. The current quest is: "${m.title}"${m.target_date ? ` (target: ${m.target_date})` : ''}. Help me update the title or target date.`
     )
   }
 
@@ -127,7 +135,7 @@ export function MainQuestsSection({
                   </div>
                   {m.target_date && (
                     <p style={{ fontSize: 10, color: '#7A5FA0', margin: '4px 0 0' }}>
-                      Milestone: {m.title} · {days}d left
+                      {days > 0 ? `${days}d left` : days === 0 ? 'Due today' : `${Math.abs(days)}d overdue`}
                     </p>
                   )}
                   {isActive && m.task_total > 0 && (
@@ -145,16 +153,53 @@ export function MainQuestsSection({
                           style={{
                             height: '100%',
                             width: `${m.progress_percent}%`,
-                            background: `linear-gradient(90deg, ${accentColor}, #FF7A65)`,
+                            background: accentColor,
                             borderRadius: 2,
                             transition: 'width 0.6s ease',
                           }}
                         />
                       </div>
                       <span style={{ fontSize: 9, color: '#5A4A7A', marginTop: 4, display: 'block' }}>
-                        {m.progress_percent}%
+                        {m.progress_percent}% complete
                       </span>
                     </>
+                  )}
+                </div>
+
+                {/* Edit + Delete actions */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                  <button
+                    type="button"
+                    onClick={() => handleEdit(m)}
+                    aria-label="Edit quest"
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      fontSize: 10,
+                      color: '#3D2878',
+                      cursor: 'pointer',
+                      padding: '2px 4px',
+                    }}
+                  >
+                    Edit ↗
+                  </button>
+                  {onDelete && (
+                    <button
+                      type="button"
+                      onClick={() => onDelete(m.id)}
+                      aria-label="Delete quest"
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: '#2D1B55',
+                        fontSize: 16,
+                        lineHeight: 1,
+                        cursor: 'pointer',
+                        padding: '0 2px',
+                      }}
+                    >
+                      ×
+                    </button>
                   )}
                 </div>
               </div>
