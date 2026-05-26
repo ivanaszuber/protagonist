@@ -74,6 +74,14 @@ export function OracleSheet() {
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
   const hideFab = pathname === '/oracle'
+  const prevStateRef = useRef<SheetState>('closed')
+
+  useEffect(() => {
+    if (prevStateRef.current !== 'closed' && state === 'closed') {
+      window.dispatchEvent(new CustomEvent('protagonist:oracle-closed'))
+    }
+    prevStateRef.current = state
+  }, [state])
 
   useEffect(() => {
     const handler = (e: Event) => {

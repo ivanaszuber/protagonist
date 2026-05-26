@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { resolveUserId } from '@/lib/api-user'
 import { getBossKillStats } from '@/lib/bosses'
 import { isQuestDbConfigured, QUEST_XP_TABLE } from '@/lib/quest-db'
+import { computeDimensionStreak } from '@/lib/streak'
 import { supabase } from '@/lib/supabase'
 
 const VALID_DIMENSIONS = new Set([
@@ -82,6 +83,7 @@ export async function GET(
   })
 
   const bossStats = await getBossKillStats(userId, dimension)
+  const streak_days = await computeDimensionStreak(userId, dimension)
 
   const thirtyDaysAgo = new Date()
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
@@ -110,6 +112,7 @@ export async function GET(
       recent_tasks: tasks ?? [],
       xp: xpRow?.xp ?? 0,
       bosses_slain: bossStats.slain,
+      streak_days,
     },
   })
 }

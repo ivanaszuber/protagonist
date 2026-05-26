@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { isQuestDbConfigured, QUEST_XP_TABLE } from '@/lib/quest-db'
+import { computeDimensionStreak } from '@/lib/streak'
 import { supabase } from '@/lib/supabase'
 
 export async function GET(request: Request) {
@@ -63,8 +64,11 @@ export async function GET(request: Request) {
           )
         : 0
 
+      const streak_days = await computeDimensionStreak(userId, quest.dimension as string)
+
       return {
         ...quest,
+        streak_days,
         active_milestone: activeMilestone
           ? {
               id: activeMilestone.id,

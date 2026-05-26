@@ -17,6 +17,7 @@ import { formatCyclePhase, getHpTier, getOracleVerdict } from '@/lib/oura'
 import { DIMENSION_TO_SLUG } from '@/lib/tierName'
 import { getLevel } from '@/lib/xp'
 import { getUserId } from '@/lib/user'
+import { TopNav } from '@/components/TopNav'
 
 interface VitalityData {
   hp: number
@@ -139,6 +140,7 @@ export default function DashboardPage() {
   const [xpToast, setXpToast] = useState<XpToast | null>(null)
   const [levelUpToast, setLevelUpToast] = useState<LevelUpToast | null>(null)
   const [completingTaskId, setCompletingTaskId] = useState<string | null>(null)
+  const [verdictKey, setVerdictKey] = useState(0)
 
   const loadDashboard = useCallback(async () => {
     const uid = userIdRef.current
@@ -162,7 +164,26 @@ export default function DashboardPage() {
       setQuests((questsRes.value.quests ?? []) as MainQuest[])
     }
     if (calRes.status === 'fulfilled') {
-      setEvents((calRes.value.events ?? []) as CalendarEventRow[])
+      const eventsData = (calRes.value.events ?? []) as CalendarEventRow[]
+      setEvents(eventsData)
+
+      if (eventsData.length === 0) {
+        fetch('/api/calendar/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: uid }),
+        })
+          .then(() =>
+            fetch(`/api/calendar/next?userId=${encodeURIComponent(uid)}&limit=10`)
+          )
+          .then((r) => r.json())
+          .then((d: { events?: CalendarEventRow[] }) => {
+            if (d.events?.length) setEvents(d.events)
+          })
+          .catch(() => {
+            /* calendar optional */
+          })
+      }
     }
     if (checkInRes.status === 'fulfilled') {
       setHasCheckedInToday(Boolean(checkInRes.value.hasCheckIn))
@@ -172,6 +193,19 @@ export default function DashboardPage() {
 
   useEffect(() => {
     void loadDashboard()
+  }, [loadDashboard])
+
+  useEffect(() => {
+    function onOracleClose() {
+      void fetch(`/api/checkin/today?userId=${encodeURIComponent(userIdRef.current)}`)
+        .then((r) => r.json())
+        .then((d: { hasCheckIn?: boolean }) => {
+          setHasCheckedInToday(Boolean(d.hasCheckIn))
+          void loadDashboard()
+        })
+    }
+    window.addEventListener('protagonist:oracle-closed', onOracleClose)
+    return () => window.removeEventListener('protagonist:oracle-closed', onOracleClose)
   }, [loadDashboard])
 
   useEffect(() => {
@@ -198,6 +232,10 @@ export default function DashboardPage() {
   )
 
   const verdict = getOracleVerdict(oracleInput, moodScore)
+  const maxStreak = useMemo(
+    () => Math.max(0, ...quests.map((q) => q.streak_days ?? 0)),
+    [quests]
+  )
   const hpValue = vitalityLoading ? null : (hpDisplay ?? vitality?.hp ?? null)
   const hpTier = hpValue != null ? getHpTier(hpValue) : null
   const cycleLabel = formatCyclePhase(vitality?.cycle_phase ?? null, vitality?.cycle_day ?? null)
@@ -251,6 +289,7 @@ export default function DashboardPage() {
 
   async function handleMoodSelect(score: number) {
     setMoodScore(score)
+    setVerdictKey((k) => k + 1)
     const uid = userIdRef.current
     await fetch('/api/mood', {
       method: 'POST',
@@ -299,12 +338,6 @@ export default function DashboardPage() {
     }
   }
 
-  const dateLabel = new Date().toLocaleDateString('en-GB', {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-  })
-
   const dashOffset =
     hpValue != null ? HP_CIRCUMFERENCE * (1 - hpValue / 100) : HP_CIRCUMFERENCE
 
@@ -314,7 +347,7 @@ export default function DashboardPage() {
       style={{
         background: '#0D0820',
         minHeight: '100dvh',
-        padding: '16px 16px calc(80px + env(safe-area-inset-bottom, 0px))',
+        padding: '0 0 calc(120px + env(safe-area-inset-bottom, 0px))',
         fontFamily: 'var(--font-space-grotesk), system-ui, sans-serif',
         overflowY: 'auto',
         scrollbarWidth: 'none',
@@ -323,6 +356,9 @@ export default function DashboardPage() {
         margin: '0 auto',
       }}
     >
+      <TopNav streakDays={maxStreak} />
+
+      <div style={{ padding: '16px 16px 0' }}>
       {/* Vital State */}
       <div
         style={{
@@ -465,11 +501,13 @@ export default function DashboardPage() {
       >
         <span style={{ fontSize: 14, flexShrink: 0 }}>🔮</span>
         <span
+          key={verdictKey}
           style={{
             fontSize: 12,
             fontStyle: 'italic',
             color: verdict.color,
             lineHeight: 1.55,
+            animation: 'verdict-flash 0.3s ease-out',
           }}
         >
           {verdict.text}
@@ -504,13 +542,22 @@ export default function DashboardPage() {
                   background: m.bg,
                   cursor: 'pointer',
                   transform: selected ? 'scale(1.2)' : 'scale(1)',
-                  opacity: moodScore != null && !selected ? 0.5 : 1,
-                  boxShadow: selected ? `0 0 0 2px ${m.border}44` : 'none',
-                  transition: 'transform 0.15s, opacity 0.15s',
+                  opacity: moodScore != null && !selected ? 0.45 : 1,
+                  boxShadow: selected ? `0 0 0 3px ${m.border}44` : 'none',
+                  transition: 'transform 0.15s, opacity 0.15s, box-shadow 0.15s',
                   padding: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 10,
+                  fontWeight: 600,
+                  color: m.border,
+                  fontFamily: 'inherit',
                 }}
                 aria-label={`Mood ${m.value}`}
-              />
+              >
+                {m.value}
+              </button>
             )
           })}
         </div>
@@ -531,10 +578,7 @@ export default function DashboardPage() {
       ) : (
         <button
           type="button"
-          onClick={() => {
-            openOracle('Good morning')
-            setHasCheckedInToday(true)
-          }}
+          onClick={() => openOracle('Good morning')}
           style={{
             width: '100%',
             padding: '12px 14px',
@@ -571,7 +615,9 @@ export default function DashboardPage() {
           }}
         >
           <span style={{ fontSize: 13, fontWeight: 500, color: '#E8E0F0' }}>Today</span>
-          <span style={{ fontSize: 11, color: '#5A4A7A' }}>{dateLabel}</span>
+          <span style={{ fontSize: 11, color: '#5A4A7A' }}>
+            {new Date().toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric' })}
+          </span>
         </div>
 
         <div
@@ -956,6 +1002,7 @@ export default function DashboardPage() {
             )
           })}
         </div>
+      </div>
       </div>
 
       <XpToastOverlay xpToast={xpToast} levelUpToast={levelUpToast} />

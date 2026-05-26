@@ -21,6 +21,7 @@ import {
   type XpToast,
 } from '@/components/XpToastOverlay'
 import { getUserId } from '@/lib/user'
+import { TopNav } from '@/components/TopNav'
 import { LegendCard } from '@/components/characters/LegendCard'
 import {
   MainQuestsSection,
@@ -51,6 +52,7 @@ interface QuestData {
   recent_tasks: Task[]
   xp: number
   bosses_slain?: number
+  streak_days?: number
 }
 
 interface OuraData {
@@ -347,6 +349,7 @@ export function CharacterPage({ dimension }: CharacterPageProps) {
   if (loading) {
     return (
       <main className="dashboard-scroll" style={pageShellStyle}>
+        <TopNav streakDays={0} />
         <div
           style={{
             display: 'flex',
@@ -363,6 +366,7 @@ export function CharacterPage({ dimension }: CharacterPageProps) {
 
   return (
     <main className="dashboard-scroll" style={pageShellStyle}>
+      <TopNav streakDays={quest?.streak_days ?? 0} />
       <div style={{ maxWidth: 430, margin: '0 auto', padding: '0 16px' }}>
         {/* Hero */}
         <div
@@ -370,7 +374,7 @@ export function CharacterPage({ dimension }: CharacterPageProps) {
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            paddingTop: 32,
+            paddingTop: 16,
             paddingBottom: 24,
             gap: 8,
           }}

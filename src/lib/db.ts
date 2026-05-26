@@ -406,6 +406,21 @@ export async function saveCalendarEvents(
   if (error) throw error
 }
 
+function offsetDate(date: string, days: number): string {
+  const d = new Date(`${date}T12:00:00`)
+  d.setDate(d.getDate() + days)
+  return d.toISOString().split('T')[0]
+}
+
+function eventOnLocalDate(startTime: string | null, eventDate: string, date: string): boolean {
+  if (startTime) {
+    const d = new Date(startTime)
+    const local = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    return local === date
+  }
+  return eventDate === date
+}
+
 export async function getCalendarEvents(userId: string, date: string) {
   if (!isSupabaseConfigured()) return []
 
@@ -413,11 +428,18 @@ export async function getCalendarEvents(userId: string, date: string) {
     .from('calendar_events')
     .select('*')
     .eq('user_id', userId)
-    .eq('event_date', date)
+    .gte('event_date', offsetDate(date, -1))
+    .lte('event_date', offsetDate(date, 1))
     .order('start_time', { ascending: true })
 
   if (error) return []
-  return data ?? []
+  return (data ?? []).filter((row) =>
+    eventOnLocalDate(
+      row.start_time as string | null,
+      row.event_date as string,
+      date
+    )
+  )
 }
 
 export async function deleteCalendarEventsForDate(userId: string, date: string) {

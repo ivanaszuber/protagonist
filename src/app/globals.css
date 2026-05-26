@@ -91,3 +91,12 @@ body::-webkit-scrollbar {
     transform: scale(1.06);
   }
 }
+
+@keyframes verdict-flash {
+  0% {
+    opacity: 0.3;
+  }
+  100% {
+    opacity: 1;
+  }
+}

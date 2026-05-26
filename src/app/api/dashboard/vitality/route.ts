@@ -40,6 +40,32 @@ export async function GET(request: Request) {
       cycle_phase = payload.cycle_phase
     }
 
+    if (readiness_score === null || sleep_score === null || activity_score === null) {
+      const weekAgo = new Date(Date.now() - 7 * 86_400_000).toISOString().split('T')[0]
+      const { data: recentRows } = await supabase
+        .from('oura_daily')
+        .select('readiness_score, sleep_score, activity_score, date')
+        .eq('user_id', userId)
+        .gte('date', weekAgo)
+        .order('date', { ascending: false })
+        .limit(7)
+
+      if (recentRows) {
+        if (readiness_score === null) {
+          const r = recentRows.find((row) => row.readiness_score != null)
+          if (r) readiness_score = r.readiness_score as number
+        }
+        if (sleep_score === null) {
+          const r = recentRows.find((row) => row.sleep_score != null)
+          if (r) sleep_score = r.sleep_score as number
+        }
+        if (activity_score === null) {
+          const r = recentRows.find((row) => row.activity_score != null)
+          if (r) activity_score = r.activity_score as number
+        }
+      }
+    }
+
     const today = todayDate()
     const { data: moodRow } = await supabase
       .from('mood_entries')
