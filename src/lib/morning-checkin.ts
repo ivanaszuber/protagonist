@@ -381,6 +381,10 @@ export async function runMorningCheckin(
       user_id: userId,
       content: transcript,
       oracle_reply: result.oracle_message,
+      mood_signal: result.mood_signal || null,
+      focus_list: result.focus_list.map((f) => ({ ...f, done: false })),
+      suggestions: result.suggestions,
+      calendar_matches: result.calendar_matches,
     })
   }
 

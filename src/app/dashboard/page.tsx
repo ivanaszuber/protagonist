@@ -1837,7 +1837,13 @@ export default function DashboardPage() {
           Champions
         </span>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {ALL_DIMENSIONS.map((dim) => {
+          {[...ALL_DIMENSIONS]
+            .sort((a, b) => {
+              const xpA = Math.max(dimXpMap[a] ?? 0, quests.find((q) => q.dimension === a)?.xp ?? 0)
+              const xpB = Math.max(dimXpMap[b] ?? 0, quests.find((q) => q.dimension === b)?.xp ?? 0)
+              return xpB - xpA
+            })
+            .map((dim) => {
             const quest = quests.find((q) => q.dimension === dim)
             const char = CHARACTERS[dim]
             // Take the higher of both XP sources — guards against stale zeros in either
@@ -2031,6 +2037,7 @@ export default function DashboardPage() {
           })}
         </div>
       </div>
+
       </div>
 
       <XpToastOverlay xpToast={xpToast} levelUpToast={levelUpToast} />

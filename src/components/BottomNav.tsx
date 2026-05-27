@@ -221,7 +221,7 @@ export default function BottomNav() {
       ))}
 
       <Link
-        href="/tasks"
+        href="/brief"
         style={{
           display: 'flex',
           flexDirection: 'column',
@@ -233,67 +233,42 @@ export default function BottomNav() {
         }}
       >
         {(() => {
-          const isActive = pathname === '/tasks' || pathname.startsWith('/tasks/')
+          const isActive = pathname === '/brief' || pathname.startsWith('/brief/')
           return (
             <>
-              <svg width="20" height="22" viewBox="0 0 24 26" fill="none">
-                <rect
-                  x="3"
-                  y="3"
-                  width="18"
-                  height="20"
-                  rx="4"
-                  fill={isActive ? 'rgba(147,51,234,0.15)' : 'transparent'}
+              {/* Oracle orb: concentric rings + sparkle centre */}
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                <circle
+                  cx="12"
+                  cy="12"
+                  r="10"
                   stroke={isActive ? '#9333EA' : '#2D1B55'}
-                  strokeWidth="1.2"
-                />
-                <rect x="8" y="1" width="8" height="4" rx="2" fill={isActive ? '#9333EA' : '#2D1B55'} />
-                <circle cx="7.5" cy="10" r="1.5" fill={isActive ? '#9333EA' : '#6A5A8A'} />
-                <line
-                  x1="10.5"
-                  y1="10"
-                  x2="18"
-                  y2="10"
-                  stroke={isActive ? '#9333EA' : '#6A5A8A'}
-                  strokeWidth="1.2"
-                  strokeLinecap="round"
+                  strokeWidth="0.8"
+                  opacity={isActive ? 0.35 : 0.5}
                 />
                 <circle
-                  cx="7.5"
-                  cy="15"
-                  r="1.5"
-                  fill={isActive ? '#C084FC' : '#6A5A8A'}
-                  opacity={isActive ? 0.7 : 0.5}
-                />
-                <line
-                  x1="10.5"
-                  y1="15"
-                  x2="16"
-                  y2="15"
-                  stroke={isActive ? '#C084FC' : '#6A5A8A'}
-                  strokeWidth="1.2"
-                  strokeLinecap="round"
-                  opacity={isActive ? 0.7 : 0.5}
+                  cx="12"
+                  cy="12"
+                  r="7"
+                  stroke={isActive ? '#9333EA' : '#2D1B55'}
+                  strokeWidth="0.8"
+                  opacity={isActive ? 0.55 : 0.5}
                 />
                 <circle
-                  cx="7.5"
-                  cy="20"
-                  r="1.5"
-                  fill={isActive ? '#C084FC' : '#6A5A8A'}
-                  opacity={isActive ? 0.4 : 0.3}
+                  cx="12"
+                  cy="12"
+                  r="4.5"
+                  fill={isActive ? 'rgba(147,51,234,0.2)' : '#1A0F35'}
+                  stroke={isActive ? '#9333EA' : '#3D2878'}
+                  strokeWidth="0.8"
                 />
-                <line
-                  x1="10.5"
-                  y1="20"
-                  x2="14"
-                  y2="20"
-                  stroke={isActive ? '#C084FC' : '#6A5A8A'}
-                  strokeWidth="1.2"
-                  strokeLinecap="round"
-                  opacity={isActive ? 0.4 : 0.3}
+                <path
+                  d="M12 9.5 L12.5 11.5 L14.5 12 L12.5 12.5 L12 14.5 L11.5 12.5 L9.5 12 L11.5 11.5 Z"
+                  fill={isActive ? '#C084FC' : '#6A5A8A'}
+                  opacity={isActive ? 1 : 0.6}
                 />
               </svg>
-              <span style={{ fontSize: 10, color: isActive ? '#9333EA' : '#6A5A8A' }}>Tasks</span>
+              <span style={{ fontSize: 10, color: isActive ? '#C084FC' : '#6A5A8A' }}>Brief</span>
               {isActive && (
                 <div
                   style={{
