@@ -33,6 +33,7 @@ import { MedalsRow } from '@/components/characters/MedalsRow'
 import { VaultNetWorthCard } from '@/components/vault/VaultNetWorthCard'
 import type { BossBattle, BossKillRow, BossTask } from '@/lib/bosses'
 import { getMedalDefinitions } from '@/lib/medals'
+import { ScoreBlock } from '@/components/characters/ScoreBlock'
 
 interface Milestone extends MainQuestMilestone {}
 
@@ -517,6 +518,14 @@ export function CharacterPage({ dimension }: CharacterPageProps) {
             </div>
           </div>
         </div>
+
+        {/* Score block — baseline setter */}
+        <ScoreBlock
+          dimension={dimension}
+          xp={xp}
+          userId={getUserId()}
+          accentColor={accentColor}
+        />
 
         {dimension === 'wealth' && (
           <>

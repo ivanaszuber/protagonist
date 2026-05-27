@@ -76,6 +76,7 @@ export interface DesktopDashboardProps {
   witnessDismissed: boolean
   quests: MainQuest[]
   dimXpMap: Record<string, number>
+  dimBaselineMap: Record<string, number>
   dimMedalsMap: Record<string, string[]>
   todayItems: TodayItem[]
   todayLoading: boolean
@@ -144,11 +145,18 @@ const MOOD_LABELS: Record<number, string> = {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-/** Derive a 1–10 life-category score from accumulated XP */
-function getDimScore(xp: number): number {
+/** Derive a 1–10 score from XP alone */
+function xpScore(xp: number): number {
   const level = getLevel(xp)
   const progress = getLevelProgress(xp)
   return Math.min(10, Math.max(1, Math.round(level * 1.5 + progress)))
+}
+
+/** Blend user-set baseline with XP-derived score */
+function getDimScore(xp: number, baseline?: number): number {
+  const xs = xpScore(xp)
+  if (baseline == null) return xs
+  return Math.round((baseline + xs) / 2)
 }
 
 function toDateStr(d: Date): string {
@@ -180,7 +188,7 @@ export default function DesktopDashboard(props: DesktopDashboardProps) {
     cycleLabel, maxStreak,
     verdict, verdictKey, moodScore, moodLoggedAt, hasCheckedInToday,
     witnessInsight, witnessDismissed,
-    quests, dimXpMap,
+    quests, dimXpMap, dimBaselineMap,
     todayItems, todayLoading, selectedDate, todayDate, weekStart,
     expandedTaskId, editingTaskId, editTaskTitle, completingTaskId,
     justCompletedIds, pickerTaskId,
@@ -237,7 +245,7 @@ export default function DesktopDashboard(props: DesktopDashboardProps) {
   const sortedDims = [...ALL_DIMENSIONS].sort((a, b) => {
     const xpA = Math.max(dimXpMap[a] ?? 0, quests.find(q => q.dimension === a)?.xp ?? 0)
     const xpB = Math.max(dimXpMap[b] ?? 0, quests.find(q => q.dimension === b)?.xp ?? 0)
-    return getDimScore(xpB) - getDimScore(xpA)
+    return getDimScore(xpB, dimBaselineMap[b]) - getDimScore(xpA, dimBaselineMap[a])
   })
 
   return (
@@ -410,7 +418,7 @@ export default function DesktopDashboard(props: DesktopDashboardProps) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
               {sortedDims.map((dim) => {
                 const xp = Math.max(dimXpMap[dim] ?? 0, quests.find(q => q.dimension === dim)?.xp ?? 0)
-                const score = getDimScore(xp)
+                const score = getDimScore(xp, dimBaselineMap[dim])
                 const char = CHARACTERS[dim]
                 const quest = quests.find(q => q.dimension === dim)
                 const Hero = HERO_MAP[dim]

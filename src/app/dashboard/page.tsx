@@ -377,6 +377,7 @@ export default function DashboardPage() {
   }, [])
   const [dimXpMap, setDimXpMap] = useState<Record<string, number>>(() => _cache?.dimXpMap ?? {})
   const [dimMedalsMap, setDimMedalsMap] = useState<Record<string, string[]>>(() => _cache?.dimMedalsMap ?? {})
+  const [dimBaselineMap, setDimBaselineMap] = useState<Record<string, number>>({})
   const [verdictKey, setVerdictKey] = useState(0)
   const [showQuickAdd, setShowQuickAdd] = useState(false)
   const [quickAddTitle, setQuickAddTitle] = useState('')
@@ -424,12 +425,13 @@ export default function DashboardPage() {
 
     const dateStr = dateOverride ?? toDateStr(new Date())
 
-    const [vitalityRes, questsRes, calRes, checkInRes, medalsRes] = await Promise.allSettled([
+    const [vitalityRes, questsRes, calRes, checkInRes, medalsRes, scoresRes] = await Promise.allSettled([
       fetch(`/api/dashboard/vitality?userId=${encodeURIComponent(uid)}`).then((r) => r.json()),
       fetch(`/api/quests/main?userId=${encodeURIComponent(uid)}&date=${encodeURIComponent(dateStr)}`).then((r) => r.json()),
       fetch(`/api/calendar/next?userId=${encodeURIComponent(uid)}&limit=20&date=${encodeURIComponent(dateStr)}`).then((r) => r.json()),
       fetch(`/api/checkin/today?userId=${encodeURIComponent(uid)}`).then((r) => r.json()),
       fetch(`/api/medals/all?userId=${encodeURIComponent(uid)}`).then((r) => r.json()),
+      fetch(`/api/dimension-score?userId=${encodeURIComponent(uid)}`).then((r) => r.json()),
     ])
 
     // Build updated cache entry from whatever succeeded
@@ -463,6 +465,10 @@ export default function DashboardPage() {
       const mm = (medalsRes.value.earned ?? {}) as Record<string, string[]>
       setDimMedalsMap(mm)
       next.dimMedalsMap = mm
+    }
+    if (scoresRes.status === 'fulfilled') {
+      const sm = (scoresRes.value.scores ?? {}) as Record<string, number>
+      setDimBaselineMap(sm)
     }
     if (calRes.status === 'fulfilled') {
       const eventsData = (calRes.value.events ?? []) as CalendarEventRow[]
@@ -853,6 +859,7 @@ export default function DashboardPage() {
           witnessDismissed={witnessDismissed}
           quests={quests}
           dimXpMap={dimXpMap}
+          dimBaselineMap={dimBaselineMap}
           dimMedalsMap={dimMedalsMap}
           todayItems={todayItems}
           todayLoading={todayLoading}
