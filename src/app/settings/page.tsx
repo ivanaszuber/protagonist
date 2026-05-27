@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { CHARACTERS, ALL_DIMENSIONS, type Dimension } from '@/lib/character'
 import { getPinnedDimensions, savePinnedDimensions } from '@/lib/pinnedDimensions'
+import { createSupabaseBrowserClient } from '@/lib/supabase-browser'
 
 function SettingsContent() {
   const router = useRouter()
@@ -11,6 +12,14 @@ function SettingsContent() {
   const editSlot = searchParams.get('editSlot') ? Number(searchParams.get('editSlot')) : null
 
   const [pinned, setPinned] = useState<Dimension[]>(['career', 'social', 'wealth'])
+  const [signingOut, setSigningOut] = useState(false)
+
+  async function handleSignOut() {
+    setSigningOut(true)
+    const supabase = createSupabaseBrowserClient()
+    await supabase.auth.signOut()
+    router.replace('/login')
+  }
 
   useEffect(() => {
     setPinned(getPinnedDimensions())
@@ -162,9 +171,31 @@ function SettingsContent() {
             fontWeight: 500,
             cursor: 'pointer',
             fontFamily: 'inherit',
+            marginBottom: 12,
           }}
         >
           Save
+        </button>
+
+        {/* Sign out */}
+        <button
+          type="button"
+          onClick={() => void handleSignOut()}
+          disabled={signingOut}
+          style={{
+            width: '100%',
+            padding: '13px 0',
+            background: 'transparent',
+            border: '0.5px solid rgba(239,68,68,0.25)',
+            borderRadius: 12,
+            color: signingOut ? '#5A4A7A' : '#F87171',
+            fontSize: 13,
+            fontWeight: 500,
+            cursor: signingOut ? 'not-allowed' : 'pointer',
+            fontFamily: 'inherit',
+          }}
+        >
+          {signingOut ? 'Signing out…' : 'Sign out'}
         </button>
       </div>
     </main>

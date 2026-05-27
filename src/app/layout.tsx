@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import { Space_Grotesk } from 'next/font/google'
-import { OracleSheet } from '@/components/OracleSheet'
-import BottomNav from '@/components/BottomNav'
+import ConditionalNav from '@/components/ConditionalNav'
 import './globals.css'
 
 const spaceGrotesk = Space_Grotesk({
@@ -44,8 +43,7 @@ export default function RootLayout({
         style={{ fontFamily: 'var(--font-space-grotesk), system-ui, sans-serif' }}
       >
         {children}
-        <BottomNav />
-        <OracleSheet />
+        <ConditionalNav />
       </body>
     </html>
   )
