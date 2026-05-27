@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser'
 
@@ -12,7 +12,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   OAuthCallback: 'Sign-in was interrupted. Please try again.',
 }
 
-export default function LoginPage() {
+function LoginContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const errorKey = searchParams.get('error')
@@ -329,5 +329,17 @@ export default function LoginPage() {
         }
       `}</style>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div style={{ minHeight: '100dvh', background: '#0D0820', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ fontSize: 11, letterSpacing: '3px', color: '#3D2878', textTransform: 'uppercase' }}>Loading…</div>
+      </div>
+    }>
+      <LoginContent />
+    </Suspense>
   )
 }
