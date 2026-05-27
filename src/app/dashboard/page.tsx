@@ -29,6 +29,8 @@ import type { MedalDefinition } from '@/lib/medals'
 import { getUserId } from '@/lib/user'
 import { openOracle } from '@/lib/oracle-events'
 import { TopNav } from '@/components/TopNav'
+import { useIsDesktop } from '@/lib/useIsDesktop'
+import DesktopDashboard from '@/components/desktop/DesktopDashboard'
 
 interface VitalityData {
   hp: number
@@ -827,6 +829,76 @@ export default function DashboardPage() {
 
   const dashOffset =
     hpValue != null ? HP_CIRCUMFERENCE * (1 - hpValue / 100) : HP_CIRCUMFERENCE
+
+  const isDesktop = useIsDesktop()
+
+  if (isDesktop) {
+    return (
+      <>
+        <DesktopDashboard
+          vitality={vitality}
+          vitalityLoading={vitalityLoading}
+          hpValue={hpValue}
+          hpTier={hpTier}
+          dashOffset={dashOffset}
+          hpCircumference={HP_CIRCUMFERENCE}
+          cycleLabel={cycleLabel}
+          maxStreak={maxStreak}
+          verdict={verdict}
+          verdictKey={verdictKey}
+          moodScore={moodScore}
+          moodLoggedAt={moodLoggedAt}
+          hasCheckedInToday={hasCheckedInToday}
+          witnessInsight={witnessInsight}
+          witnessDismissed={witnessDismissed}
+          quests={quests}
+          dimXpMap={dimXpMap}
+          dimMedalsMap={dimMedalsMap}
+          todayItems={todayItems}
+          todayLoading={todayLoading}
+          selectedDate={selectedDate}
+          todayDate={todayDate}
+          weekStart={weekStart}
+          expandedTaskId={expandedTaskId}
+          editingTaskId={editingTaskId}
+          editTaskTitle={editTaskTitle}
+          completingTaskId={completingTaskId}
+          justCompletedIds={justCompletedIds}
+          reschedulingTaskId={reschedulingTaskId}
+          pickerTaskId={pickerTaskId}
+          showQuickAdd={showQuickAdd}
+          onMoodSelect={handleMoodSelect}
+          onCompleteTask={handleCompleteTask}
+          onExpandTask={setExpandedTaskId}
+          onReschedule={handleRescheduleTask}
+          onDelete={handleDeleteTask}
+          onStartEdit={(id, title) => { setEditingTaskId(id); setEditTaskTitle(title) }}
+          onEditTitleChange={setEditTaskTitle}
+          onCancelEdit={() => setEditingTaskId(null)}
+          onSaveEdit={handleEditTask}
+          onPickerToggle={setPickerTaskId}
+          onDateSelect={selectDate}
+          onWeekBack={() => {
+            const prev = new Date(weekStart)
+            prev.setDate(prev.getDate() - 7)
+            setWeekStart(prev)
+          }}
+          onWeekForward={() => {
+            const next = new Date(weekStart)
+            next.setDate(next.getDate() + 7)
+            setWeekStart(next)
+          }}
+          onDismissWitness={() => {
+            setWitnessDismissed(true)
+            const dismissKey = `witness_dismissed_${new Date().toISOString().slice(0, 7)}`
+            localStorage.setItem(dismissKey, 'true')
+          }}
+          onToggleQuickAdd={() => setShowQuickAdd((v) => !v)}
+        />
+        <XpToastOverlay xpToast={xpToast} levelUpToast={levelUpToast} />
+      </>
+    )
+  }
 
   return (
     <main
