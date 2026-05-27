@@ -1,0 +1,768 @@
+'use client'
+
+import React, { useEffect, useRef } from 'react'
+import { useRouter } from 'next/navigation'
+import type { CSSProperties } from 'react'
+import { ALL_DIMENSIONS, type Dimension } from '@/lib/character'
+import { DIMENSION_TO_SLUG } from '@/lib/tierName'
+import { getLevel, getLevelProgress } from '@/lib/xp'
+import { openOracle } from '@/lib/oracle-events'
+import type { DesktopDashboardProps } from './DesktopDashboard'
+
+// ── Extended props ────────────────────────────────────────────────────────────
+
+export interface DesktopDashboardV2Props extends DesktopDashboardProps {
+  /**
+   * Map of date-string (YYYY-MM-DD) → completed task count for the week.
+   * Used to power the Weekly Progress bars. Optional — bars show empty if absent.
+   */
+  weeklyTaskCounts?: Record<string, number>
+  /** Single letter shown in the user avatar circle (top-right). Defaults to 'I'. */
+  userInitial?: string
+}
+
+// ── Constants ─────────────────────────────────────────────────────────────────
+
+const CATEGORY_LABELS: Record<Dimension, string> = {
+  career:   'Career',
+  social:   'Friends',
+  wealth:   'Finances',
+  vitality: 'Body',
+  mind:     'Mind',
+  love:     'Relationship',
+  family:   'Family',
+}
+
+const DIM_COLORS: Record<Dimension, string> = {
+  family:   '#C4A8FF',
+  career:   '#FFD47A',
+  wealth:   '#6EE7A4',
+  vitality: '#FF9A5C',
+  mind:     '#A87EF8',
+  love:     '#FFB0A3',
+  social:   '#6EE7A4',
+}
+
+/** Fixed display order for life areas */
+const AREA_ORDER: Dimension[] = ['family', 'career', 'wealth', 'love', 'social', 'vitality', 'mind']
+
+const MOOD_OPTIONS_V2 = [
+  { value: 1, color: '#E57373', label: 'Rough' },
+  { value: 2, color: '#FF9A5C', label: 'Low' },
+  { value: 3, color: '#FFB347', label: 'Meh' },
+  { value: 4, color: '#6EE7A4', label: 'Good' },
+  { value: 5, color: '#00D4B8', label: 'Great' },
+] as const
+
+const CSS_ANIMATIONS = `
+  @keyframes v2-float    { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-5px)} }
+  @keyframes v2-pulse-dot{ 0%,100%{transform:scale(1);opacity:1} 50%{transform:scale(1.15);opacity:0.75} }
+  @keyframes v2-pulse-btn{ 0%,100%{box-shadow:0 0 0 0 rgba(255,122,101,0.4)} 50%{box-shadow:0 0 0 8px rgba(255,122,101,0)} }
+  @keyframes v2-orb-a    { from{transform:rotate(0deg) translateX(22px) rotate(0deg)}    to{transform:rotate(360deg) translateX(22px) rotate(-360deg)} }
+  @keyframes v2-orb-b    { from{transform:rotate(130deg) translateX(22px) rotate(-130deg)} to{transform:rotate(490deg) translateX(22px) rotate(-490deg)} }
+  @keyframes v2-orb-c    { from{transform:rotate(250deg) translateX(22px) rotate(-250deg)} to{transform:rotate(610deg) translateX(22px) rotate(-610deg)} }
+  @keyframes v2-twinkle  { 0%,100%{opacity:0.1} 50%{opacity:0.65} }
+  @keyframes v2-score-pop{ 0%{transform:scale(0.75);opacity:0} 60%{transform:scale(1.12);opacity:1} 100%{transform:scale(1);opacity:1} }
+  ::-webkit-scrollbar { display: none; }
+`
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function xpScore(xp: number): number {
+  const level = getLevel(xp)
+  const progress = getLevelProgress(xp)
+  return Math.min(10, Math.max(1, Math.round(level * 1.5 + progress)))
+}
+
+function getDimScore(xp: number, baseline?: number): number {
+  const xs = xpScore(xp)
+  if (baseline == null) return xs
+  return Math.round((baseline + xs) / 2)
+}
+
+function toDateStr(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+function getTomorrowStr(): string {
+  const d = new Date()
+  d.setDate(d.getDate() + 1)
+  return d.toISOString().split('T')[0]
+}
+
+// ── Sub-components ────────────────────────────────────────────────────────────
+
+function MiniCharFigure({ color }: { color: string }) {
+  return (
+    <div style={{ width: 18, height: 24, position: 'relative', flexShrink: 0 }}>
+      <div style={{ width: 9, height: 9, borderRadius: '50%', background: color, position: 'absolute', top: 0, left: 4.5 }} />
+      <div style={{ width: 11, height: 12, background: color, borderRadius: '2px 2px 0 0', position: 'absolute', top: 10, left: 3.5 }} />
+      <div style={{ width: 3, height: 5, background: color, borderRadius: 2, position: 'absolute', bottom: 0, left: 3, opacity: 0.65 }} />
+      <div style={{ width: 3, height: 5, background: color, borderRadius: 2, position: 'absolute', bottom: 0, right: 2, opacity: 0.65 }} />
+    </div>
+  )
+}
+
+function SettingsIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+    </svg>
+  )
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
+
+export default function DesktopDashboardV2(props: DesktopDashboardV2Props) {
+  const {
+    vitality, vitalityLoading,
+    moodScore,
+    verdict,
+    quests, dimXpMap, dimBaselineMap,
+    todayItems, todayLoading, selectedDate, todayDate, weekStart,
+    expandedTaskId, editingTaskId, editTaskTitle,
+    justCompletedIds, pickerTaskId,
+    onMoodSelect, onCompleteTask, onExpandTask, onReschedule, onDelete,
+    onStartEdit, onEditTitleChange, onCancelEdit, onSaveEdit,
+    onPickerToggle, onDateSelect, onWeekBack, onWeekForward,
+    weeklyTaskCounts = {},
+    userInitial = 'I',
+  } = props
+
+  const router = useRouter()
+  const starsRef = useRef<HTMLDivElement>(null)
+
+  const font: CSSProperties = { fontFamily: "'Space Grotesk', system-ui, sans-serif" }
+  const colScroll: CSSProperties = { overflowY: 'auto', overflowX: 'hidden', scrollbarWidth: 'none' }
+  const metaLabel: CSSProperties = {
+    color: 'rgba(255,255,255,0.25)',
+    fontSize: 9,
+    fontWeight: 500,
+    letterSpacing: '1.6px',
+    textTransform: 'uppercase' as const,
+    display: 'block',
+    marginBottom: 10,
+  }
+
+  // ── Derived values ────────────────────────────────────────────────────────
+
+  const todayStr       = toDateStr(todayDate)
+  const selectedDateStr = toDateStr(selectedDate)
+  const isToday        = selectedDateStr === todayStr
+
+  const weekDays = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(weekStart)
+    d.setDate(d.getDate() + i)
+    return d
+  })
+
+  // Life score: average of all 7 dimension scores
+  const allScores = ALL_DIMENSIONS.map(dim => {
+    const xp = Math.max(dimXpMap[dim] ?? 0, quests.find(q => q.dimension === dim)?.xp ?? 0)
+    return getDimScore(xp, dimBaselineMap[dim])
+  })
+  const lifeScoreNum = allScores.length > 0 ? allScores.reduce((a, b) => a + b, 0) / allScores.length : 0
+  const lifeScoreDisplay = lifeScoreNum.toFixed(1)
+
+  // Ring gauge
+  const RING_R = 42
+  const circumference = 2 * Math.PI * RING_R
+  const ringOffset = circumference * (1 - Math.min(lifeScoreNum / 10, 1))
+
+  // Today's items split
+  const calendarEvents = todayItems.filter(i => i.type === 'event')
+  const taskItems      = todayItems.filter(i => i.type === 'task')
+
+  // Weekly progress (Mon–Fri of the current week)
+  const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']
+  const weeklyData = weekDays.slice(0, 5).map((d, i) => {
+    const ds = toDateStr(d)
+    return {
+      label:    DAY_LABELS[i],
+      dateStr:  ds,
+      count:    weeklyTaskCounts[ds] ?? 0,
+      isToday:  ds === todayStr,
+    }
+  })
+  const maxCount = Math.max(...weeklyData.map(w => w.count), 5)
+
+  // Mood helpers
+  const moodOption   = MOOD_OPTIONS_V2.find(m => m.value === moodScore)
+  const moodLabel    = moodOption?.label ?? ''
+  const moodColor    = moodOption?.color ?? 'rgba(255,255,255,0.25)'
+
+  // Oracle insight
+  const oracleInsight = verdict?.text ?? 'Complete your morning check-in to receive today\'s insight.'
+
+  // ── Starfield ─────────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    const container = starsRef.current
+    if (!container) return
+    container.innerHTML = ''
+    for (let i = 0; i < 55; i++) {
+      const star = document.createElement('div')
+      const size  = (Math.random() * 1.8 + 0.8).toFixed(1)
+      const dur   = (1.5 + Math.random() * 3).toFixed(1)
+      const delay = (Math.random() * 4).toFixed(1)
+      star.style.cssText =
+        `position:absolute;width:${size}px;height:${size}px;border-radius:50%;background:white;` +
+        `left:${(Math.random() * 100).toFixed(1)}%;top:${(Math.random() * 100).toFixed(1)}%;` +
+        `animation:v2-twinkle ${dur}s ease-in-out ${delay}s infinite;`
+      container.appendChild(star)
+    }
+  }, [])
+
+  // ── Render ────────────────────────────────────────────────────────────────
+
+  return (
+    <>
+      <style>{CSS_ANIMATIONS}</style>
+
+      <div style={{ ...font, background: '#0D0820', minHeight: '100dvh', display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden' }}>
+
+        {/* Starfield */}
+        <div ref={starsRef} style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 0 }} />
+
+        {/* ══════════════════ TOP NAV ══════════════════ */}
+        <nav style={{
+          position: 'relative', zIndex: 20,
+          display: 'flex', alignItems: 'center', height: 52,
+          padding: '0 20px',
+          background: 'rgba(13,8,32,0.95)',
+          borderBottom: '1px solid rgba(255,255,255,0.06)',
+          flexShrink: 0,
+        }}>
+          {/* Logo */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginRight: 28 }}>
+            <div style={{ width: 9, height: 9, borderRadius: '50%', background: '#FF7A65', animation: 'v2-pulse-dot 2.5s ease-in-out infinite' }} />
+            <span style={{ color: 'white', fontWeight: 700, fontSize: 15, letterSpacing: -0.3 }}>Protagonist</span>
+          </div>
+
+          {/* Nav links */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <div style={{ background: '#7B3FE4', color: 'white', padding: '6px 14px', borderRadius: 8, fontSize: 13, fontWeight: 500 }}>
+              Dashboard
+            </div>
+            <button type="button" onClick={() => router.push('/characters')}
+              style={{ color: 'rgba(255,255,255,0.4)', padding: '6px 14px', fontSize: 13, background: 'transparent', border: 'none', cursor: 'pointer', ...font }}>
+              Characters
+            </button>
+            <button type="button" onClick={() => router.push('/journal')}
+              style={{ color: 'rgba(255,255,255,0.4)', padding: '6px 14px', fontSize: 13, background: 'transparent', border: 'none', cursor: 'pointer', ...font }}>
+              Journal
+            </button>
+          </div>
+
+          <div style={{ flex: 1 }} />
+
+          {/* Morning Check-In */}
+          <button
+            type="button"
+            onClick={() => openOracle('', 'morning_checkin')}
+            style={{
+              background: '#FF7A65', color: 'white', padding: '9px 22px',
+              borderRadius: 100, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+              marginRight: 12, border: 'none',
+              animation: 'v2-pulse-btn 3s ease-in-out infinite',
+              letterSpacing: 0.1, ...font,
+            }}
+          >
+            Morning Check-In
+          </button>
+
+          {/* Settings */}
+          <button
+            type="button"
+            onClick={() => router.push('/settings')}
+            style={{
+              width: 34, height: 34, borderRadius: 8,
+              border: '1px solid rgba(255,255,255,0.1)',
+              background: 'transparent',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer', marginRight: 10,
+              color: 'rgba(255,255,255,0.45)',
+            }}
+            aria-label="Settings"
+          >
+            <SettingsIcon />
+          </button>
+
+          {/* Avatar */}
+          <div style={{
+            width: 34, height: 34, borderRadius: '50%', background: '#7B3FE4',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 13, fontWeight: 600, color: 'white', flexShrink: 0,
+          }}>
+            {userInitial}
+          </div>
+        </nav>
+
+        {/* ══════════════════ THREE COLUMNS ══════════════════ */}
+        <div style={{ position: 'relative', zIndex: 5, display: 'flex', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+
+          {/* ═══════ LEFT PANEL ═══════ */}
+          <div style={{
+            ...colScroll,
+            width: 210, minWidth: 210,
+            borderRight: '1px solid rgba(255,255,255,0.06)',
+            padding: '20px 14px',
+            display: 'flex', flexDirection: 'column',
+          }}>
+
+            {/* Identity + Life Score ring */}
+            <div style={{ textAlign: 'center', marginBottom: 20 }}>
+              <svg width="96" height="96" viewBox="0 0 96 96" style={{ display: 'block', margin: '0 auto 8px' }}>
+                <circle cx="48" cy="48" r={RING_R} fill="none" stroke="rgba(123,63,228,0.15)" strokeWidth="6" />
+                <circle
+                  cx="48" cy="48" r={RING_R} fill="none" stroke="#7B3FE4" strokeWidth="6"
+                  strokeLinecap="round"
+                  strokeDasharray={circumference}
+                  strokeDashoffset={ringOffset}
+                  transform="rotate(-90 48 48)"
+                  style={{ transition: 'stroke-dashoffset 0.8s ease-out' }}
+                />
+                <circle cx="48" cy="48" r="34" fill="#130E2A" />
+                <text x="48" y="45" textAnchor="middle" fill="white" fontSize="26" fontWeight="700" fontFamily="Space Grotesk, sans-serif">{lifeScoreDisplay}</text>
+                <text x="48" y="60" textAnchor="middle" fill="rgba(255,255,255,0.28)" fontSize="8" letterSpacing="1.8" fontFamily="Space Grotesk, sans-serif">LIFE SCORE</text>
+              </svg>
+              <div style={{ color: 'white', fontSize: 16, fontWeight: 600, letterSpacing: -0.3 }}>Ivana</div>
+              <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, marginTop: 2, letterSpacing: 0.3 }}>The Protagonist</div>
+            </div>
+
+            {/* Life Areas */}
+            <span style={metaLabel}>Life Areas</span>
+            <div>
+              {AREA_ORDER.map((dim, i) => {
+                const xp    = Math.max(dimXpMap[dim] ?? 0, quests.find(q => q.dimension === dim)?.xp ?? 0)
+                const score = getDimScore(xp, dimBaselineMap[dim])
+                const color = DIM_COLORS[dim]
+                const isLast = i === AREA_ORDER.length - 1
+
+                return (
+                  <div
+                    key={dim}
+                    role="button" tabIndex={0}
+                    onClick={() => router.push(`/${DIMENSION_TO_SLUG[dim]}`)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') router.push(`/${DIMENSION_TO_SLUG[dim]}`) }}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 8,
+                      padding: '6px 4px',
+                      borderBottom: isLast ? 'none' : '1px solid rgba(255,255,255,0.05)',
+                      cursor: 'pointer',
+                      transition: 'opacity 0.15s',
+                    }}
+                  >
+                    <MiniCharFigure color={color} />
+                    <span style={{ color, fontSize: 12, fontWeight: 500, flex: 1 }}>{CATEGORY_LABELS[dim]}</span>
+                    <span
+                      key={score}
+                      style={{
+                        color, fontSize: 15, fontWeight: 700,
+                        background: 'rgba(255,255,255,0.06)',
+                        padding: '2px 8px', borderRadius: 6,
+                        minWidth: 30, textAlign: 'center',
+                        display: 'inline-block',
+                        animation: 'v2-score-pop 0.35s cubic-bezier(0.34,1.56,0.64,1) both',
+                      }}
+                    >
+                      {score}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* ═══════ CENTER PANEL ═══════ */}
+          <div style={{ ...colScroll, flex: 1, padding: '26px 28px 20px', minWidth: 0 }}>
+
+            {/* Greeting */}
+            <div style={{ marginBottom: 22 }}>
+              <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: 26, fontWeight: 300, lineHeight: 1.1 }}>
+                {isToday
+                  ? 'Good morning,'
+                  : selectedDate.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' })
+                }
+              </div>
+              {isToday && (
+                <div style={{ color: '#FF7A65', fontSize: 40, fontStyle: 'italic', fontWeight: 700, lineHeight: 1.05 }}>
+                  Ivana.
+                </div>
+              )}
+            </div>
+
+            {/* Week strip */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 18 }}>
+              <button type="button" onClick={onWeekBack}
+                style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.3)', fontSize: 20, cursor: 'pointer', padding: '0 6px', lineHeight: 1, ...font }}>
+                ‹
+              </button>
+              <div style={{ display: 'flex', flex: 1, gap: 3 }}>
+                {weekDays.map((d) => {
+                  const ds         = toDateStr(d)
+                  const isSelected = ds === selectedDateStr
+                  const isT        = ds === todayStr
+                  return (
+                    <button key={ds} type="button" onClick={() => onDateSelect(d)}
+                      style={{
+                        flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
+                        padding: '7px 2px', borderRadius: 10,
+                        background: isSelected ? '#7B3FE4' : 'rgba(255,255,255,0.04)',
+                        border: `1px solid ${isSelected ? 'rgba(123,63,228,0.8)' : 'rgba(255,255,255,0.07)'}`,
+                        cursor: 'pointer', ...font,
+                      }}
+                    >
+                      <span style={{ color: isSelected ? 'rgba(255,255,255,0.75)' : 'rgba(255,255,255,0.28)', fontSize: 8, fontWeight: 500, letterSpacing: 0.6 }}>
+                        {d.toLocaleDateString('en-GB', { weekday: 'short' }).toUpperCase().slice(0, 3)}
+                      </span>
+                      <span style={{ color: isSelected ? 'white' : isT ? '#E8E0F0' : 'rgba(255,255,255,0.55)', fontSize: 14, fontWeight: isSelected ? 700 : 400 }}>
+                        {d.getDate()}
+                      </span>
+                      <div style={{ width: 4, height: 4, borderRadius: '50%', background: isSelected ? 'white' : isT ? '#A87EF8' : 'transparent' }} />
+                    </button>
+                  )
+                })}
+              </div>
+              <button type="button" onClick={onWeekForward}
+                style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.3)', fontSize: 20, cursor: 'pointer', padding: '0 6px', lineHeight: 1, ...font }}>
+                ›
+              </button>
+            </div>
+
+            {/* Date label */}
+            <div style={{ color: 'rgba(255,255,255,0.28)', fontSize: 10, fontWeight: 500, letterSpacing: '1.4px', marginBottom: 14 }}>
+              {selectedDate.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'long' }).toUpperCase()}
+            </div>
+
+            {/* Items */}
+            {todayLoading ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {[0.7, 0.9, 0.55].map((w, i) => (
+                  <div key={i} style={{ height: 52, borderRadius: 10, background: 'rgba(255,255,255,0.05)', width: `${w * 100}%` }} />
+                ))}
+              </div>
+            ) : (
+              <>
+                {/* ── Calendar events ── */}
+                {calendarEvents.length > 0 && (
+                  <div style={{ marginBottom: 16 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 9 }}>
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.25)" strokeWidth="2" strokeLinecap="round">
+                        <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
+                      </svg>
+                      <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: 9, fontWeight: 500, letterSpacing: '1.4px' }}>CALENDAR</span>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {calendarEvents.map(ev => {
+                        const isPast    = ev.endIso ? new Date(ev.endIso) < new Date() : false
+                        const dimColor  = ev.dimension ? DIM_COLORS[ev.dimension] : '#FFD47A'
+                        const dimLabel  = ev.dimension ? CATEGORY_LABELS[ev.dimension] : null
+                        const timeLabel = ev.time ? (ev.timeEnd ? `${ev.time}–${ev.timeEnd}` : ev.time) : ''
+                        return (
+                          <div key={ev.id} style={{
+                            display: 'flex', alignItems: 'center', gap: 10,
+                            background: 'rgba(255,183,77,0.08)', border: '1px solid rgba(255,183,77,0.18)',
+                            borderRadius: 10, padding: '10px 14px',
+                            opacity: isPast ? 0.5 : 1,
+                          }}>
+                            {timeLabel && (
+                              <div style={{
+                                background: 'rgba(255,183,77,0.18)', color: '#FFB74D',
+                                fontSize: 11, fontWeight: 600, padding: '3px 8px',
+                                borderRadius: 6, whiteSpace: 'nowrap', minWidth: 72, textAlign: 'center',
+                              }}>
+                                {timeLabel}
+                              </div>
+                            )}
+                            <div style={{ flex: 1, color: 'rgba(255,255,255,0.82)', fontSize: 13, fontWeight: 500 }}>{ev.title}</div>
+                            {dimLabel && (
+                              <div style={{ background: `${dimColor}18`, color: dimColor, fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 6 }}>
+                                {dimLabel}
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Tasks ── */}
+                {taskItems.length > 0 && (
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 9 }}>
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.25)" strokeWidth="2" strokeLinecap="round">
+                        <polyline points="9 11 12 14 22 4" /><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+                      </svg>
+                      <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: 9, fontWeight: 500, letterSpacing: '1.4px' }}>TASKS</span>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {taskItems.map(item => {
+                        const isCompleted = item.completed || justCompletedIds.has(item.id)
+                        const isExpanded  = expandedTaskId === item.id
+                        const isEditing   = editingTaskId === item.id
+                        const dimColor    = item.dimension ? DIM_COLORS[item.dimension] : 'rgba(168,126,248,0.5)'
+                        const dimLabel    = item.dimension ? CATEGORY_LABELS[item.dimension] : null
+
+                        return (
+                          <div key={item.id}>
+                            <div
+                              style={{
+                                display: 'flex', alignItems: 'center', gap: 12,
+                                background: isCompleted ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.04)',
+                                border: `1px solid ${isCompleted ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.08)'}`,
+                                borderRadius: 10, padding: '10px 14px',
+                                opacity: isCompleted ? 0.4 : 1,
+                                cursor: 'pointer',
+                                transition: 'opacity 0.2s',
+                              }}
+                              onClick={() => { if (!isCompleted) onExpandTask(isExpanded ? null : item.id) }}
+                            >
+                              {/* Checkbox */}
+                              <div
+                                style={{
+                                  width: 18, height: 18, borderRadius: 5, flexShrink: 0,
+                                  background: isCompleted ? '#7B3FE4' : 'transparent',
+                                  border: isCompleted ? 'none' : `1.5px solid ${dimColor}`,
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                  cursor: 'pointer',
+                                }}
+                                onClick={(e) => { e.stopPropagation(); if (!isCompleted) void onCompleteTask(item) }}
+                              >
+                                {isCompleted && (
+                                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                                    <path d="M2 5L4 7L8 3" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
+                                  </svg>
+                                )}
+                              </div>
+
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{
+                                  fontSize: 13, fontWeight: 500,
+                                  color: isCompleted ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.85)',
+                                  textDecoration: isCompleted ? 'line-through' : 'none',
+                                }}>
+                                  {item.title}
+                                </div>
+                                {dimLabel && (
+                                  <div style={{ color: dimColor, fontSize: 11, marginTop: 1 }}>{dimLabel}</div>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Expanded task actions */}
+                            {isExpanded && !isCompleted && (
+                              <div style={{ paddingLeft: 44, paddingTop: 6, paddingBottom: 4 }}>
+                                {isEditing ? (
+                                  <div style={{ display: 'flex', gap: 8 }}>
+                                    <input
+                                      autoFocus type="text" value={editTaskTitle}
+                                      onChange={(e) => onEditTitleChange(e.target.value)}
+                                      onKeyDown={(e) => { if (e.key === 'Enter') onSaveEdit(item.id, editTaskTitle); if (e.key === 'Escape') onCancelEdit() }}
+                                      style={{ flex: 1, background: '#0D0820', border: `0.5px solid ${dimColor}60`, borderRadius: 8, padding: '7px 10px', fontSize: 12, color: 'white', outline: 'none', ...font }}
+                                    />
+                                    <button type="button" onClick={() => onSaveEdit(item.id, editTaskTitle)}
+                                      style={{ padding: '7px 14px', borderRadius: 8, border: 'none', background: dimColor, color: '#0D0820', fontSize: 11, fontWeight: 700, cursor: 'pointer', ...font }}>
+                                      Save
+                                    </button>
+                                    <button type="button" onClick={onCancelEdit}
+                                      style={{ padding: '7px 10px', borderRadius: 8, border: '0.5px solid rgba(255,255,255,0.1)', background: 'transparent', color: 'rgba(255,255,255,0.4)', fontSize: 16, cursor: 'pointer', ...font }}>
+                                      ×
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                                    {[
+                                      { label: 'Edit',     action: () => onStartEdit(item.id, item.title),       style: { border: '0.5px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.55)', background: 'transparent' } as CSSProperties },
+                                      { label: 'Tomorrow', action: () => onReschedule(item.id, getTomorrowStr()), style: { border: `0.5px solid ${dimColor}50`, color: dimColor, background: `${dimColor}12` } as CSSProperties },
+                                      { label: 'Someday',  action: () => onReschedule(item.id, null),            style: { border: '0.5px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.38)', background: 'transparent' } as CSSProperties },
+                                      { label: 'Delete',   action: () => onDelete(item.id),                      style: { border: '0.5px solid rgba(239,68,68,0.25)', color: '#ef4444', background: 'rgba(239,68,68,0.05)' } as CSSProperties },
+                                    ].map(({ label, action, style: s }) => (
+                                      <button key={label} type="button"
+                                        onClick={(e) => { e.stopPropagation(); action() }}
+                                        style={{ padding: '5px 12px', borderRadius: 20, fontSize: 11, cursor: 'pointer', whiteSpace: 'nowrap', ...s, ...font }}>
+                                        {label}
+                                      </button>
+                                    ))}
+                                    <button type="button"
+                                      onClick={(e) => { e.stopPropagation(); onPickerToggle(pickerTaskId === item.id ? null : item.id) }}
+                                      style={{ padding: '5px 12px', borderRadius: 20, fontSize: 11, cursor: 'pointer', border: '0.5px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.38)', background: 'transparent', ...font }}>
+                                      Pick date
+                                    </button>
+                                  </div>
+                                )}
+                                {pickerTaskId === item.id && (
+                                  <input type="date" autoFocus min={getTomorrowStr()}
+                                    onChange={(e) => { if (e.target.value) { onPickerToggle(null); onReschedule(item.id, e.target.value) } }}
+                                    style={{ marginTop: 8, width: '100%', background: '#0D0820', border: '0.5px solid rgba(255,255,255,0.12)', borderRadius: 8, padding: '8px 12px', fontSize: 12, color: 'white', outline: 'none', ...font, colorScheme: 'dark', boxSizing: 'border-box' }}
+                                  />
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Empty state */}
+                {calendarEvents.length === 0 && taskItems.length === 0 && (
+                  <div style={{ textAlign: 'center', padding: '48px 0' }}>
+                    <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.3)', marginBottom: 14 }}>Nothing scheduled here.</div>
+                    <button type="button" onClick={() => openOracle()}
+                      style={{ background: 'rgba(123,63,228,0.1)', border: '0.5px solid rgba(123,63,228,0.3)', borderRadius: 20, color: '#A87EF8', fontSize: 12, padding: '8px 20px', cursor: 'pointer', ...font }}>
+                      Ask Oracle to plan your day
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+
+          {/* ═══════ RIGHT PANEL ═══════ */}
+          <div style={{
+            ...colScroll,
+            width: 200, minWidth: 200,
+            borderLeft: '1px solid rgba(255,255,255,0.06)',
+            padding: '18px 14px',
+            display: 'flex', flexDirection: 'column', gap: 20,
+          }}>
+
+            {/* ── Oracle ── */}
+            <div style={{
+              background: 'rgba(255,122,101,0.07)',
+              border: '1px solid rgba(255,122,101,0.18)',
+              borderRadius: 12, padding: '16px 14px',
+            }}>
+              <span style={{ ...metaLabel, marginBottom: 14 }}>The Oracle · Arc</span>
+
+              {/* Orb */}
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}>
+                <div style={{ position: 'relative', width: 58, height: 58 }}>
+                  {/* Orbiting particles */}
+                  <div style={{ position: 'absolute', top: '50%', left: '50%', margin: -3,   width: 6, height: 6, borderRadius: '50%', background: '#FFB347', animation: 'v2-orb-a 3.2s linear infinite' }} />
+                  <div style={{ position: 'absolute', top: '50%', left: '50%', margin: -2.5, width: 5, height: 5, borderRadius: '50%', background: '#00D4B8', animation: 'v2-orb-b 3.2s linear infinite' }} />
+                  <div style={{ position: 'absolute', top: '50%', left: '50%', margin: -2,   width: 4, height: 4, borderRadius: '50%', background: '#6EE7A4', animation: 'v2-orb-c 4.5s linear infinite' }} />
+                  {/* Core */}
+                  <div style={{
+                    position: 'absolute', inset: 7, borderRadius: '50%', background: '#FF7A65',
+                    animation: 'v2-float 3s ease-in-out infinite',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                  }}>
+                    <div style={{ width: 5, height: 5, borderRadius: '50%', background: 'white' }} />
+                    <div style={{ width: 5, height: 5, borderRadius: '50%', background: 'white' }} />
+                  </div>
+                  {/* Crown */}
+                  <div style={{ position: 'absolute', top: 1, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 2, alignItems: 'flex-end' }}>
+                    <div style={{ width: 3, height: 5, background: '#FFB347', borderRadius: '1px 1px 0 0', transform: 'rotate(-15deg)' }} />
+                    <div style={{ width: 3, height: 7, background: '#FFB347', borderRadius: '1px 1px 0 0' }} />
+                    <div style={{ width: 3, height: 5, background: '#FFB347', borderRadius: '1px 1px 0 0', transform: 'rotate(15deg)' }} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Insight quote */}
+              <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11.5, fontStyle: 'italic', lineHeight: 1.55, textAlign: 'center', marginBottom: 14 }}>
+                &ldquo;{oracleInsight}&rdquo;
+              </div>
+
+              {/* Chat button */}
+              <button
+                type="button"
+                onClick={() => openOracle()}
+                style={{ width: '100%', background: '#FF7A65', color: 'white', padding: 9, borderRadius: 8, fontSize: 12, fontWeight: 600, border: 'none', cursor: 'pointer', ...font }}
+              >
+                Chat with Oracle →
+              </button>
+            </div>
+
+            {/* ── Biometrics ── */}
+            <div>
+              <span style={metaLabel}>Biometrics · Oura</span>
+              {vitalityLoading ? (
+                <div style={{ color: 'rgba(255,255,255,0.2)', fontSize: 11 }}>Loading…</div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {([
+                    { label: 'Sleep',     value: vitality?.sleep_score,     color: '#FFB347' },
+                    { label: 'Readiness', value: vitality?.readiness_score, color: '#FFB347' },
+                    { label: 'Activity',  value: vitality?.activity_score,  color: '#6EE7A4' },
+                  ] as const).map(({ label, value, color }) => (
+                    <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ color: 'rgba(255,255,255,0.45)', fontSize: 11, width: 58, flexShrink: 0 }}>{label}</span>
+                      <div style={{ flex: 1, height: 4, background: 'rgba(255,255,255,0.08)', borderRadius: 2, overflow: 'hidden' }}>
+                        <div style={{ width: `${value ?? 0}%`, height: '100%', background: color, borderRadius: 2, transition: 'width 0.6s ease-out' }} />
+                      </div>
+                      <span style={{ color: (value ?? 0) >= 90 ? color : 'white', fontSize: 12, fontWeight: 700, minWidth: 22, textAlign: 'right' }}>
+                        {value != null ? value : '—'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* ── Mood ── */}
+            <div>
+              <span style={metaLabel}>Mood</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                {MOOD_OPTIONS_V2.map(({ value, color, label }) => {
+                  const isSelected = moodScore === value
+                  return (
+                    <button
+                      key={value} type="button"
+                      onClick={() => onMoodSelect(value)}
+                      title={label}
+                      aria-label={`Mood: ${label}`}
+                      style={{
+                        width: 26, height: 26, borderRadius: '50%',
+                        background: isSelected ? color : 'rgba(255,255,255,0.04)',
+                        border: `2.5px solid ${color}`,
+                        opacity: isSelected ? 1 : 0.45,
+                        cursor: 'pointer', padding: 0,
+                        transition: 'all 0.15s',
+                        ...font,
+                      }}
+                    />
+                  )
+                })}
+              </div>
+              <div style={{ fontSize: 11, textAlign: 'center', color: moodScore != null ? moodColor : 'rgba(255,255,255,0.22)' }}>
+                {moodScore != null ? moodLabel : 'How are you feeling?'}
+              </div>
+            </div>
+
+            {/* ── Weekly Progress ── */}
+            <div>
+              <span style={metaLabel}>Weekly Progress</span>
+              <div style={{ color: 'rgba(255,255,255,0.18)', fontSize: 9, marginBottom: 10 }}>tasks done / day</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {weeklyData.map(({ label: dayLabel, count, isToday: isDayToday }) => {
+                  const pct      = maxCount > 0 ? Math.round((count / maxCount) * 100) : 0
+                  const barColor = count >= 4 ? '#6EE7A4' : count >= 2 ? '#A87EF8' : count === 1 ? '#FF7A65' : 'rgba(255,255,255,0.06)'
+                  return (
+                    <div key={dayLabel} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ color: isDayToday ? '#FF7A65' : 'rgba(255,255,255,0.35)', fontSize: 10, width: 24, fontWeight: isDayToday ? 600 : 400 }}>
+                        {dayLabel}
+                      </span>
+                      <div style={{ flex: 1, height: 5, background: 'rgba(255,255,255,0.06)', borderRadius: 3, overflow: 'hidden' }}>
+                        <div style={{ width: `${pct}%`, height: '100%', background: barColor, borderRadius: 3 }} />
+                      </div>
+                      <span style={{ color: count > 0 ? (isDayToday ? '#FF7A65' : 'rgba(255,255,255,0.45)') : 'rgba(255,255,255,0.12)', fontSize: 10, minWidth: 8, textAlign: 'right' }}>
+                        {count > 0 ? count : '—'}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </>
+  )
+}

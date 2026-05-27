@@ -30,7 +30,7 @@ import { getUserId } from '@/lib/user'
 import { openOracle } from '@/lib/oracle-events'
 import { TopNav } from '@/components/TopNav'
 import { useIsDesktop } from '@/lib/useIsDesktop'
-import DesktopDashboard from '@/components/desktop/DesktopDashboard'
+import DesktopDashboard from '@/components/desktop/DesktopDashboardV2'
 
 interface VitalityData {
   hp: number
