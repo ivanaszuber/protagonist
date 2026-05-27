@@ -8,7 +8,11 @@ export async function PATCH(
 ) {
   const { id } = await params
   const body = await request.json()
-  const { userId, task_date } = body as { userId?: string; task_date?: string | null }
+  const { userId, task_date, title } = body as {
+    userId?: string
+    task_date?: string | null
+    title?: string
+  }
 
   if (!userId) {
     return NextResponse.json({ error: 'userId required' }, { status: 400 })
@@ -17,9 +21,13 @@ export async function PATCH(
     return NextResponse.json({ error: 'Database not configured' }, { status: 503 })
   }
 
+  const updates: Record<string, unknown> = {}
+  if (task_date !== undefined) updates.task_date = task_date ?? null
+  if (title !== undefined) updates.title = title.trim()
+
   const { data, error } = await supabase
     .from('tasks')
-    .update({ task_date: task_date ?? null })
+    .update(updates)
     .eq('id', id)
     .eq('user_id', userId)
     .select()

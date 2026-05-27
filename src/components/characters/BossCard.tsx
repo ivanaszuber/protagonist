@@ -507,14 +507,14 @@ export function BossCard({
                     >
                       {task.title}
                     </span>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0 }}>
+                    <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2, flexShrink: 0 }}>
                       {task.task_date && (
-                        <span style={{ fontSize: 10, color: task.completed ? '#3D2878' : '#5A4A7A' }}>
+                        <span style={{ fontSize: 9, color: task.completed ? '#3D2878' : '#5A4A7A' }}>
                           {new Date(task.task_date + 'T12:00:00').toLocaleDateString('en-GB', { month: 'short', day: 'numeric' })}
                         </span>
                       )}
                       {!task.completed && (
-                        <span style={{ fontSize: 10, color: '#6B5E8C' }}>
+                        <span style={{ fontSize: 9, color: '#6B5E8C' }}>
                           +{task.xp_reward} XP
                         </span>
                       )}

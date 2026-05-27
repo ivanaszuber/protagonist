@@ -39,9 +39,10 @@ interface Milestone extends MainQuestMilestone {}
 interface Task {
   id: string
   title: string
-  task_date: string
+  task_date: string | null
   completed: boolean
   xp_reward: number
+  boss_battle_id: string | null
 }
 
 interface QuestData {
@@ -283,6 +284,35 @@ export function CharacterPage({ dimension }: CharacterPageProps) {
           ? { ...prev, milestones: prev.milestones.filter((m) => m.id !== milestoneId) }
           : prev
       )
+    }
+  }
+
+  async function completeLooseTask(taskId: string, xpReward: number) {
+    const uid = getUserId()
+    setQuest((prev) =>
+      prev
+        ? {
+            ...prev,
+            recent_tasks: prev.recent_tasks.map((t) =>
+              t.id === taskId ? { ...t, completed: true } : t
+            ),
+          }
+        : prev
+    )
+    const res = await fetch(`/api/quests/tasks/${taskId}/complete`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: uid }),
+    })
+    const data = (await res.json()) as {
+      xp_earned?: number
+      leveled_up?: boolean
+      new_level?: number
+    }
+    if (res.ok) {
+      const earned = data.xp_earned ?? xpReward
+      setQuest((prev) => (prev ? { ...prev, xp: prev.xp + earned } : prev))
+      showXpFeedback({ dimension }, data, setXpToast, setLevelUpToast)
     }
   }
 
@@ -567,6 +597,91 @@ export function CharacterPage({ dimension }: CharacterPageProps) {
             }
           />
         )}
+
+        {/* Loose tasks — not linked to any challenge */}
+        {(() => {
+          const looseTasks = (quest?.recent_tasks ?? []).filter(
+            (t) => t.boss_battle_id == null
+          )
+          const incomplete = looseTasks.filter((t) => !t.completed)
+          const recentDone = looseTasks
+            .filter((t) => t.completed)
+            .slice(0, 3)
+          if (looseTasks.length === 0) return null
+          return (
+            <section style={{ marginBottom: 20 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                <span style={{ fontSize: 11, fontWeight: 600, color: '#9B8EC4', letterSpacing: '0.06em' }}>
+                  Tasks
+                </span>
+                <span style={{ fontSize: 10, color: '#3D3358' }}>
+                  {incomplete.length} remaining
+                </span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {[...incomplete, ...recentDone].map((task) => (
+                  <div
+                    key={task.id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      padding: '8px 10px',
+                      background: '#140C28',
+                      borderRadius: 8,
+                      border: '0.5px solid #2D1B55',
+                      opacity: task.completed ? 0.45 : 1,
+                      cursor: task.completed ? 'default' : 'pointer',
+                    }}
+                    onClick={() => {
+                      if (!task.completed) void completeLooseTask(task.id, task.xp_reward)
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: 16,
+                        height: 16,
+                        borderRadius: '50%',
+                        flexShrink: 0,
+                        border: `1.5px solid ${task.completed ? accentColor : '#4A2878'}`,
+                        background: task.completed ? accentColor : 'transparent',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      {task.completed && (
+                        <svg width="8" height="8" viewBox="0 0 10 10" fill="none">
+                          <path d="M2 5l2 2.5L8 3" stroke="white" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      )}
+                    </div>
+                    <span
+                      style={{
+                        flex: 1,
+                        fontSize: 11,
+                        color: task.completed ? '#5A4A7A' : '#E8E0F0',
+                        textDecoration: task.completed ? 'line-through' : 'none',
+                      }}
+                    >
+                      {task.title}
+                    </span>
+                    <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2, flexShrink: 0 }}>
+                      {task.task_date && (
+                        <span style={{ fontSize: 9, color: task.completed ? '#3D2878' : '#5A4A7A' }}>
+                          {new Date(task.task_date + 'T12:00:00').toLocaleDateString('en-GB', { month: 'short', day: 'numeric' })}
+                        </span>
+                      )}
+                      {!task.completed && (
+                        <span style={{ fontSize: 9, color: '#6B5E8C' }}>+{task.xp_reward} XP</span>
+                      )}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )
+        })()}
 
         <BossCard
           characterName={char.name}

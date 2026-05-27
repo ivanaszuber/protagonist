@@ -360,6 +360,8 @@ export default function DashboardPage() {
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null)
   const [reschedulingTaskId, setReschedulingTaskId] = useState<string | null>(null)
   const [pickerTaskId, setPickerTaskId] = useState<string | null>(null)
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null)
+  const [editTaskTitle, setEditTaskTitle] = useState('')
   // Loading state specifically for the Today section (tasks + calendar)
   const [todayLoading, setTodayLoading] = useState(() => _cache == null)
   const todayDate = useMemo(() => new Date(), [])
@@ -785,6 +787,26 @@ export default function DashboardPage() {
     } finally {
       setReschedulingTaskId(null)
     }
+  }
+
+  async function handleEditTask(id: string, newTitle: string) {
+    const trimmed = newTitle.trim()
+    if (!trimmed) return
+    // Optimistic update
+    setQuests((prev) =>
+      prev.map((q) => ({
+        ...q,
+        todays_tasks: q.todays_tasks?.map((t) =>
+          t.id === id ? { ...t, title: trimmed } : t
+        ),
+      }))
+    )
+    setEditingTaskId(null)
+    await fetch(`/api/quests/tasks/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: userIdRef.current, title: trimmed }),
+    }).catch(() => {})
   }
 
   async function handleDeleteTask(id: string) {
@@ -1592,8 +1614,91 @@ export default function DashboardPage() {
                           paddingTop: 2,
                         }}
                       >
-                        {/* Buttons row */}
+                        {/* Edit mode: inline title input */}
+                        {editingTaskId === item.id ? (
+                          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                            <input
+                              autoFocus
+                              type="text"
+                              value={editTaskTitle}
+                              onChange={(e) => setEditTaskTitle(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') void handleEditTask(item.id, editTaskTitle)
+                                if (e.key === 'Escape') setEditingTaskId(null)
+                              }}
+                              style={{
+                                flex: 1,
+                                background: '#0D0820',
+                                border: `0.5px solid ${item.color}60`,
+                                borderRadius: 8,
+                                padding: '6px 10px',
+                                fontSize: 12,
+                                color: '#E8E0F0',
+                                outline: 'none',
+                                fontFamily: 'inherit',
+                              }}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => void handleEditTask(item.id, editTaskTitle)}
+                              style={{
+                                padding: '6px 12px',
+                                borderRadius: 8,
+                                border: 'none',
+                                background: item.color,
+                                color: '#0D0820',
+                                fontSize: 11,
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                fontFamily: 'inherit',
+                                flexShrink: 0,
+                              }}
+                            >
+                              Save
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setEditingTaskId(null)}
+                              style={{
+                                padding: '6px 8px',
+                                borderRadius: 8,
+                                border: '0.5px solid #2D1B55',
+                                background: 'transparent',
+                                color: '#5A4A7A',
+                                fontSize: 14,
+                                cursor: 'pointer',
+                                fontFamily: 'inherit',
+                                flexShrink: 0,
+                                lineHeight: 1,
+                              }}
+                            >
+                              ×
+                            </button>
+                          </div>
+                        ) : (
+                        /* Buttons row */
                         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                          {/* Edit */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingTaskId(item.id)
+                              setEditTaskTitle(item.title)
+                            }}
+                            style={{
+                              padding: '5px 10px',
+                              borderRadius: 20,
+                              border: '0.5px solid #2D1B55',
+                              background: 'transparent',
+                              color: '#9B8EC4',
+                              fontSize: 10,
+                              cursor: 'pointer',
+                              fontFamily: 'inherit',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            ✏️ Edit
+                          </button>
                           {/* Tomorrow */}
                           <button
                             type="button"
@@ -1671,6 +1776,7 @@ export default function DashboardPage() {
                             Delete
                           </button>
                         </div>
+                        )}
                         {/* Real date input — shown when picker toggled */}
                         {pickerTaskId === item.id && (
                           <input
