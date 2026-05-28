@@ -208,13 +208,14 @@ export function DesktopLeftSidebar({
   return (
     <div style={{
       ...font,
-      width: 248, minWidth: 248,
+      width: 272, minWidth: 272,
       background: '#1A1335',
       borderRight: '1px solid rgba(255,255,255,0.07)',
       padding: '18px 16px 20px',
       display: 'flex', flexDirection: 'column',
       overflowY: 'auto', overflowX: 'hidden',
-      scrollbarWidth: 'none',
+      scrollbarWidth: 'thin',
+      scrollbarColor: 'rgba(123,63,228,0.3) transparent',
     }}>
 
       {/* ── Back button ── */}
@@ -376,25 +377,29 @@ export function DesktopLeftSidebar({
             <>
               {divider}
               <span style={metaLabel}>Character</span>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 10 }}>
-                {identity.strengths?.map((pill, i) => {
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginBottom: 10 }}>
+                {identity.strengths?.slice(0, 4).map((pill, i) => {
                   const c = PILL_COLORS[pill.color] ?? '#C4A8FF'
                   return (
-                    <span key={i} style={{
-                      fontSize: 10, fontWeight: 600,
+                    <span key={i} title={pill.label} style={{
+                      fontSize: 9, fontWeight: 600,
                       background: `${c}14`, color: c,
                       border: `1px solid ${c}28`,
-                      padding: '2px 8px', borderRadius: 100,
+                      padding: '3px 7px', borderRadius: 100,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
                       whiteSpace: 'nowrap' as const,
                     }}>{pill.label}</span>
                   )
                 })}
-                {identity.growthEdges?.map((pill, i) => (
-                  <span key={`g${i}`} style={{
-                    fontSize: 10, fontWeight: 600,
+                {identity.growthEdges?.slice(0, 2).map((pill, i) => (
+                  <span key={`g${i}`} title={pill.label} style={{
+                    fontSize: 9, fontWeight: 600,
                     background: 'rgba(255,212,122,0.1)', color: '#FFD47A',
                     border: '1px solid rgba(255,212,122,0.22)',
-                    padding: '2px 8px', borderRadius: 100,
+                    padding: '3px 7px', borderRadius: 100,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
                     whiteSpace: 'nowrap' as const,
                   }}>△ {pill.label}</span>
                 ))}

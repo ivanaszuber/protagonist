@@ -43,6 +43,7 @@ function SettingsContent() {
   const [signingOut, setSigningOut] = useState(false)
   const [savingProfile, setSavingProfile] = useState(false)
   const [profileSaved, setProfileSaved] = useState(false)
+  const [profileError, setProfileError] = useState('')
   const [userId, setUserId] = useState('')
 
   // Profile fields
@@ -105,8 +106,9 @@ function SettingsContent() {
   async function handleSaveProfile() {
     if (!userId) return
     setSavingProfile(true)
+    setProfileError('')
     try {
-      await fetch('/api/user-profile', {
+      const r = await fetch('/api/user-profile', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -123,12 +125,18 @@ function SettingsContent() {
           neurodivergentNotes,
         } satisfies UserProfile),
       })
+      const json = await r.json() as { ok?: boolean; error?: string }
+      if (!r.ok || json.error) {
+        setProfileError(json.error ?? 'Save failed — check console')
+        return
+      }
       // Bust sidebar cache so it re-fetches
       try { localStorage.removeItem(`protagonist-profile-${userId}`) } catch { /* ignore */ }
       setProfileSaved(true)
       setTimeout(() => setProfileSaved(false), 2500)
-    } catch { /* ignore */ }
-    finally { setSavingProfile(false) }
+    } catch (e) {
+      setProfileError(e instanceof Error ? e.message : 'Network error')
+    } finally { setSavingProfile(false) }
   }
 
   function togglePin(dim: Dimension) {
@@ -247,6 +255,12 @@ function SettingsContent() {
               Arc uses this to personalise how it understands and speaks to you.
             </p>
           </div>
+
+          {profileError && (
+            <p style={{ fontSize: 11, color: '#F87171', marginBottom: 10, padding: '6px 10px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 8 }}>
+              ⚠ {profileError}
+            </p>
+          )}
 
           <button
             type="button"

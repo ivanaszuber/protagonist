@@ -210,6 +210,46 @@ export async function addDimensionXP(
   }
 }
 
+// ── USER PROFILE ───────────────────────────────────────
+
+export interface UserProfileRow {
+  displayName: string
+  location: string
+  age: number | null
+  familyInfo: string
+  financialStatus: string
+  relationshipStatus: string
+  enneagram: string
+  sunSign: string
+  risingSign: string
+  neurodivergentNotes: string
+}
+
+export async function getUserProfile(userId: string): Promise<UserProfileRow | null> {
+  if (!isSupabaseConfigured()) return null
+
+  const { data, error } = await supabase
+    .from('user_profiles')
+    .select('*')
+    .eq('user_id', userId)
+    .maybeSingle()
+
+  if (error || !data) return null
+
+  return {
+    displayName:         data.display_name ?? '',
+    location:            data.location ?? '',
+    age:                 data.age ?? null,
+    familyInfo:          data.family_info ?? '',
+    financialStatus:     data.financial_status ?? '',
+    relationshipStatus:  data.relationship_status ?? '',
+    enneagram:           data.enneagram ?? '',
+    sunSign:             data.sun_sign ?? '',
+    risingSign:          data.rising_sign ?? '',
+    neurodivergentNotes: data.neurodivergent_notes ?? '',
+  }
+}
+
 // ── MEMORIES (for specialist agents) ──────────────────
 
 export async function saveDimensionMemory(

@@ -5,6 +5,8 @@ import {
   getOuraDaily,
   getCalendarEvents,
   getGmailDigest,
+  getUserProfile,
+  type UserProfileRow,
 } from '@/lib/db'
 import {
   buildCalendarContext,
@@ -190,20 +192,59 @@ function toPersistenceId(dim: DimensionId): string {
   return dim === 'create' ? 'career' : dim
 }
 
+/**
+ * Build a "WHO THIS PERSON IS" context block from the user's profile.
+ * Injected into both the Arc system prompt and each specialist call so
+ * every response is personalised to their identity, wiring, and life context.
+ */
+function buildPersonContext(profile: UserProfileRow): string {
+  const lines: string[] = ['WHO THIS PERSON IS (always factor this in):']
+
+  // Personal facts
+  const facts: string[] = []
+  if (profile.displayName) facts.push(`Name: ${profile.displayName}`)
+  if (profile.age)          facts.push(`Age: ${profile.age}`)
+  if (profile.location)     facts.push(`Lives in: ${profile.location}`)
+  if (profile.familyInfo)   facts.push(profile.familyInfo)
+  if (profile.financialStatus) facts.push(profile.financialStatus)
+  if (profile.relationshipStatus) facts.push(profile.relationshipStatus)
+  if (facts.length) lines.push(facts.join(' · '))
+
+  // Personality archetypes
+  if (profile.enneagram) {
+    lines.push(`Enneagram: ${profile.enneagram} — The Achiever-Artist. Driven by success and recognition, but equally hungry for depth and authenticity. Can conflate worth with output. Needs to be seen for who they ARE, not just what they achieve.`)
+  }
+
+  if (profile.sunSign || profile.risingSign) {
+    const astro: string[] = []
+    if (profile.sunSign)    astro.push(`${profile.sunSign} Sun — bold, pioneering, direct, impatient, needs to lead`)
+    if (profile.risingSign) astro.push(`${profile.risingSign} Rising — intuitive, protective, reads the room, feels everything more deeply than they show`)
+    lines.push(`Astrology: ${astro.join('. ')}.`)
+  }
+
+  if (profile.neurodivergentNotes) {
+    lines.push(`Neurodivergent wiring: ${profile.neurodivergentNotes}. This means: pattern-thinking, hyperfocus, sensory depth, non-linear processing, tendency to over-research before acting. Don't pathologise — this is a superpower with sharp edges.`)
+  }
+
+  lines.push(`HOW TO SPEAK TO THEM: Direct and warm. Acknowledge the complexity underneath. Don't oversimplify. They can handle the real picture. Avoid generic affirmations. They will see through performance.`)
+
+  return lines.join('\n')
+}
+
 export async function consultArc(input: ArcInput): Promise<ArcOutput> {
   const { userMessage, userId, checkInData } = input
 
-  const loadedOura =
+  // Load profile and all external context in parallel
+  const [loadedOura, { calendarContext, freeBlocks }, profileResult] = await Promise.all([
     input.ouraData !== undefined
-      ? {
-          payload: input.ouraData,
-          contextBlock: '',
-        }
-      : await loadOuraContextForUser(userId)
+      ? Promise.resolve({ payload: input.ouraData, contextBlock: '' })
+      : loadOuraContextForUser(userId),
+    loadCalendarContextForUser(userId),
+    getUserProfile(userId).catch(() => null),
+  ])
 
   const ouraContextBlock = loadedOura.contextBlock
-
-  const { calendarContext, freeBlocks } = await loadCalendarContextForUser(userId)
+  const personContextBlock = profileResult ? buildPersonContext(profileResult) : ''
 
   let gmailContext = ''
   try {
@@ -231,12 +272,14 @@ export async function consultArc(input: ArcInput): Promise<ArcOutput> {
 
   const specialistResults = await Promise.all(
     allDimensions.map((dim) => {
-      const specialistExtra =
+      const dimensionExtra =
         dim === 'create' && (calendarContext || gmailContext)
           ? `WORK CONTEXT TODAY:\n${calendarContext || ''}\n${gmailContext ? `Inbox: ${gmailContext}` : ''}\nFree blocks: ${freeBlocks.join(', ') || 'check calendar'}`
           : dim === 'love' && calendarContext
             ? `Schedule note: ${calendarContext.split('\n')[0]}`
             : undefined
+
+      const specialistExtra = [personContextBlock, dimensionExtra].filter(Boolean).join('\n\n') || undefined
 
       return callSpecialist(
         dim,
@@ -263,6 +306,7 @@ export async function consultArc(input: ArcInput): Promise<ArcOutput> {
     : ''
 
   const contextSection = [
+    personContextBlock ? personContextBlock : '',
     ouraContextBlock
       ? `BIODATA FOR TODAY (from Oura Ring — use for energy/recovery calibration):\n${ouraContextBlock}`
       : '',
