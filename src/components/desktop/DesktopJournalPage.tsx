@@ -8,6 +8,7 @@ import { openOracle } from '@/lib/oracle-events'
 import { DesktopLeftSidebar, DIM_COLORS } from './DesktopLeftSidebar'
 import DesktopTopNav from './DesktopTopNav'
 import { DesktopOracleModal } from './DesktopOracleModal'
+import ImportContextModal from './ImportContextModal'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -853,6 +854,7 @@ export default function DesktopJournalPage() {
   const [loadingEntries, setLoadingEntries] = useState(true)
   const [loadingInsights, setLoadingInsights] = useState(true)
   const [loadingPortrait, setLoadingPortrait] = useState(false)
+  const [showImport, setShowImport] = useState(false)
 
   // Init
   useEffect(() => {
@@ -951,6 +953,14 @@ export default function DesktopJournalPage() {
 
       {/* Oracle modal — required for the check-in button to work */}
       <DesktopOracleModal />
+
+      {/* ChatGPT import modal */}
+      {showImport && userId && (
+        <ImportContextModal
+          userId={userId}
+          onClose={() => setShowImport(false)}
+        />
+      )}
 
       {/* Body */}
       <div style={{ display: 'flex', flex: 1, minHeight: 0, overflow: 'hidden' }}>
@@ -1108,7 +1118,36 @@ export default function DesktopJournalPage() {
               )}
 
               {activeTab === 'portrait' && (
-                <PortraitView portrait={portrait} loading={loadingPortrait} onGenerate={() => void generatePortrait()} />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  {/* Import banner — shown when no portrait yet or always accessible */}
+                  <div style={{
+                    background: 'linear-gradient(135deg, rgba(123,63,228,0.12), rgba(196,168,255,0.06))',
+                    borderRadius: 14, padding: '14px 18px',
+                    border: '1px solid rgba(196,168,255,0.15)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap',
+                  }}>
+                    <div>
+                      <p style={{ ...font, fontSize: 13, fontWeight: 700, color: '#C4A8FF', marginBottom: 2 }}>
+                        Coming from ChatGPT?
+                      </p>
+                      <p style={{ ...font, fontSize: 12, color: 'rgba(255,255,255,0.4)', lineHeight: 1.5 }}>
+                        Import your conversation history so Arc already knows you from day one.
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setShowImport(true)}
+                      style={{
+                        ...font, cursor: 'pointer', fontWeight: 700, fontSize: 12,
+                        background: 'rgba(196,168,255,0.15)', color: '#C4A8FF',
+                        border: '1px solid rgba(196,168,255,0.25)', borderRadius: 9,
+                        padding: '8px 16px', whiteSpace: 'nowrap', flexShrink: 0,
+                      }}
+                    >
+                      Import context →
+                    </button>
+                  </div>
+                  <PortraitView portrait={portrait} loading={loadingPortrait} onGenerate={() => void generatePortrait()} />
+                </div>
               )}
 
               {activeTab === 'growth' && (
