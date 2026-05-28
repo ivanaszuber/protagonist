@@ -525,7 +525,7 @@ export function DesktopCharacterPage({ dimension }: DesktopCharacterPageProps) {
 
       {/* ── Right panel ──────────────────────────────────────────────────── */}
       <div style={{
-        width: 340, flexShrink: 0,
+        width: 300, flexShrink: 0,
         background: '#0F0B1F',
         borderLeft: '1px solid rgba(255,255,255,0.06)',
         overflowY: 'auto', padding: '28px 20px 60px',

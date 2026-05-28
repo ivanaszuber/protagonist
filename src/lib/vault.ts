@@ -273,8 +273,8 @@ export function formatGbp(amount: number, compact = false): string {
 }
 
 export function coinFillColor(coinIndex: number): string {
-  if (coinIndex <= 5) return '#085041'
-  if (coinIndex <= 10) return '#0F6E56'
-  if (coinIndex <= 15) return '#1D9E75'
-  return '#1D9E75'
+  if (coinIndex <= 5)  return '#063A52'
+  if (coinIndex <= 10) return '#0D6080'
+  if (coinIndex <= 15) return '#1A9EC7'
+  return '#4DC4FF'
 }

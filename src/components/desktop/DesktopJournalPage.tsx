@@ -1603,7 +1603,7 @@ export default function DesktopJournalPage() {
 
         {/* Right sidebar — true sibling of left sidebar and main content */}
         <div style={{
-          width: 240, flexShrink: 0,
+          width: 300, flexShrink: 0,
           borderLeft: '1px solid rgba(255,255,255,0.06)',
           overflowY: 'auto', overflowX: 'hidden',
           padding: '20px 14px',

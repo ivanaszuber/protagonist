@@ -47,11 +47,13 @@ function CoinSlot({
   coinsFilled,
   coinsPartialPct,
   goalCoinIndex,
+  accentColor,
 }: {
   index: number
   coinsFilled: number
   coinsPartialPct: number
   goalCoinIndex: number
+  accentColor: string
 }) {
   const isFilled = index <= coinsFilled
   const isPartial = index === coinsFilled + 1
@@ -65,8 +67,8 @@ function CoinSlot({
           width: 28,
           height: 7,
           borderRadius: 3,
-          border: '1px dashed rgba(147,51,234,0.5)',
-          background: 'rgba(147,51,234,0.08)',
+          border: '1px dashed rgba(255,212,122,0.55)',
+          background: 'rgba(255,212,122,0.07)',
         }}
       />
     )
@@ -79,8 +81,8 @@ function CoinSlot({
           width: 28,
           height: 7,
           borderRadius: 3,
-          background: '#0A0718',
-          border: '0.5px solid rgba(29,158,117,0.5)',
+          background: '#040F18',
+          border: `0.5px solid ${accentColor}55`,
           position: 'relative',
           overflow: 'hidden',
           animation: 'vault-pulse-glow 2s ease-in-out infinite',
@@ -93,7 +95,7 @@ function CoinSlot({
             top: 0,
             bottom: 0,
             width: `${coinsPartialPct}%`,
-            background: '#1D9E75',
+            background: accentColor,
             borderRadius: 3,
           }}
         />
@@ -117,8 +119,8 @@ function CoinSlot({
           width: 28,
           height: 7,
           borderRadius: 3,
-          border: '1px dashed rgba(61,32,112,0.6)',
-          background: 'rgba(61,32,112,0.06)',
+          border: '1px dashed rgba(77,196,255,0.18)',
+          background: 'rgba(77,196,255,0.04)',
         }}
       />
     )
@@ -160,8 +162,8 @@ function CoinSlot({
         width: 28,
         height: 7,
         borderRadius: 3,
-        background: 'rgba(61,32,112,0.04)',
-        border: '0.5px solid rgba(61,32,112,0.15)',
+        background: 'rgba(77,196,255,0.04)',
+        border: '0.5px solid rgba(77,196,255,0.12)',
       }}
     />
   )
@@ -239,13 +241,13 @@ export function VaultNetWorthCard({ userId, accentColor }: VaultNetWorthCardProp
     return (
       <div
         style={{
-          background: '#140C28',
+          background: '#070E18',
           borderRadius: 14,
-          border: '0.5px solid #2D1B55',
+          border: '0.5px solid #0D2030',
           padding: 16,
           marginBottom: 8,
           fontSize: 11,
-          color: '#5A4A7A',
+          color: 'rgba(77,196,255,0.3)',
         }}
       >
         Loading vault...
@@ -270,9 +272,9 @@ export function VaultNetWorthCard({ userId, accentColor }: VaultNetWorthCardProp
   return (
     <div
       style={{
-        background: '#140C28',
+        background: '#070E18',
         borderRadius: 14,
-        border: '0.5px solid #2D1B55',
+        border: '0.5px solid #0D2030',
         padding: '14px 14px 14px 17px',
         marginBottom: 8,
         position: 'relative',
@@ -295,7 +297,7 @@ export function VaultNetWorthCard({ userId, accentColor }: VaultNetWorthCardProp
           <div
             style={{
               fontSize: 7,
-              color: '#4A2878',
+              color: 'rgba(77,196,255,0.35)',
               textAlign: 'center',
               marginBottom: 4,
             }}
@@ -311,6 +313,7 @@ export function VaultNetWorthCard({ userId, accentColor }: VaultNetWorthCardProp
                   coinsFilled={data.coinsFilled}
                   coinsPartialPct={data.coinsPartialPct}
                   goalCoinIndex={data.goalCoinIndex}
+                  accentColor={accentColor}
                 />
               ))}
             </div>
@@ -322,6 +325,7 @@ export function VaultNetWorthCard({ userId, accentColor }: VaultNetWorthCardProp
                   coinsFilled={data.coinsFilled}
                   coinsPartialPct={data.coinsPartialPct}
                   goalCoinIndex={data.goalCoinIndex}
+                  accentColor={accentColor}
                 />
               ))}
             </div>
@@ -349,7 +353,7 @@ export function VaultNetWorthCard({ userId, accentColor }: VaultNetWorthCardProp
           <div
             style={{
               fontSize: 10,
-              color: '#4A3870',
+              color: 'rgba(77,196,255,0.45)',
               textTransform: 'uppercase',
               letterSpacing: '0.06em',
               marginBottom: 4,
@@ -360,13 +364,13 @@ export function VaultNetWorthCard({ userId, accentColor }: VaultNetWorthCardProp
           <div style={{ fontSize: 34, fontWeight: 500, color: '#E8E0F0', lineHeight: 1.1 }}>
             {formatGbp(data.totalNetWorth)}
           </div>
-          <div style={{ fontSize: 10, color: '#2D5A44', marginTop: 4, marginBottom: 8 }}>
+          <div style={{ fontSize: 10, color: 'rgba(77,196,255,0.5)', marginTop: 4, marginBottom: 8 }}>
             {formatGbp(toGo, true)} to go
           </div>
           <div
             style={{
               height: 4,
-              background: '#0A1F17',
+              background: 'rgba(77,196,255,0.08)',
               borderRadius: 2,
               overflow: 'hidden',
               marginBottom: 10,
@@ -386,39 +390,41 @@ export function VaultNetWorthCard({ userId, accentColor }: VaultNetWorthCardProp
             <div
               style={{
                 flex: 1,
-                background: '#0A1F17',
+                background: 'rgba(77,196,255,0.07)',
+                border: '0.5px solid rgba(77,196,255,0.15)',
                 borderRadius: 8,
                 padding: '6px 8px',
               }}
             >
-              <div style={{ fontSize: 9, color: '#2D5A44' }}>Invested</div>
+              <div style={{ fontSize: 9, color: 'rgba(77,196,255,0.45)' }}>Invested</div>
               <div style={{ fontSize: 12, color: accentColor }}>{formatGbp(settings.invested, true)}</div>
             </div>
             <div
               style={{
                 flex: 1,
-                background: '#100820',
+                background: 'rgba(168,126,248,0.07)',
+                border: '0.5px solid rgba(168,126,248,0.15)',
                 borderRadius: 8,
                 padding: '6px 8px',
               }}
             >
-              <div style={{ fontSize: 9, color: '#4A2878' }}>Cash</div>
+              <div style={{ fontSize: 9, color: 'rgba(168,126,248,0.45)' }}>Cash</div>
               <div style={{ fontSize: 12, color: '#A87EF8' }}>{formatGbp(settings.cash, true)}</div>
             </div>
           </div>
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
-              <span style={{ fontSize: 9, color: '#2D5A44' }}>
+              <span style={{ fontSize: 9, color: 'rgba(255,212,122,0.7)' }}>
                 FIRE {settings.fire_target_year}
               </span>
-              <span style={{ fontSize: 9, color: '#2D5A44' }}>
+              <span style={{ fontSize: 9, color: 'rgba(255,212,122,0.7)' }}>
                 {data.fireProgressPct.toFixed(1)}%
               </span>
             </div>
             <div
               style={{
                 height: 2,
-                background: '#0A1F17',
+                background: 'rgba(255,212,122,0.1)',
                 borderRadius: 1,
                 overflow: 'hidden',
               }}
@@ -427,7 +433,7 @@ export function VaultNetWorthCard({ userId, accentColor }: VaultNetWorthCardProp
                 style={{
                   height: '100%',
                   width: `${Math.min(100, data.fireProgressPct)}%`,
-                  background: '#2D5A44',
+                  background: '#FFD47A',
                 }}
               />
             </div>
@@ -435,7 +441,7 @@ export function VaultNetWorthCard({ userId, accentColor }: VaultNetWorthCardProp
         </div>
       </div>
 
-      <div style={{ borderTop: '0.5px solid #1E0D40', paddingTop: 10 }}>
+      <div style={{ borderTop: '0.5px solid rgba(77,196,255,0.08)', paddingTop: 10 }}>
         <button
           type="button"
           onClick={() => setShadowExpanded((v) => !v)}
@@ -449,13 +455,13 @@ export function VaultNetWorthCard({ userId, accentColor }: VaultNetWorthCardProp
             border: behind
               ? '0.5px solid rgba(186,117,23,0.35)'
               : ahead
-                ? '0.5px solid rgba(29,158,117,0.3)'
-                : '0.5px solid rgba(29,158,117,0.2)',
+                ? `0.5px solid ${accentColor}40`
+                : `0.5px solid ${accentColor}25`,
             background: behind
               ? 'rgba(186,117,23,0.12)'
               : ahead
-                ? 'rgba(29,158,117,0.10)'
-                : 'rgba(29,158,117,0.06)',
+                ? 'rgba(77,196,255,0.06)'
+                : 'rgba(77,196,255,0.03)',
             cursor: 'pointer',
             fontFamily: 'inherit',
           }}
@@ -472,18 +478,18 @@ export function VaultNetWorthCard({ userId, accentColor }: VaultNetWorthCardProp
               </>
             ) : ahead ? (
               <>
-                <span style={{ color: '#1D9E75' }}>✓ Ahead of shadow </span>
-                <span style={{ color: '#1D9E75' }}>+{formatGbp(Math.abs(shadowGap))}</span>
-                <span style={{ color: '#2D5A44' }}>
+                <span style={{ color: accentColor }}>✓ Ahead of shadow </span>
+                <span style={{ color: accentColor }}>+{formatGbp(Math.abs(shadowGap))}</span>
+                <span style={{ color: 'rgba(77,196,255,0.45)' }}>
                   {' '}
                   → +{formatGbp(Math.abs(data.shadow5yr))} in 5yr
                 </span>
               </>
             ) : (
-              <span style={{ color: '#2D5A44' }}>On track with shadow</span>
+              <span style={{ color: 'rgba(77,196,255,0.4)' }}>On track with shadow</span>
             )}
           </span>
-          <span style={{ color: '#4A2878', fontSize: 10 }}>{shadowExpanded ? '▴' : '▾'}</span>
+          <span style={{ color: 'rgba(77,196,255,0.35)', fontSize: 10 }}>{shadowExpanded ? '▴' : '▾'}</span>
         </button>
 
         <div
@@ -493,39 +499,39 @@ export function VaultNetWorthCard({ userId, accentColor }: VaultNetWorthCardProp
             transition: 'max-height 0.3s ease',
           }}
         >
-          <p style={{ fontSize: 11, color: '#6B5E8C', margin: '10px 0 8px', lineHeight: 1.5 }}>
+          <p style={{ fontSize: 11, color: 'rgba(77,196,255,0.4)', margin: '10px 0 8px', lineHeight: 1.5 }}>
             Shadow tracks whether your net worth grew as much as your budget surplus suggests it
             should.
           </p>
           <div
             style={{
-              background: '#100818',
-              border: '0.5px solid #1E0D40',
+              background: '#040E18',
+              border: '0.5px solid rgba(77,196,255,0.1)',
               borderRadius: 10,
               padding: '10px 12px',
               fontSize: 11,
-              color: '#9B8EC4',
+              color: 'rgba(77,196,255,0.5)',
             }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
               <span>Budget surplus (monthly)</span>
-              <span style={{ color: '#C0B0E0' }}>{formatGbp(actualSurplus)}</span>
+              <span style={{ color: 'rgba(77,196,255,0.75)' }}>{formatGbp(actualSurplus)}</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
               <span>Total budget</span>
               <span>{formatGbp(budgetTotal)}</span>
             </div>
-            <div style={{ height: '0.5px', background: '#1E0D40', margin: '8px 0' }} />
+            <div style={{ height: '0.5px', background: 'rgba(77,196,255,0.08)', margin: '8px 0' }} />
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
               <span>Gap now</span>
-              <span style={{ color: behind ? '#ef4444' : ahead ? '#1D9E75' : '#C0B0E0' }}>
+              <span style={{ color: behind ? '#ef4444' : ahead ? accentColor : 'rgba(77,196,255,0.75)' }}>
                 {behind ? '−' : ahead ? '+' : ''}
                 {formatGbp(Math.abs(shadowGap))}
               </span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span>In 5yr at {settings.shadow_interest_rate}%</span>
-              <span style={{ color: behind ? '#ef4444' : ahead ? '#1D9E75' : '#C0B0E0' }}>
+              <span style={{ color: behind ? '#ef4444' : ahead ? accentColor : 'rgba(77,196,255,0.75)' }}>
                 {behind ? '−' : ahead ? '+' : ''}
                 {formatGbp(Math.abs(data.shadow5yr))}
               </span>
@@ -570,7 +576,7 @@ export function VaultNetWorthCard({ userId, accentColor }: VaultNetWorthCardProp
           transition: 'max-height 0.35s ease',
         }}
       >
-        <div style={{ marginTop: 14, borderTop: '0.5px solid #1E0D40', paddingTop: 14 }}>
+        <div style={{ marginTop: 14, borderTop: '0.5px solid rgba(77,196,255,0.08)', paddingTop: 14 }}>
           {/* Sad animated robot + message */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
             <div
@@ -583,24 +589,24 @@ export function VaultNetWorthCard({ userId, accentColor }: VaultNetWorthCardProp
                 transformOrigin: 'bottom center',
               }}
             >
-              {/* Sad vault robot — GREEN, sad brows (inner corners UP) */}
+              {/* Sad vault robot — CYAN, sad brows (inner corners UP) */}
               <svg width="64" height="80" viewBox="0 0 42 56" fill="none" aria-hidden>
                 <circle cx="18" cy="7" r="5.5" fill="#FAC775" opacity="0.85" />
                 <circle cx="18" cy="7" r="3.5" fill="#EF9F27" />
                 <path d="M17.5 4.5V9.5M15.5 7H21" stroke="#FAC775" strokeWidth="1.2" strokeLinecap="round" />
-                <rect x="3" y="12" width="30" height="24" rx="9" fill="#1D9E75" />
-                <circle cx="13" cy="24" r="6" fill="#012A1E" />
-                <circle cx="26" cy="24" r="6" fill="#012A1E" />
+                <rect x="3" y="12" width="30" height="24" rx="9" fill="#0D5C78" />
+                <circle cx="13" cy="24" r="6" fill="#021420" />
+                <circle cx="26" cy="24" r="6" fill="#021420" />
                 {/* pupils down-center — sad look */}
                 <circle cx="13" cy="25" r="2.5" fill="white" opacity="0.55" />
                 <circle cx="26" cy="25" r="2.5" fill="white" opacity="0.55" />
                 {/* sad brows: inner corners UP, outer corners DOWN */}
-                <path d="M8 22L13 20" stroke="#9FE1CB" strokeWidth="1.2" strokeLinecap="round" />
-                <path d="M23 20L28 22" stroke="#9FE1CB" strokeWidth="1.2" strokeLinecap="round" />
+                <path d="M8 22L13 20" stroke="rgba(77,196,255,0.6)" strokeWidth="1.2" strokeLinecap="round" />
+                <path d="M23 20L28 22" stroke="rgba(77,196,255,0.6)" strokeWidth="1.2" strokeLinecap="round" />
                 {/* frown */}
-                <path d="M10 33Q18 30 26 33" stroke="#012A1E" strokeWidth="1.8" fill="none" strokeLinecap="round" />
-                <rect x="7" y="38" width="22" height="16" rx="5" fill="#0F6E56" />
-                <path d="M11 51L16 47L20 49L26 44" stroke="#1D9E75" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" opacity="0.75" />
+                <path d="M10 33Q18 30 26 33" stroke="#021420" strokeWidth="1.8" fill="none" strokeLinecap="round" />
+                <rect x="7" y="38" width="22" height="16" rx="5" fill="#073D52" />
+                <path d="M11 51L16 47L20 49L26 44" stroke="#1A9EC7" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" opacity="0.75" />
               </svg>
               {/* Animated tears */}
               <div
@@ -610,7 +616,7 @@ export function VaultNetWorthCard({ userId, accentColor }: VaultNetWorthCardProp
                   top: 46,
                   width: 4,
                   height: 8,
-                  background: '#9FE1CB',
+                  background: 'rgba(77,196,255,0.5)',
                   borderRadius: '0 0 4px 4px',
                   animation: 'vault-tear-fall 1.1s ease-in infinite',
                 }}
@@ -622,7 +628,7 @@ export function VaultNetWorthCard({ userId, accentColor }: VaultNetWorthCardProp
                   top: 46,
                   width: 4,
                   height: 8,
-                  background: '#9FE1CB',
+                  background: 'rgba(77,196,255,0.5)',
                   borderRadius: '0 0 4px 4px',
                   animation: 'vault-tear-fall 1.1s ease-in 0.45s infinite',
                 }}
@@ -644,7 +650,7 @@ export function VaultNetWorthCard({ userId, accentColor }: VaultNetWorthCardProp
             style={{
               fontSize: 10,
               fontWeight: 600,
-              color: '#5A4A7A',
+              color: 'rgba(77,196,255,0.4)',
               letterSpacing: '0.1em',
               textTransform: 'uppercase',
               margin: '0 0 8px',
@@ -678,7 +684,7 @@ export function VaultNetWorthCard({ userId, accentColor }: VaultNetWorthCardProp
 
           {/* Amount — underline style */}
           <div style={{ marginBottom: 10 }}>
-            <div style={{ fontSize: 10, color: '#4A3870', marginBottom: 4, letterSpacing: '0.04em' }}>
+            <div style={{ fontSize: 10, color: 'rgba(77,196,255,0.4)', marginBottom: 4, letterSpacing: '0.04em' }}>
               Amount
             </div>
             <div
@@ -686,11 +692,11 @@ export function VaultNetWorthCard({ userId, accentColor }: VaultNetWorthCardProp
                 display: 'flex',
                 alignItems: 'center',
                 gap: 6,
-                borderBottom: '0.5px solid #2D1B55',
+                borderBottom: '0.5px solid rgba(77,196,255,0.15)',
                 paddingBottom: 6,
               }}
             >
-              <span style={{ fontSize: 12, color: '#3D2070' }}>£</span>
+              <span style={{ fontSize: 12, color: 'rgba(77,196,255,0.4)' }}>£</span>
               <input
                 type="number"
                 placeholder="0"
@@ -712,10 +718,10 @@ export function VaultNetWorthCard({ userId, accentColor }: VaultNetWorthCardProp
 
           {/* Note — underline style */}
           <div style={{ marginBottom: 14 }}>
-            <div style={{ fontSize: 10, color: '#4A3870', marginBottom: 4, letterSpacing: '0.04em' }}>
+            <div style={{ fontSize: 10, color: 'rgba(77,196,255,0.4)', marginBottom: 4, letterSpacing: '0.04em' }}>
               Note (optional)
             </div>
-            <div style={{ borderBottom: '0.5px solid #1E0D40', paddingBottom: 6 }}>
+            <div style={{ borderBottom: '0.5px solid rgba(77,196,255,0.08)', paddingBottom: 6 }}>
               <input
                 type="text"
                 placeholder="What was it?"
