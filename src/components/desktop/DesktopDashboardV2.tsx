@@ -58,11 +58,12 @@ const CSS_ANIMATIONS = `
   @keyframes v2-float    { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-5px)} }
   @keyframes v2-pulse-dot{ 0%,100%{transform:scale(1);opacity:1} 50%{transform:scale(1.15);opacity:0.75} }
   @keyframes v2-pulse-btn{ 0%,100%{box-shadow:0 0 0 0 rgba(255,122,101,0.4)} 50%{box-shadow:0 0 0 8px rgba(255,122,101,0)} }
-  @keyframes v2-orb-a    { from{transform:rotate(0deg) translateX(22px) rotate(0deg)}    to{transform:rotate(360deg) translateX(22px) rotate(-360deg)} }
-  @keyframes v2-orb-b    { from{transform:rotate(130deg) translateX(22px) rotate(-130deg)} to{transform:rotate(490deg) translateX(22px) rotate(-490deg)} }
-  @keyframes v2-orb-c    { from{transform:rotate(250deg) translateX(22px) rotate(-250deg)} to{transform:rotate(610deg) translateX(22px) rotate(-610deg)} }
+  @keyframes v2-orb-a    { from{transform:rotate(0deg) translateX(38px) rotate(0deg)}    to{transform:rotate(360deg) translateX(38px) rotate(-360deg)} }
+  @keyframes v2-orb-b    { from{transform:rotate(130deg) translateX(38px) rotate(-130deg)} to{transform:rotate(490deg) translateX(38px) rotate(-490deg)} }
+  @keyframes v2-orb-c    { from{transform:rotate(250deg) translateX(38px) rotate(-250deg)} to{transform:rotate(610deg) translateX(38px) rotate(-610deg)} }
   @keyframes v2-twinkle  { 0%,100%{opacity:0.1} 50%{opacity:0.65} }
   @keyframes v2-score-pop{ 0%{transform:scale(0.75);opacity:0} 60%{transform:scale(1.12);opacity:1} 100%{transform:scale(1);opacity:1} }
+  @keyframes v2-sparkle  { 0%,100%{opacity:0;transform:scale(0.4) rotate(0deg)} 40%,60%{opacity:1;transform:scale(1) rotate(45deg)} }
   ::-webkit-scrollbar { display: none; }
 `
 
@@ -92,14 +93,74 @@ function getTomorrowStr(): string {
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-function MiniCharFigure({ color }: { color: string }) {
+function RobotChar({ dim, color }: { dim: Dimension; color: string }) {
+  // Unique top accessory per dimension
+  const accessory: React.ReactNode = (() => {
+    switch (dim) {
+      case 'family':
+        // branches
+        return <>
+          <line x1="12" y1="7" x2="12" y2="2" stroke={color} strokeWidth="1.3" strokeLinecap="round"/>
+          <line x1="12" y1="4" x2="9"  y2="1" stroke={color} strokeWidth="1.1" strokeLinecap="round"/>
+          <line x1="12" y1="4" x2="15" y2="1" stroke={color} strokeWidth="1.1" strokeLinecap="round"/>
+        </>
+      case 'career':
+        // antenna + circle
+        return <>
+          <line x1="12" y1="7" x2="12" y2="2" stroke={color} strokeWidth="1.3" strokeLinecap="round"/>
+          <circle cx="12" cy="1.5" r="1.5" fill={color}/>
+        </>
+      case 'wealth':
+        // coin with $
+        return <>
+          <circle cx="12" cy="2.5" r="2.5" fill={color} opacity="0.9"/>
+          <text x="12" y="4" textAnchor="middle" fill="#130E2A" fontSize="3" fontWeight="700" fontFamily="sans-serif">$</text>
+        </>
+      case 'love':
+        // heart
+        return <path d="M10 5 C10 3.5 8 2 8 3.5 C8 5 10 6.5 12 8 C14 6.5 16 5 16 3.5 C16 2 14 3.5 14 5 C13 4 12 3 12 3 C12 3 11 4 10 5Z" fill={color} transform="scale(0.7) translate(5,-2)"/>
+      case 'social':
+        // waves
+        return <path d="M8 4 Q10 2 12 4 Q14 6 16 4" stroke={color} strokeWidth="1.3" fill="none" strokeLinecap="round"/>
+      case 'vitality':
+        // flame
+        return <path d="M12 7 C11 5 9 4 10 2 C10.5 3 11.5 3.5 12 2 C12.5 3.5 13.5 3 14 2 C15 4 13 5 12 7Z" fill={color} opacity="0.9"/>
+      case 'mind':
+        // hat
+        return <>
+          <polygon points="8,7 16,7 14,3 10,3" fill={color} opacity="0.9"/>
+          <rect x="7" y="6.5" width="10" height="1.5" rx="0.75" fill={color}/>
+        </>
+      default:
+        return null
+    }
+  })()
+
   return (
-    <div style={{ width: 18, height: 24, position: 'relative', flexShrink: 0 }}>
-      <div style={{ width: 9, height: 9, borderRadius: '50%', background: color, position: 'absolute', top: 0, left: 4.5 }} />
-      <div style={{ width: 11, height: 12, background: color, borderRadius: '2px 2px 0 0', position: 'absolute', top: 10, left: 3.5 }} />
-      <div style={{ width: 3, height: 5, background: color, borderRadius: 2, position: 'absolute', bottom: 0, left: 3, opacity: 0.65 }} />
-      <div style={{ width: 3, height: 5, background: color, borderRadius: 2, position: 'absolute', bottom: 0, right: 2, opacity: 0.65 }} />
-    </div>
+    <svg width="26" height="32" viewBox="0 0 24 32" style={{ flexShrink: 0 }}>
+      {/* Accessory */}
+      {accessory}
+      {/* Body */}
+      <rect x="2" y="7" width="20" height="16" rx="4" fill={color}/>
+      {/* Left eye outer */}
+      <rect x="4" y="10" width="7" height="7" rx="2.5" fill="#130E2A"/>
+      {/* Right eye outer */}
+      <rect x="13" y="10" width="7" height="7" rx="2.5" fill="#130E2A"/>
+      {/* Shine L */}
+      <circle cx="6.5" cy="12" r="1.8" fill="white" opacity="0.9"/>
+      {/* Shine R */}
+      <circle cx="15.5" cy="12" r="1.8" fill="white" opacity="0.9"/>
+      {/* Pupil L */}
+      <circle cx="7.8" cy="13.2" r="1.1" fill="#130E2A"/>
+      {/* Pupil R */}
+      <circle cx="16.8" cy="13.2" r="1.1" fill="#130E2A"/>
+      {/* Smile */}
+      <path d="M9 20 Q12 22 15 20" stroke="#130E2A" strokeWidth="1.2" fill="none" strokeLinecap="round"/>
+      {/* Left leg */}
+      <rect x="5" y="24" width="5" height="7" rx="2.5" fill={color} opacity="0.8"/>
+      {/* Right leg */}
+      <rect x="14" y="24" width="5" height="7" rx="2.5" fill={color} opacity="0.8"/>
+    </svg>
   )
 }
 
@@ -131,7 +192,8 @@ export default function DesktopDashboardV2(props: DesktopDashboardV2Props) {
   } = props
 
   const router = useRouter()
-  const starsRef = useRef<HTMLDivElement>(null)
+  const starsRef    = useRef<HTMLDivElement>(null)
+  const sparklesRef = useRef<HTMLDivElement>(null)
 
   const font: CSSProperties = { fontFamily: "'Space Grotesk', system-ui, sans-serif" }
   const colScroll: CSSProperties = { overflowY: 'auto', overflowX: 'hidden', scrollbarWidth: 'none' }
@@ -166,7 +228,7 @@ export default function DesktopDashboardV2(props: DesktopDashboardV2Props) {
   const lifeScoreDisplay = lifeScoreNum.toFixed(1)
 
   // Ring gauge
-  const RING_R = 42
+  const RING_R = 46
   const circumference = 2 * Math.PI * RING_R
   const ringOffset = circumference * (1 - Math.min(lifeScoreNum / 10, 1))
 
@@ -214,6 +276,37 @@ export default function DesktopDashboardV2(props: DesktopDashboardV2Props) {
     }
   }, [])
 
+  // ── Sparkles ──────────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    const container = sparklesRef.current
+    if (!container) return
+    container.innerHTML = ''
+    // Discrete positions (% of container) — corners and edges only
+    const positions = [
+      { x: 4, y: 8 }, { x: 21, y: 11 }, { x: 7, y: 17 }, { x: 18, y: 22 },
+      { x: 36, y: 6 }, { x: 55, y: 12 }, { x: 42, y: 20 }, { x: 28, y: 8 },
+    ]
+    positions.forEach(({ x, y }) => {
+      const size  = 10 + Math.random() * 6
+      const dur   = (2.5 + Math.random() * 2.5).toFixed(1)
+      const delay = (Math.random() * 5).toFixed(1)
+      const el = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+      el.setAttribute('width', String(size))
+      el.setAttribute('height', String(size))
+      el.setAttribute('viewBox', '0 0 20 20')
+      el.style.cssText =
+        `position:absolute;left:${x}%;top:${y}%;` +
+        `animation:v2-sparkle ${dur}s ease-in-out ${delay}s infinite;` +
+        `pointer-events:none;opacity:0;`
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path')
+      path.setAttribute('d', 'M10 0 L11.5 8.5 L20 10 L11.5 11.5 L10 20 L8.5 11.5 L0 10 L8.5 8.5 Z')
+      path.setAttribute('fill', 'white')
+      el.appendChild(path)
+      container.appendChild(el)
+    })
+  }, [])
+
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
@@ -224,6 +317,9 @@ export default function DesktopDashboardV2(props: DesktopDashboardV2Props) {
 
         {/* Starfield */}
         <div ref={starsRef} style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 0 }} />
+
+        {/* Sparkles */}
+        <div ref={sparklesRef} style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 1 }} />
 
         {/* ══════════════════ TOP NAV ══════════════════ */}
         <nav style={{
@@ -315,20 +411,20 @@ export default function DesktopDashboardV2(props: DesktopDashboardV2Props) {
 
             {/* Identity + Life Score ring */}
             <div style={{ textAlign: 'center', marginBottom: 20 }}>
-              <svg width="96" height="96" viewBox="0 0 96 96" style={{ display: 'block', margin: '0 auto 8px' }}>
-                <circle cx="48" cy="48" r={RING_R} fill="none" stroke="rgba(123,63,228,0.15)" strokeWidth="6" />
+              <svg width="110" height="110" viewBox="0 0 110 110" style={{ display: 'block', margin: '0 auto 2px' }}>
+                <circle cx="55" cy="55" r={RING_R} fill="none" stroke="rgba(123,63,228,0.15)" strokeWidth="6" />
                 <circle
-                  cx="48" cy="48" r={RING_R} fill="none" stroke="#7B3FE4" strokeWidth="6"
+                  cx="55" cy="55" r={RING_R} fill="none" stroke="#7B3FE4" strokeWidth="6"
                   strokeLinecap="round"
                   strokeDasharray={circumference}
                   strokeDashoffset={ringOffset}
-                  transform="rotate(-90 48 48)"
+                  transform="rotate(-90 55 55)"
                   style={{ transition: 'stroke-dashoffset 0.8s ease-out' }}
                 />
-                <circle cx="48" cy="48" r="34" fill="#130E2A" />
-                <text x="48" y="45" textAnchor="middle" fill="white" fontSize="26" fontWeight="700" fontFamily="Space Grotesk, sans-serif">{lifeScoreDisplay}</text>
-                <text x="48" y="60" textAnchor="middle" fill="rgba(255,255,255,0.28)" fontSize="8" letterSpacing="1.8" fontFamily="Space Grotesk, sans-serif">LIFE SCORE</text>
+                <circle cx="55" cy="55" r="38" fill="#130E2A" />
+                <text x="55" y="66" textAnchor="middle" fill="white" fontSize="36" fontWeight="700" fontFamily="Space Grotesk, sans-serif">{lifeScoreDisplay}</text>
               </svg>
+              <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: 10, fontWeight: 500, letterSpacing: '1.8px', marginBottom: 8 }}>LIFE SCORE</div>
               <div style={{ color: 'white', fontSize: 16, fontWeight: 600, letterSpacing: -0.3 }}>Ivana</div>
               <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, marginTop: 2, letterSpacing: 0.3 }}>The Protagonist</div>
             </div>
@@ -356,7 +452,7 @@ export default function DesktopDashboardV2(props: DesktopDashboardV2Props) {
                       transition: 'opacity 0.15s',
                     }}
                   >
-                    <MiniCharFigure color={color} />
+                    <RobotChar dim={dim} color={color} />
                     <span style={{ color, fontSize: 12, fontWeight: 500, flex: 1 }}>{CATEGORY_LABELS[dim]}</span>
                     <span
                       key={score}
@@ -642,28 +738,43 @@ export default function DesktopDashboardV2(props: DesktopDashboardV2Props) {
             }}>
               <span style={{ ...metaLabel, marginBottom: 14 }}>The Oracle · Arc</span>
 
-              {/* Orb */}
+              {/* Oracle Robot */}
               <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}>
-                <div style={{ position: 'relative', width: 58, height: 58 }}>
+                <div style={{ position: 'relative', width: 90, height: 90, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   {/* Orbiting particles */}
-                  <div style={{ position: 'absolute', top: '50%', left: '50%', margin: -3,   width: 6, height: 6, borderRadius: '50%', background: '#FFB347', animation: 'v2-orb-a 3.2s linear infinite' }} />
-                  <div style={{ position: 'absolute', top: '50%', left: '50%', margin: -2.5, width: 5, height: 5, borderRadius: '50%', background: '#00D4B8', animation: 'v2-orb-b 3.2s linear infinite' }} />
-                  <div style={{ position: 'absolute', top: '50%', left: '50%', margin: -2,   width: 4, height: 4, borderRadius: '50%', background: '#6EE7A4', animation: 'v2-orb-c 4.5s linear infinite' }} />
-                  {/* Core */}
-                  <div style={{
-                    position: 'absolute', inset: 7, borderRadius: '50%', background: '#FF7A65',
-                    animation: 'v2-float 3s ease-in-out infinite',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
-                  }}>
-                    <div style={{ width: 5, height: 5, borderRadius: '50%', background: 'white' }} />
-                    <div style={{ width: 5, height: 5, borderRadius: '50%', background: 'white' }} />
-                  </div>
-                  {/* Crown */}
-                  <div style={{ position: 'absolute', top: 1, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 2, alignItems: 'flex-end' }}>
-                    <div style={{ width: 3, height: 5, background: '#FFB347', borderRadius: '1px 1px 0 0', transform: 'rotate(-15deg)' }} />
-                    <div style={{ width: 3, height: 7, background: '#FFB347', borderRadius: '1px 1px 0 0' }} />
-                    <div style={{ width: 3, height: 5, background: '#FFB347', borderRadius: '1px 1px 0 0', transform: 'rotate(15deg)' }} />
-                  </div>
+                  <div style={{ position: 'absolute', top: '50%', left: '50%', margin: -3,   width: 6, height: 6, borderRadius: '50%', background: '#FFB347', animation: 'v2-orb-a 3.5s linear infinite' }} />
+                  <div style={{ position: 'absolute', top: '50%', left: '50%', margin: -2.5, width: 5, height: 5, borderRadius: '50%', background: '#00D4B8', animation: 'v2-orb-b 3.5s linear infinite' }} />
+                  <div style={{ position: 'absolute', top: '50%', left: '50%', margin: -2,   width: 4, height: 4, borderRadius: '50%', background: '#6EE7A4', animation: 'v2-orb-c 5s   linear infinite' }} />
+                  {/* Square robot body — floating */}
+                  <svg width="58" height="66" viewBox="0 0 58 66" style={{ animation: 'v2-float 3s ease-in-out infinite', position: 'relative', zIndex: 1 }}>
+                    {/* Crown */}
+                    <polygon points="16,16 22,6 29,13 36,6 42,16" fill="#FFB347"/>
+                    <rect x="14" y="14" width="30" height="3" rx="1.5" fill="#FFB347" opacity="0.7"/>
+                    {/* Ear left */}
+                    <rect x="1" y="25" width="4" height="8" rx="2" fill="#FF7A65" opacity="0.7"/>
+                    {/* Ear right */}
+                    <rect x="53" y="25" width="4" height="8" rx="2" fill="#FF7A65" opacity="0.7"/>
+                    {/* Body */}
+                    <rect x="5" y="17" width="48" height="32" rx="9" fill="#FF7A65"/>
+                    {/* Left eye outer */}
+                    <rect x="11" y="24" width="14" height="14" rx="4" fill="#130E2A"/>
+                    {/* Right eye outer */}
+                    <rect x="33" y="24" width="14" height="14" rx="4" fill="#130E2A"/>
+                    {/* Shine L */}
+                    <circle cx="15" cy="28" r="3" fill="white" opacity="0.9"/>
+                    {/* Shine R */}
+                    <circle cx="37" cy="28" r="3" fill="white" opacity="0.9"/>
+                    {/* Pupil L */}
+                    <circle cx="17" cy="30" r="2" fill="#130E2A"/>
+                    {/* Pupil R */}
+                    <circle cx="39" cy="30" r="2" fill="#130E2A"/>
+                    {/* Smile */}
+                    <path d="M20 39 Q29 44 38 39" stroke="#130E2A" strokeWidth="1.8" fill="none" strokeLinecap="round"/>
+                    {/* Left leg */}
+                    <rect x="12" y="50" width="12" height="14" rx="5" fill="#FF7A65" opacity="0.85"/>
+                    {/* Right leg */}
+                    <rect x="34" y="50" width="12" height="14" rx="5" fill="#FF7A65" opacity="0.85"/>
+                  </svg>
                 </div>
               </div>
 
