@@ -1,13 +1,12 @@
 'use client'
 
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { CSSProperties } from 'react'
 import { ALL_DIMENSIONS, type Dimension } from '@/lib/character'
 import { DIMENSION_TO_SLUG } from '@/lib/tierName'
 import type { UserProfile } from '@/app/api/user-profile/route'
 import type { IdentityData } from '@/app/api/identity/synthesize/route'
-import type { ArchetypeInsights, ArchetypePill } from '@/app/api/user-profile/archetype-insights/route'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -60,8 +59,6 @@ const SIGN_GLYPHS: Record<string, string> = {
   Sagittarius: '♐', Capricorn: '♑', Aquarius: '♒', Pisces: '♓',
 }
 
-const INSIGHTS_CACHE_KEY = (uid: string) => `protagonist-archetype-insights-${uid}`
-const INSIGHTS_CACHE_TTL = 24 * 60 * 60 * 1000 // 24h
 const IDENTITY_CACHE_KEY = (uid: string) => `protagonist-identity-${uid}`
 const IDENTITY_CACHE_TTL = 12 * 60 * 60 * 1000
 const PROFILE_CACHE_KEY  = (uid: string) => `protagonist-profile-${uid}`
@@ -130,70 +127,6 @@ interface DesktopLeftSidebarProps {
   userInitial?: string
 }
 
-// ── Pill component with custom tooltip ───────────────────────────────────────
-
-function InsightPill({ pill, isWatch = false }: { pill: ArchetypePill; isWatch?: boolean }) {
-  const [hovered, setHovered] = React.useState(false)
-  const c = PILL_HEX[pill.color] ?? '#C4A8FF'
-
-  return (
-    <span
-      style={{ position: 'relative', display: 'block', minWidth: 0 }}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-    >
-      <span style={{
-        fontSize: 11, fontWeight: 600,
-        background: `${c}14`, color: c,
-        border: `1px solid ${c}28`,
-        padding: '5px 8px', borderRadius: 100,
-        overflow: 'hidden',
-        textOverflow: 'ellipsis',
-        whiteSpace: 'nowrap' as const,
-        cursor: 'default',
-        display: 'block',
-      }}>
-        {isWatch ? `△ ${pill.label}` : pill.label}
-      </span>
-      {hovered && pill.tooltip && (
-        <span style={{
-          position: 'absolute',
-          bottom: 'calc(100% + 6px)',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          zIndex: 200,
-          background: '#1E1540',
-          border: `1px solid ${c}40`,
-          borderRadius: 8,
-          padding: '7px 10px',
-          fontSize: 10,
-          fontWeight: 400,
-          color: 'rgba(255,255,255,0.85)',
-          lineHeight: 1.5,
-          whiteSpace: 'normal' as const,
-          width: 180,
-          boxShadow: `0 4px 16px rgba(0,0,0,0.5)`,
-          pointerEvents: 'none',
-        }}>
-          {pill.tooltip}
-          {/* Arrow */}
-          <span style={{
-            position: 'absolute',
-            bottom: -5,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            width: 8, height: 8,
-            background: '#1E1540',
-            border: `1px solid ${c}40`,
-            borderTop: 'none', borderLeft: 'none',
-            rotate: '45deg',
-          }} />
-        </span>
-      )}
-    </span>
-  )
-}
-
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function DesktopLeftSidebar({
@@ -204,10 +137,8 @@ export function DesktopLeftSidebar({
   const router = useRouter()
 
   // ── Local data state ───────────────────────────────────────────────────────
-  const [profile,   setProfile]   = useState<UserProfile | null>(null)
-  const [identity,  setIdentity]  = useState<IdentityData | null>(null)
-  const [insights,  setInsights]  = useState<ArchetypeInsights | null>(null)
-  const fetchedInsights = useRef(false)
+  const [profile,  setProfile]  = useState<UserProfile | null>(null)
+  const [identity, setIdentity] = useState<IdentityData | null>(null)
 
   useEffect(() => {
     const userId = document.cookie
@@ -223,7 +154,6 @@ export function DesktopLeftSidebar({
         const p = JSON.parse(cp) as UserProfile & { cachedAt?: number }
         if (Date.now() - (p.cachedAt ?? 0) < PROFILE_CACHE_TTL) {
           setProfile(p)
-          if (p.archetypeInsights) setInsights(p.archetypeInsights)
         } else localStorage.removeItem(PROFILE_CACHE_KEY(userId))
       }
     } catch { /* ignore */ }
@@ -235,7 +165,6 @@ export function DesktopLeftSidebar({
           const toCache = { ...d.profile, cachedAt: Date.now() }
           try { localStorage.setItem(PROFILE_CACHE_KEY(userId), JSON.stringify(toCache)) } catch { /* ignore */ }
           setProfile(d.profile)
-          if (d.profile.archetypeInsights) setInsights(d.profile.archetypeInsights)
         }
       })
       .catch(() => {/* silent */})
@@ -261,30 +190,6 @@ export function DesktopLeftSidebar({
       })
       .catch(() => {/* silent */})
 
-    // ── Load archetype insights (separate call if not in profile) ──
-    try {
-      const ci = localStorage.getItem(INSIGHTS_CACHE_KEY(userId))
-      if (ci) {
-        const cached = JSON.parse(ci) as ArchetypeInsights & { cachedAt?: number }
-        if (Date.now() - (cached.cachedAt ?? 0) < INSIGHTS_CACHE_TTL) {
-          setInsights(cached)
-          fetchedInsights.current = true
-        } else localStorage.removeItem(INSIGHTS_CACHE_KEY(userId))
-      }
-    } catch { /* ignore */ }
-
-    if (!fetchedInsights.current) {
-      fetch(`/api/user-profile/archetype-insights?userId=${userId}`)
-        .then(r => r.ok ? r.json() : null)
-        .then((d: { insights?: ArchetypeInsights | null } | null) => {
-          if (d?.insights) {
-            const toCache = { ...d.insights, cachedAt: Date.now() }
-            try { localStorage.setItem(INSIGHTS_CACHE_KEY(userId), JSON.stringify(toCache)) } catch { /* ignore */ }
-            setInsights(d.insights)
-          }
-        })
-        .catch(() => {/* silent */})
-    }
   }, [])
 
   // ── Derived values ─────────────────────────────────────────────────────────
@@ -318,11 +223,10 @@ export function DesktopLeftSidebar({
     archTags.push({ label: profile.neurodivergentNotes, color: 'rgba(110,231,164,0.65)', border: 'rgba(110,231,164,0.18)' })
   }
 
-  // ── NOW pills — from Oracle identity synthesis ──────────────────────────────
-  const nowPills = [
-    ...(identity?.strengths?.slice(0, 2) ?? []),
-    ...(identity?.growthEdges?.slice(0, 2) ?? []),
-  ]
+  // ── NOW — from Oracle identity synthesis (conversation context) ──────────────
+  const nowStrengths = identity?.strengths?.slice(0, 3) ?? []
+  const nowWatch     = identity?.growthEdges?.slice(0, 3) ?? []
+  const hasNow       = nowStrengths.length > 0 || nowWatch.length > 0
 
   // ── Helpers ────────────────────────────────────────────────────────────────
   const divider = (
@@ -452,55 +356,84 @@ export function DesktopLeftSidebar({
 
               {divider}
 
-              {/* ── WIRING — archetype-derived structural traits ── */}
-              {insights?.wiring && insights.wiring.length > 0 && (
-                <>
-                  <span style={metaLabel}>Wiring</span>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginBottom: 10, minWidth: 0 }}>
-                    {insights.wiring.map((pill, i) => (
-                      <InsightPill key={i} pill={pill} />
-                    ))}
-                  </div>
-                </>
-              )}
-
-              {/* ── WATCH — blind spots / traps ── */}
-              {insights?.watch && insights.watch.length > 0 && (
-                <>
-                  <span style={metaLabel}>Watch</span>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginBottom: 10, minWidth: 0 }}>
-                    {insights.watch.map((pill, i) => (
-                      <InsightPill key={i} pill={pill} isWatch />
-                    ))}
-                  </div>
-                </>
-              )}
-
-              {/* ── NOW — Oracle-derived character traits ── */}
-              {nowPills.length > 0 && (
+              {/* ── NOW — split into strengths + watch-for ── */}
+              {hasNow && (
                 <>
                   {divider}
                   <span style={metaLabel}>Now</span>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginBottom: 4, minWidth: 0 }}>
-                    {nowPills.map((pill, i) => {
-                      const c = PILL_HEX[pill.color] ?? '#FF6B9D'
-                      return (
-                        <span key={i} title={pill.label} style={{
-                          fontSize: 11, fontWeight: 600,
-                          background: `${c}14`, color: c,
-                          border: `1px solid ${c}28`,
-                          padding: '5px 8px', borderRadius: 100,
-                          overflow: 'hidden', textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap' as const,
-                          cursor: 'default',
-                          minWidth: 0,
-                        }}>
-                          {pill.label}
-                        </span>
-                      )
-                    })}
-                  </div>
-                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.2)', marginBottom: 2, marginTop: 1 }}>
+
+                  {/* Strengths showing up */}
+                  {nowStrengths.length > 0 && (
+                    <div style={{ marginBottom: nowWatch.length > 0 ? 10 : 4 }}>
+                      <div style={{
+                        display: 'flex', alignItems: 'center', gap: 5, marginBottom: 5,
+                        fontSize: 9, fontWeight: 700, letterSpacing: '1.2px', textTransform: 'uppercase' as const,
+                        color: 'rgba(110,231,164,0.65)',
+                      }}>
+                        <span style={{ fontSize: 7 }}>●</span>
+                        Strengths showing up
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                        {nowStrengths.map((pill, i) => {
+                          const c = PILL_HEX[pill.color] ?? '#6EE7A4'
+                          return (
+                            <div key={i} style={{
+                              display: 'flex', alignItems: 'flex-start', gap: 7,
+                              padding: '4px 0',
+                              borderBottom: i < nowStrengths.length - 1 ? '0.5px solid rgba(255,255,255,0.05)' : 'none',
+                            }}>
+                              <div style={{
+                                width: 5, height: 5, borderRadius: '50%',
+                                background: c, flexShrink: 0, marginTop: 5,
+                              }} />
+                              <span style={{
+                                ...font,
+                                fontSize: 12, color: 'rgba(255,255,255,0.72)', lineHeight: 1.45,
+                              }}>
+                                {pill.label}
+                              </span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Watch for */}
+                  {nowWatch.length > 0 && (
+                    <div style={{ marginBottom: 4 }}>
+                      <div style={{
+                        display: 'flex', alignItems: 'center', gap: 5, marginBottom: 5,
+                        fontSize: 9, fontWeight: 700, letterSpacing: '1.2px', textTransform: 'uppercase' as const,
+                        color: 'rgba(255,212,122,0.65)',
+                      }}>
+                        <span style={{ fontSize: 9 }}>△</span>
+                        Watch for
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                        {nowWatch.map((pill, i) => (
+                          <div key={i} style={{
+                            display: 'flex', alignItems: 'flex-start', gap: 7,
+                            padding: '4px 0',
+                            borderBottom: i < nowWatch.length - 1 ? '0.5px solid rgba(255,255,255,0.05)' : 'none',
+                          }}>
+                            <div style={{
+                              width: 5, height: 5, borderRadius: '50%',
+                              background: '#FFD47A', flexShrink: 0, marginTop: 5,
+                            }} />
+                            <span style={{
+                              ...font,
+                              fontSize: 12, color: 'rgba(255,212,122,0.72)', lineHeight: 1.45,
+                            }}>
+                              {pill.label}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.18)', marginTop: 6 }}>
                     from your recent conversations
                   </div>
                 </>
