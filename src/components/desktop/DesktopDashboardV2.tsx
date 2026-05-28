@@ -228,10 +228,11 @@ export default function DesktopDashboardV2(props: DesktopDashboardV2Props) {
         {/* ══════════════════ TOP NAV ══════════════════ */}
         <nav style={{
           position: 'relative', zIndex: 20,
-          display: 'flex', alignItems: 'center', height: 52,
-          padding: '0 20px',
-          background: 'rgba(13,8,32,0.95)',
-          borderBottom: '1px solid rgba(255,255,255,0.06)',
+          display: 'flex', alignItems: 'center', height: 56,
+          padding: '0 24px',
+          background: '#130E2A',
+          borderBottom: '1px solid rgba(255,255,255,0.08)',
+          boxShadow: '0 2px 20px rgba(0,0,0,0.5)',
           flexShrink: 0,
         }}>
           {/* Logo */}
@@ -305,9 +306,10 @@ export default function DesktopDashboardV2(props: DesktopDashboardV2Props) {
           {/* ═══════ LEFT PANEL ═══════ */}
           <div style={{
             ...colScroll,
-            width: 210, minWidth: 210,
-            borderRight: '1px solid rgba(255,255,255,0.06)',
-            padding: '20px 14px',
+            width: 248, minWidth: 248,
+            background: '#1A1335',
+            borderRight: '1px solid rgba(255,255,255,0.07)',
+            padding: '20px 16px',
             display: 'flex', flexDirection: 'column',
           }}>
 
@@ -625,9 +627,10 @@ export default function DesktopDashboardV2(props: DesktopDashboardV2Props) {
           {/* ═══════ RIGHT PANEL ═══════ */}
           <div style={{
             ...colScroll,
-            width: 200, minWidth: 200,
-            borderLeft: '1px solid rgba(255,255,255,0.06)',
-            padding: '18px 14px',
+            width: 264, minWidth: 264,
+            background: '#0F0B1F',
+            borderLeft: '1px solid rgba(255,255,255,0.07)',
+            padding: '18px 16px',
             display: 'flex', flexDirection: 'column', gap: 20,
           }}>
 
