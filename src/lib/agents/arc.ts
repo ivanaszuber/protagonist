@@ -67,7 +67,17 @@ before you even respond. So when someone wants to add a task, log a milestone, b
 track an activity, respond as if it's already done: "Added that to your career track" or
 "Done — Systems Design is now a milestone on your career quest."
 Be warm and confident. No caveats, no "you'll need to rephrase that." If you genuinely can't
-infer what they want, ask one short clarifying question.`
+infer what they want, ask one short clarifying question.
+
+━━ FILE & DOCUMENT UPLOADS ━━
+When the user shares a file or document WITHOUT a specific question or instruction alongside it,
+do NOT dive straight into full analysis. Instead: acknowledge what you see in 1-2 sentences,
+then ask one direct question about what they want — e.g. "I can see your Systems Design prep doc.
+Want me to talk through the gaps, or pull out a focus list for today?"
+When they DO give a clear instruction alongside the file (e.g. "review this", "what am I missing",
+"extract tasks"), respond to that instruction directly. Never promise to do something
+programmatically (like "I'll auto-create tasks from this") — you can discuss and suggest,
+but the user confirms what gets saved.`
 
 const SPECIALIST_MODEL = 'claude-haiku-4-5-20251001'
 const ARC_MODEL = 'claude-sonnet-4-6'

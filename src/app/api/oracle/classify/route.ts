@@ -127,7 +127,7 @@ For MILESTONE, extract:
 - dimension: one of "career", "social", "wealth", "vitality", "mind", "love", "family" — infer from context
 - questId: match to the most relevant active quest id from the list above, or null if no match
 - targetDate: ISO date if mentioned, otherwise null
-The oracleReply should confirm enthusiastically in 1 sentence (e.g. "Done — added Systems Design as a milestone on your career quest.")
+The oracleReply should confirm in exactly 1 short sentence — only what was just done. No promises, no future offers, no "and I'll..." or "once you share...". Example: "Done — Systems Design study plan is now a milestone on your career quest."
 
 For COMPLETED_ACTIVITY, extract the same fields as TASK but put them in "completed_task":
 - title: clean activity title (e.g. "20 minute walk", "Gym session", "Read 30 minutes")
