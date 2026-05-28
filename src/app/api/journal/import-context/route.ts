@@ -100,12 +100,20 @@ export async function POST(request: Request) {
       importance: m.importance,
     }))
 
-    const { error } = await supabase.from('dimension_memories').insert(rows)
+    console.log('[import-context] Saving', rows.length, 'rows for userId:', userId)
+
+    const { data: insertData, error } = await supabase
+      .from('dimension_memories')
+      .insert(rows)
+      .select('id')
+
+    console.log('[import-context] Insert result — data:', insertData, 'error:', error)
+
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ error: error.message, detail: error.details, hint: error.hint }, { status: 500 })
     }
 
-    return NextResponse.json({ saved: rows.length })
+    return NextResponse.json({ saved: insertData?.length ?? rows.length })
   }
 
   // ── EXTRACT mode: analyze pasted text ───────────────────────────────────
