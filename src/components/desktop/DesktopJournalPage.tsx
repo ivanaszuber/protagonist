@@ -1,13 +1,13 @@
 'use client'
 
-import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import React, { useCallback, useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { type Dimension } from '@/lib/character'
 import { getUserId } from '@/lib/user'
 import { openOracle } from '@/lib/oracle-events'
 import { DesktopLeftSidebar, DIM_COLORS } from './DesktopLeftSidebar'
-import { isCheckinDoneToday } from './DesktopOracleModal'
+import DesktopTopNav from './DesktopTopNav'
+import { DesktopOracleModal } from './DesktopOracleModal'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -79,41 +79,38 @@ const DIM_CHAR_NAMES: Record<Dimension, string> = {
 
 const PAGE_CSS = `
   @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
-  * { box-sizing: border-box; margin: 0; padding: 0; }
+  * { box-sizing: border-box; }
   ::-webkit-scrollbar { display: none; }
 
-  @keyframes jrn-pulse-btn { 0%,100%{box-shadow:0 0 0 0 rgba(255,122,101,0.4)} 50%{box-shadow:0 0 0 8px rgba(255,122,101,0)} }
-  @keyframes jrn-fade-in   { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
-  @keyframes jrn-shimmer   { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
-  @keyframes jrn-pulse-orb { 0%,100%{transform:scale(1);opacity:0.6} 50%{transform:scale(1.05);opacity:0.9} }
-  @keyframes jrn-twinkle   { 0%,100%{opacity:0.08} 50%{opacity:0.5} }
-  @keyframes jrn-bar-grow  { from{transform:scaleY(0)} to{transform:scaleY(1)} }
+  @keyframes v2-pulse-dot { 0%,100%{transform:scale(1);opacity:1} 50%{transform:scale(1.15);opacity:0.75} }
+  @keyframes v2-pulse-btn { 0%,100%{box-shadow:0 0 0 0 rgba(255,122,101,0.4)} 50%{box-shadow:0 0 0 8px rgba(255,122,101,0)} }
+  @keyframes jrn-fade-in  { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+  @keyframes jrn-shimmer  { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
+  @keyframes jrn-pulse    { 0%,100%{transform:scale(1);opacity:0.6} 50%{transform:scale(1.06);opacity:1} }
 
   .jrn-entry { animation: jrn-fade-in 0.35s ease both; }
   .jrn-tab-btn {
     background: none; border: none; cursor: pointer;
-    padding: 8px 16px; border-radius: 8px;
+    padding: 7px 14px; border-radius: 8px;
     font-family: 'Space Grotesk', sans-serif;
     font-size: 13px; font-weight: 600;
     transition: all 0.2s;
     color: rgba(255,255,255,0.45);
+    display: flex; align-items: center; gap: 6px;
   }
   .jrn-tab-btn:hover { color: rgba(255,255,255,0.75); background: rgba(255,255,255,0.06); }
   .jrn-tab-btn.active { color: #fff; background: rgba(255,255,255,0.1); }
-
   .jrn-dim-pill {
     border: none; cursor: pointer; border-radius: 20px;
     font-family: 'Space Grotesk', sans-serif; font-size: 11px; font-weight: 600;
     padding: 4px 10px; transition: all 0.18s; white-space: nowrap;
   }
-
   .jrn-entry-card {
     border-radius: 14px; padding: 16px;
     transition: background 0.2s;
     border: 1px solid rgba(255,255,255,0.06);
   }
   .jrn-entry-card:hover { background: rgba(255,255,255,0.04) !important; }
-
   .jrn-portrait-section { animation: jrn-fade-in 0.4s ease both; }
   .jrn-portrait-section:nth-child(1) { animation-delay: 0.05s }
   .jrn-portrait-section:nth-child(2) { animation-delay: 0.10s }
@@ -123,6 +120,109 @@ const PAGE_CSS = `
 `
 
 const font: CSSProperties = { fontFamily: "'Space Grotesk', system-ui, sans-serif" }
+
+// ── SVG Icons ─────────────────────────────────────────────────────────────────
+
+function Icon({ name, size = 14, color = 'currentColor' }: { name: string; size?: number; color?: string }) {
+  const s = { width: size, height: size, flexShrink: 0 } as CSSProperties
+  switch (name) {
+    case 'journal':
+      return <svg style={s} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+      </svg>
+    case 'stream':
+      return <svg style={s} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M17 12a5 5 0 0 1-5 5m0-10a5 5 0 0 0-5 5m14-5s-1.5 2-4 2-4-2-4-2-1.5-2-4-2-4 2-4 2"/>
+      </svg>
+    case 'pulse':
+      return <svg style={s} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+      </svg>
+    case 'portrait':
+      return <svg style={s} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2z"/><path d="M12 8a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"/><path d="M6.8 18a6 6 0 0 1 10.4 0"/>
+      </svg>
+    case 'growth':
+      return <svg style={s} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/>
+      </svg>
+    case 'sun':
+      return <svg style={s} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
+        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+        <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
+        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+      </svg>
+    case 'message':
+      return <svg style={s} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+      </svg>
+    case 'sword':
+      return <svg style={s} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <polyline points="14.5 17.5 3 6 3 3 6 3 17.5 14.5"/><line x1="13" y1="19" x2="19" y2="13"/>
+        <line x1="16" y1="16" x2="20" y2="20"/><line x1="19" y1="21" x2="21" y2="19"/>
+      </svg>
+    case 'zap':
+      return <svg style={s} viewBox="0 0 24 24" fill={color} stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+      </svg>
+    case 'entries':
+      return <svg style={s} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/>
+        <line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
+      </svg>
+    case 'flame':
+      return <svg style={s} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>
+      </svg>
+    case 'calendar':
+      return <svg style={s} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+      </svg>
+    case 'arc':
+      return <svg style={s} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="8" r="4"/><path d="M6 20v-2a6 6 0 0 1 12 0v2"/>
+        <path d="M19 11a7 7 0 0 1-7 7"/>
+      </svg>
+    case 'refresh':
+      return <svg style={s} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
+        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+      </svg>
+    case 'sparkle':
+      return <svg style={s} viewBox="0 0 24 24" fill={color} stroke="none">
+        <path d="M12 2l2.4 7.6H22l-6.4 4.6 2.4 7.6L12 17.2l-6 4.6 2.4-7.6L2 9.6h7.6L12 2z"/>
+      </svg>
+    case 'waves':
+      return <svg style={s} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M2 6c.6.5 1.2 1 2.5 1C7 7 7 5 9.5 5c2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/>
+        <path d="M2 12c.6.5 1.2 1 2.5 1C7 13 7 11 9.5 11c2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/>
+        <path d="M2 18c.6.5 1.2 1 2.5 1C7 19 7 17 9.5 17c2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/>
+      </svg>
+    default:
+      return <svg style={s} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8"><circle cx="12" cy="12" r="8"/></svg>
+  }
+}
+
+// Mood indicator — colored dot instead of emoji
+function MoodDot({ signal }: { signal: string | null }) {
+  const color = (() => {
+    if (!signal) return 'rgba(255,255,255,0.2)'
+    const s = signal.toLowerCase()
+    if (['excited', 'very_positive', 'great'].some(k => s.includes(k))) return '#FF9A5C'
+    if (['positive', 'happy', 'good', 'proud', 'energized', 'motivated', 'grateful'].some(k => s.includes(k))) return '#6EE7A4'
+    if (['neutral', 'calm', 'content', 'okay', 'fine'].some(k => s.includes(k))) return '#4DC4FF'
+    if (['anxious', 'stressed', 'worried'].some(k => s.includes(k))) return '#FFD47A'
+    if (['tired', 'low', 'sad', 'negative', 'frustrated', 'overwhelmed'].some(k => s.includes(k))) return '#FF6B9D'
+    return 'rgba(255,255,255,0.3)'
+  })()
+  return (
+    <span title={signal ?? ''} style={{
+      display: 'inline-block', width: 7, height: 7, borderRadius: '50%',
+      background: color, boxShadow: `0 0 5px ${color}88`, flexShrink: 0,
+    }} />
+  )
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -141,31 +241,11 @@ function formatRelTime(iso: string): string {
   return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
 }
 
-function getMoodEmoji(signal: string | null): string {
-  if (!signal) return '💭'
-  const s = signal.toLowerCase()
-  if (['excited', 'very_positive', 'great'].some(k => s.includes(k))) return '🔥'
-  if (['positive', 'happy', 'good', 'proud', 'energized', 'motivated', 'grateful'].some(k => s.includes(k))) return '✨'
-  if (['neutral', 'calm', 'content', 'okay', 'fine'].some(k => s.includes(k))) return '🌊'
-  if (['anxious', 'stressed', 'worried'].some(k => s.includes(k))) return '⚡'
-  if (['tired', 'low', 'sad', 'negative', 'frustrated', 'overwhelmed'].some(k => s.includes(k))) return '🌧️'
-  return '💭'
-}
-
 function getScoreColor(score: number): string {
   if (score >= 4) return '#6EE7A4'
   if (score >= 3) return '#FFD47A'
   if (score >= 2) return '#FF9A5C'
   return '#FF6B9D'
-}
-
-function SettingsIcon() {
-  return (
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="3" />
-      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-    </svg>
-  )
 }
 
 // ── Stream Entry Card ─────────────────────────────────────────────────────────
@@ -174,9 +254,9 @@ function EntryCard({ entry }: { entry: JournalEntry }) {
   const [expanded, setExpanded] = useState(false)
 
   const typeConfig = {
-    'morning-checkin': { label: 'Morning Check-In', color: '#FFD47A', bg: 'rgba(255,212,122,0.12)', icon: '☀️' },
-    'voice-reflection': { label: 'Reflection', color: '#C4A8FF', bg: 'rgba(196,168,255,0.12)', icon: '💭' },
-    'achievement': { label: 'Achievement', color: '#6EE7A4', bg: 'rgba(110,231,164,0.12)', icon: '⚔️' },
+    'morning-checkin': { label: 'Morning Brief', color: '#FFD47A', bg: 'rgba(255,212,122,0.12)', icon: 'sun' as const },
+    'voice-reflection': { label: 'Reflection', color: '#C4A8FF', bg: 'rgba(196,168,255,0.12)', icon: 'message' as const },
+    'achievement': { label: 'Achievement', color: '#6EE7A4', bg: 'rgba(110,231,164,0.12)', icon: 'sword' as const },
   }[entry.type]
 
   const primaryDim = entry.dimensions[0] as Dimension | undefined
@@ -184,7 +264,7 @@ function EntryCard({ entry }: { entry: JournalEntry }) {
 
   const previewText = entry.type === 'achievement'
     ? entry.content
-    : entry.brief ?? (entry.content.length > 120 ? entry.content.slice(0, 120) + '…' : entry.content)
+    : entry.brief ?? (entry.content.length > 130 ? entry.content.slice(0, 130) + '…' : entry.content)
 
   return (
     <div
@@ -193,18 +273,17 @@ function EntryCard({ entry }: { entry: JournalEntry }) {
       onClick={() => setExpanded(e => !e)}
     >
       {/* Header row */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-        {/* Type badge */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 10, flexWrap: 'wrap' }}>
         <span style={{
           ...font, fontSize: 11, fontWeight: 700,
           background: typeConfig.bg, color: typeConfig.color,
           padding: '3px 9px', borderRadius: 20,
-          display: 'flex', alignItems: 'center', gap: 4,
+          display: 'flex', alignItems: 'center', gap: 5,
         }}>
-          {typeConfig.icon} {typeConfig.label}
+          <Icon name={typeConfig.icon} size={10} color={typeConfig.color} />
+          {typeConfig.label}
         </span>
 
-        {/* Dimension tags */}
         {entry.dimensions.slice(0, 3).map(dim => (
           <span key={dim} style={{
             ...font, fontSize: 10, fontWeight: 600,
@@ -217,15 +296,18 @@ function EntryCard({ entry }: { entry: JournalEntry }) {
           </span>
         ))}
 
-        <span style={{ ...font, fontSize: 11, color: 'rgba(255,255,255,0.3)', marginLeft: 'auto' }}>
-          {getMoodEmoji(entry.moodSignal)} {formatRelTime(entry.createdAt)}
-        </span>
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 5 }}>
+          <MoodDot signal={entry.moodSignal} />
+          <span style={{ ...font, fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>
+            {formatRelTime(entry.createdAt)}
+          </span>
+        </div>
       </div>
 
       {/* Content */}
       {entry.type === 'achievement' ? (
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span style={{ fontSize: 20 }}>⚔️</span>
+          <Icon name="sword" size={18} color="#6EE7A4" />
           <div>
             <p style={{ ...font, fontSize: 14, color: 'rgba(255,255,255,0.85)', lineHeight: 1.5 }}>
               {entry.content}
@@ -241,30 +323,29 @@ function EntryCard({ entry }: { entry: JournalEntry }) {
         <>
           <p style={{
             ...font, fontSize: 13.5, color: 'rgba(255,255,255,0.75)',
-            lineHeight: 1.65, marginBottom: entry.oracleReply && expanded ? 10 : 0,
+            lineHeight: 1.65,
           }}>
             {expanded && !entry.brief ? entry.content : previewText}
           </p>
 
-          {/* Oracle reply */}
           {expanded && entry.oracleReply && (
             <div style={{
-              marginTop: 10,
+              marginTop: 12,
               borderLeft: `2px solid ${dimColor}`,
               paddingLeft: 12,
             }}>
-              <p style={{ ...font, fontSize: 11, color: dimColor, fontWeight: 700, marginBottom: 4 }}>
+              <p style={{ ...font, fontSize: 10, color: dimColor, fontWeight: 700, marginBottom: 4, letterSpacing: '1.2px' }}>
                 ARC'S INSIGHT
               </p>
-              <p style={{ ...font, fontSize: 13, color: 'rgba(255,255,255,0.6)', lineHeight: 1.6 }}>
+              <p style={{ ...font, fontSize: 13, color: 'rgba(255,255,255,0.6)', lineHeight: 1.65 }}>
                 {entry.oracleReply}
               </p>
             </div>
           )}
 
           {!expanded && entry.oracleReply && (
-            <p style={{ ...font, fontSize: 11, color: 'rgba(255,255,255,0.3)', marginTop: 6 }}>
-              tap to see Arc's insight →
+            <p style={{ ...font, fontSize: 11, color: 'rgba(255,255,255,0.28)', marginTop: 6 }}>
+              tap to see Arc's insight
             </p>
           )}
         </>
@@ -276,7 +357,6 @@ function EntryCard({ entry }: { entry: JournalEntry }) {
 // ── Pulse Chart ───────────────────────────────────────────────────────────────
 
 function PulseChart({ pulse }: { pulse: PulseDay[] }) {
-  const maxScore = 5
   const last30 = pulse.slice(-30)
   const hasData = last30.some(d => d.hasEntry)
 
@@ -284,12 +364,11 @@ function PulseChart({ pulse }: { pulse: PulseDay[] }) {
     return (
       <div style={{
         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-        minHeight: 200, gap: 12,
+        minHeight: 180, gap: 12,
       }}>
-        <span style={{ fontSize: 40 }}>🌊</span>
-        <p style={{ ...font, color: 'rgba(255,255,255,0.4)', fontSize: 14, textAlign: 'center' }}>
+        <Icon name="pulse" size={36} color="rgba(255,255,255,0.15)" />
+        <p style={{ ...font, color: 'rgba(255,255,255,0.35)', fontSize: 13, textAlign: 'center', lineHeight: 1.65 }}>
           Your emotional pulse will appear here as you journal with Oracle.
-          <br />Start by sharing how you're feeling today.
         </p>
       </div>
     )
@@ -297,51 +376,30 @@ function PulseChart({ pulse }: { pulse: PulseDay[] }) {
 
   return (
     <div>
-      {/* Score labels */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-        {['1', '2', '3', '4', '5'].reverse().map(s => (
-          <span key={s} style={{ ...font, fontSize: 10, color: 'rgba(255,255,255,0.25)' }}>{s}</span>
-        ))}
-      </div>
-
-      {/* Bar chart */}
-      <div style={{
-        display: 'flex', alignItems: 'flex-end', gap: 3,
-        height: 120, padding: '0 4px',
-      }}>
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: 110 }}>
         {last30.map((day, i) => {
-          const height = day.score ? (day.score / maxScore) * 100 : 0
+          const h = day.score ? (day.score / 5) * 100 : 0
           const color = day.score ? getScoreColor(day.score) : 'rgba(255,255,255,0.06)'
-          const isWeekend = [0, 6].includes(new Date(day.date).getDay())
-
           return (
             <div
               key={day.date}
-              title={day.score ? `${day.date}: ${day.score}/5${day.label ? ` (${day.label})` : ''}` : day.date}
-              style={{
-                flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
-                justifyContent: 'flex-end', height: '100%',
-              }}
+              title={day.score ? `${day.date}: ${day.score.toFixed(1)}/5${day.label ? ` · ${day.label}` : ''}` : day.date}
+              style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: '100%' }}
             >
               <div style={{
-                width: '100%', maxWidth: 18,
-                height: day.hasEntry ? `${Math.max(height, 8)}%` : '4%',
+                width: '100%', maxWidth: 16,
+                height: day.hasEntry ? `${Math.max(h, 8)}%` : '4%',
                 background: color,
                 borderRadius: '3px 3px 2px 2px',
-                opacity: isWeekend ? 0.7 : 1,
                 transition: 'height 0.4s ease',
-                transformOrigin: 'bottom',
-                animation: day.hasEntry ? 'jrn-bar-grow 0.5s ease both' : 'none',
-                animationDelay: `${i * 0.02}s`,
               }} />
             </div>
           )
         })}
       </div>
 
-      {/* X-axis labels */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, padding: '0 4px' }}>
-        {[0, 6, 13, 20, 27, 29].map(i => (
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6 }}>
+        {[0, 9, 19, 29].map(i => (
           last30[i] ? (
             <span key={i} style={{ ...font, fontSize: 9, color: 'rgba(255,255,255,0.25)' }}>
               {new Date(last30[i].date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
@@ -350,8 +408,7 @@ function PulseChart({ pulse }: { pulse: PulseDay[] }) {
         ))}
       </div>
 
-      {/* Legend */}
-      <div style={{ display: 'flex', gap: 12, marginTop: 16, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 12, marginTop: 14, flexWrap: 'wrap' }}>
         {[
           { color: '#6EE7A4', label: 'Great (4–5)' },
           { color: '#FFD47A', label: 'Good (3)' },
@@ -370,9 +427,7 @@ function PulseChart({ pulse }: { pulse: PulseDay[] }) {
 
 // ── Arc Portrait Tab ──────────────────────────────────────────────────────────
 
-function PortraitView({
-  portrait, loading, onGenerate,
-}: {
+function PortraitView({ portrait, loading, onGenerate }: {
   portrait: Portrait | null
   loading: boolean
   onGenerate: () => void
@@ -383,14 +438,13 @@ function PortraitView({
         <div style={{
           width: 64, height: 64, borderRadius: '50%',
           background: 'linear-gradient(135deg, #7B3FE4, #C4A8FF)',
-          animation: 'jrn-pulse-orb 2s ease-in-out infinite',
+          animation: 'jrn-pulse 2s ease-in-out infinite',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 28,
         }}>
-          🌀
+          <Icon name="arc" size={28} color="white" />
         </div>
         <p style={{ ...font, color: 'rgba(255,255,255,0.5)', fontSize: 14 }}>
-          Arc is reading your soul…
+          Arc is synthesizing your story…
         </p>
       </div>
     )
@@ -399,135 +453,116 @@ function PortraitView({
   if (!portrait) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 300, gap: 16 }}>
-        <div style={{ fontSize: 56 }}>🪩</div>
-        <h3 style={{ ...font, color: '#fff', fontSize: 18, fontWeight: 700 }}>
-          Arc's Portrait awaits
-        </h3>
-        <p style={{ ...font, color: 'rgba(255,255,255,0.45)', fontSize: 14, textAlign: 'center', maxWidth: 340, lineHeight: 1.65 }}>
+        <div style={{
+          width: 72, height: 72, borderRadius: '50%',
+          background: 'rgba(123,63,228,0.15)', border: '1px solid rgba(196,168,255,0.2)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <Icon name="portrait" size={32} color="#C4A8FF" />
+        </div>
+        <h3 style={{ ...font, color: '#fff', fontSize: 18, fontWeight: 700 }}>Arc's Portrait awaits</h3>
+        <p style={{ ...font, color: 'rgba(255,255,255,0.45)', fontSize: 13.5, textAlign: 'center', maxWidth: 340, lineHeight: 1.7 }}>
           Arc synthesizes your memories, reflections, and growth into a living psychological portrait — a mirror of who you're becoming.
         </p>
         <button
           onClick={onGenerate}
           style={{
             ...font, cursor: 'pointer', fontWeight: 700, fontSize: 13,
-            background: 'linear-gradient(135deg, #7B3FE4, #C4A8FF)',
-            color: '#fff', border: 'none', borderRadius: 12,
-            padding: '12px 28px', marginTop: 8,
+            background: '#7B3FE4', color: '#fff',
+            border: 'none', borderRadius: 12, padding: '11px 28px', marginTop: 4,
+            display: 'flex', alignItems: 'center', gap: 7,
           }}
         >
-          ✨ Generate My Portrait
+          <Icon name="sparkle" size={13} color="white" />
+          Generate My Portrait
         </button>
       </div>
     )
   }
 
-  // portrait.summary = simple fallback
   if (portrait.summary && !portrait.essence) {
     return (
       <div className="jrn-portrait-section" style={{
         background: 'rgba(123,63,228,0.08)', borderRadius: 16, padding: 24,
         border: '1px solid rgba(196,168,255,0.15)',
       }}>
-        <p style={{ ...font, fontSize: 15, color: 'rgba(255,255,255,0.8)', lineHeight: 1.75 }}>
-          {portrait.summary}
-        </p>
+        <p style={{ ...font, fontSize: 15, color: 'rgba(255,255,255,0.8)', lineHeight: 1.75 }}>{portrait.summary}</p>
       </div>
     )
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      {/* Essence */}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       {portrait.essence && (
         <div className="jrn-portrait-section" style={{
-          background: 'linear-gradient(135deg, rgba(123,63,228,0.15), rgba(196,168,255,0.08))',
-          borderRadius: 16, padding: 22,
-          border: '1px solid rgba(196,168,255,0.2)',
+          background: 'linear-gradient(135deg, rgba(123,63,228,0.15), rgba(196,168,255,0.06))',
+          borderRadius: 16, padding: 22, border: '1px solid rgba(196,168,255,0.18)',
         }}>
-          <p style={{ ...font, fontSize: 11, fontWeight: 700, color: '#C4A8FF', letterSpacing: '1.4px', marginBottom: 10 }}>
-            YOUR ESSENCE
-          </p>
-          <p style={{ ...font, fontSize: 16, color: '#fff', lineHeight: 1.75, fontWeight: 500 }}>
-            "{portrait.essence}"
-          </p>
+          <p style={{ ...font, fontSize: 10, fontWeight: 700, color: '#C4A8FF', letterSpacing: '1.5px', marginBottom: 10 }}>YOUR ESSENCE</p>
+          <p style={{ ...font, fontSize: 16, color: '#fff', lineHeight: 1.8, fontWeight: 500 }}>"{portrait.essence}"</p>
         </div>
       )}
 
-      {/* Growth */}
       {portrait.growth && (
         <div className="jrn-portrait-section" style={{
           background: 'rgba(110,231,164,0.06)', borderRadius: 14, padding: 18,
-          border: '1px solid rgba(110,231,164,0.12)',
+          border: '1px solid rgba(110,231,164,0.1)',
         }}>
-          <p style={{ ...font, fontSize: 11, fontWeight: 700, color: '#6EE7A4', letterSpacing: '1.4px', marginBottom: 8 }}>
-            YOUR GROWTH
-          </p>
-          <p style={{ ...font, fontSize: 14, color: 'rgba(255,255,255,0.8)', lineHeight: 1.7 }}>
-            {portrait.growth}
-          </p>
+          <p style={{ ...font, fontSize: 10, fontWeight: 700, color: '#6EE7A4', letterSpacing: '1.5px', marginBottom: 8 }}>YOUR GROWTH</p>
+          <p style={{ ...font, fontSize: 14, color: 'rgba(255,255,255,0.8)', lineHeight: 1.75 }}>{portrait.growth}</p>
         </div>
       )}
 
-      {/* Strengths */}
       {portrait.strengths && portrait.strengths.length > 0 && (
         <div className="jrn-portrait-section">
-          <p style={{ ...font, fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', letterSpacing: '1.4px', marginBottom: 10 }}>
+          <p style={{ ...font, fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.35)', letterSpacing: '1.5px', marginBottom: 10 }}>
             WHAT MAKES YOU POWERFUL
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {portrait.strengths.map((s, i) => (
               <div key={i} style={{
-                background: 'rgba(255,255,255,0.04)', borderRadius: 12, padding: '12px 16px',
-                border: '1px solid rgba(255,255,255,0.07)',
-                display: 'flex', gap: 12, alignItems: 'flex-start',
+                background: 'rgba(255,255,255,0.03)', borderRadius: 12, padding: '12px 16px',
+                border: '1px solid rgba(255,255,255,0.06)', display: 'flex', gap: 12, alignItems: 'flex-start',
               }}>
-                <span style={{ fontSize: 16, flexShrink: 0, marginTop: 1 }}>⚡</span>
-                <p style={{ ...font, fontSize: 13.5, color: 'rgba(255,255,255,0.75)', lineHeight: 1.6 }}>{s}</p>
+                <Icon name="zap" size={14} color="#FFD47A" />
+                <p style={{ ...font, fontSize: 13.5, color: 'rgba(255,255,255,0.75)', lineHeight: 1.65 }}>{s}</p>
               </div>
             ))}
           </div>
         </div>
       )}
 
-      {/* Patterns */}
       {portrait.patterns && portrait.patterns.length > 0 && (
         <div className="jrn-portrait-section">
-          <p style={{ ...font, fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', letterSpacing: '1.4px', marginBottom: 10 }}>
+          <p style={{ ...font, fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.35)', letterSpacing: '1.5px', marginBottom: 10 }}>
             YOUR RECURRING PATTERNS
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {portrait.patterns.map((p, i) => (
               <div key={i} style={{
-                background: 'rgba(255,255,255,0.03)', borderRadius: 12, padding: '12px 16px',
+                background: 'rgba(255,255,255,0.025)', borderRadius: 12, padding: '12px 16px',
                 borderLeft: '3px solid rgba(255,212,122,0.4)',
               }}>
-                <p style={{ ...font, fontSize: 13.5, color: 'rgba(255,255,255,0.7)', lineHeight: 1.6 }}>{p}</p>
+                <p style={{ ...font, fontSize: 13.5, color: 'rgba(255,255,255,0.7)', lineHeight: 1.65 }}>{p}</p>
               </div>
             ))}
           </div>
         </div>
       )}
 
-      {/* Calling */}
       {portrait.calling && (
         <div className="jrn-portrait-section" style={{
-          background: 'linear-gradient(135deg, rgba(255,107,157,0.1), rgba(255,154,92,0.08))',
-          borderRadius: 14, padding: 18,
-          border: '1px solid rgba(255,107,157,0.15)',
+          background: 'linear-gradient(135deg, rgba(255,107,157,0.08), rgba(255,154,92,0.06))',
+          borderRadius: 14, padding: 18, border: '1px solid rgba(255,107,157,0.12)',
         }}>
-          <p style={{ ...font, fontSize: 11, fontWeight: 700, color: '#FF6B9D', letterSpacing: '1.4px', marginBottom: 8 }}>
-            WHAT'S CALLING YOU
-          </p>
-          <p style={{ ...font, fontSize: 14, color: 'rgba(255,255,255,0.8)', lineHeight: 1.7, fontStyle: 'italic' }}>
-            {portrait.calling}
-          </p>
+          <p style={{ ...font, fontSize: 10, fontWeight: 700, color: '#FF6B9D', letterSpacing: '1.5px', marginBottom: 8 }}>WHAT'S CALLING YOU</p>
+          <p style={{ ...font, fontSize: 14, color: 'rgba(255,255,255,0.8)', lineHeight: 1.75, fontStyle: 'italic' }}>{portrait.calling}</p>
         </div>
       )}
 
-      {/* Dimension insights */}
       {portrait.dimensionInsights && Object.keys(portrait.dimensionInsights).length > 0 && (
         <div className="jrn-portrait-section">
-          <p style={{ ...font, fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', letterSpacing: '1.4px', marginBottom: 10 }}>
+          <p style={{ ...font, fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.35)', letterSpacing: '1.5px', marginBottom: 10 }}>
             ACROSS YOUR LIFE AREAS
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -535,17 +570,14 @@ function PortraitView({
               <div key={dim} style={{
                 background: 'rgba(255,255,255,0.025)', borderRadius: 12, padding: '11px 14px',
                 display: 'flex', gap: 10, alignItems: 'flex-start',
-                border: `1px solid ${DIM_COLORS[dim]}20`,
+                border: `1px solid ${DIM_COLORS[dim]}18`,
               }}>
-                <div style={{
-                  width: 3, borderRadius: 4, flexShrink: 0,
-                  background: DIM_COLORS[dim], alignSelf: 'stretch',
-                }} />
+                <div style={{ width: 3, borderRadius: 4, flexShrink: 0, background: DIM_COLORS[dim], alignSelf: 'stretch', minHeight: 20 }} />
                 <div>
                   <p style={{ ...font, fontSize: 10, fontWeight: 700, color: DIM_COLORS[dim], marginBottom: 4, letterSpacing: '1px' }}>
                     {DIM_LABELS[dim].toUpperCase()}
                   </p>
-                  <p style={{ ...font, fontSize: 13, color: 'rgba(255,255,255,0.7)', lineHeight: 1.6 }}>
+                  <p style={{ ...font, fontSize: 13, color: 'rgba(255,255,255,0.7)', lineHeight: 1.65 }}>
                     {portrait.dimensionInsights?.[dim]}
                   </p>
                 </div>
@@ -555,22 +587,19 @@ function PortraitView({
         </div>
       )}
 
-      {/* Footer */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 8 }}>
-        <p style={{ ...font, fontSize: 11, color: 'rgba(255,255,255,0.25)' }}>
-          {portrait.memoryCount ? `Synthesized from ${portrait.memoryCount} memories` : ''}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 4 }}>
+        <p style={{ ...font, fontSize: 11, color: 'rgba(255,255,255,0.22)' }}>
+          {portrait.memoryCount ? `${portrait.memoryCount} memories` : ''}
           {portrait.generatedAt ? ` · ${formatRelTime(portrait.generatedAt)}` : ''}
         </p>
-        <button
-          onClick={onGenerate}
-          style={{
-            ...font, cursor: 'pointer', fontSize: 11, fontWeight: 600,
-            background: 'rgba(123,63,228,0.15)', color: '#C4A8FF',
-            border: '1px solid rgba(196,168,255,0.2)', borderRadius: 8,
-            padding: '6px 14px',
-          }}
-        >
-          ↻ Refresh
+        <button onClick={onGenerate} style={{
+          ...font, cursor: 'pointer', fontSize: 11, fontWeight: 600,
+          background: 'rgba(123,63,228,0.15)', color: '#C4A8FF',
+          border: '1px solid rgba(196,168,255,0.18)', borderRadius: 8, padding: '6px 14px',
+          display: 'flex', alignItems: 'center', gap: 5,
+        }}>
+          <Icon name="refresh" size={11} color="#C4A8FF" />
+          Refresh
         </button>
       </div>
     </div>
@@ -579,9 +608,7 @@ function PortraitView({
 
 // ── Growth Map Tab ────────────────────────────────────────────────────────────
 
-function GrowthMapView({
-  growthMarkers, achievements,
-}: {
+function GrowthMapView({ growthMarkers, achievements }: {
   growthMarkers: GrowthMarker[]
   achievements: JournalEntry[]
 }) {
@@ -589,38 +616,36 @@ function GrowthMapView({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      {/* Dimension progress bars */}
       <div>
-        <p style={{ ...font, fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', letterSpacing: '1.4px', marginBottom: 14 }}>
-          TASKS COMPLETED (LAST 30 DAYS)
+        <p style={{ ...font, fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.35)', letterSpacing: '1.5px', marginBottom: 14 }}>
+          TASKS COMPLETED · LAST 30 DAYS
         </p>
         {growthMarkers.length === 0 ? (
-          <p style={{ ...font, fontSize: 13, color: 'rgba(255,255,255,0.35)' }}>
+          <p style={{ ...font, fontSize: 13, color: 'rgba(255,255,255,0.3)', lineHeight: 1.6 }}>
             Complete tasks with Oracle to see your growth here.
           </p>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
             {ALL_DIMS.map(dim => {
               const marker = growthMarkers.find(g => g.dimension === dim)
               const count = marker?.completedTasks ?? 0
               const xp = marker?.xpEarned ?? 0
               const pct = (count / maxTasks) * 100
-
               return (
                 <div key={dim}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
-                    <span style={{ ...font, fontSize: 12, color: DIM_COLORS[dim], fontWeight: 600 }}>
+                    <span style={{ ...font, fontSize: 12, color: count > 0 ? DIM_COLORS[dim] : 'rgba(255,255,255,0.3)', fontWeight: 600 }}>
                       {DIM_CHAR_NAMES[dim]} · {DIM_LABELS[dim]}
                     </span>
-                    <span style={{ ...font, fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>
-                      {count} tasks · {xp} XP
+                    <span style={{ ...font, fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>
+                      {count > 0 ? `${count} tasks · ${xp} XP` : '—'}
                     </span>
                   </div>
-                  <div style={{ height: 7, background: 'rgba(255,255,255,0.06)', borderRadius: 4 }}>
+                  <div style={{ height: 6, background: 'rgba(255,255,255,0.06)', borderRadius: 4 }}>
                     <div style={{
                       height: '100%', borderRadius: 4,
                       width: count > 0 ? `${pct}%` : '0%',
-                      background: `linear-gradient(90deg, ${DIM_COLORS[dim]}88, ${DIM_COLORS[dim]})`,
+                      background: `linear-gradient(90deg, ${DIM_COLORS[dim]}66, ${DIM_COLORS[dim]})`,
                       transition: 'width 0.8s ease',
                     }} />
                   </div>
@@ -631,38 +656,28 @@ function GrowthMapView({
         )}
       </div>
 
-      {/* Recent achievements */}
       <div>
-        <p style={{ ...font, fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', letterSpacing: '1.4px', marginBottom: 12 }}>
+        <p style={{ ...font, fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.35)', letterSpacing: '1.5px', marginBottom: 12 }}>
           RECENT WINS
         </p>
         {achievements.length === 0 ? (
-          <p style={{ ...font, fontSize: 13, color: 'rgba(255,255,255,0.35)' }}>
-            Your completed tasks will appear here as trophies. Time to start!
+          <p style={{ ...font, fontSize: 13, color: 'rgba(255,255,255,0.3)', lineHeight: 1.6 }}>
+            Your completed tasks will appear here as trophies.
           </p>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-            {achievements.slice(0, 15).map((a) => {
+            {achievements.slice(0, 15).map(a => {
               const dim = a.dimensions[0] as Dimension | undefined
               const color = dim ? DIM_COLORS[dim] : '#C4A8FF'
               return (
                 <div key={a.id} style={{
                   display: 'flex', alignItems: 'center', gap: 10,
-                  background: 'rgba(255,255,255,0.025)', borderRadius: 10,
-                  padding: '10px 14px',
+                  background: 'rgba(255,255,255,0.025)', borderRadius: 10, padding: '10px 14px',
                 }}>
-                  <span style={{ fontSize: 14 }}>⚔️</span>
-                  <p style={{ ...font, fontSize: 13, color: 'rgba(255,255,255,0.75)', flex: 1 }}>
-                    {a.content}
-                  </p>
-                  {a.xpReward && (
-                    <span style={{ ...font, fontSize: 11, color, fontWeight: 700, flexShrink: 0 }}>
-                      +{a.xpReward} XP
-                    </span>
-                  )}
-                  <span style={{ ...font, fontSize: 11, color: 'rgba(255,255,255,0.25)', flexShrink: 0 }}>
-                    {formatRelTime(a.createdAt)}
-                  </span>
+                  <Icon name="sword" size={14} color={color} />
+                  <p style={{ ...font, fontSize: 13, color: 'rgba(255,255,255,0.75)', flex: 1 }}>{a.content}</p>
+                  {a.xpReward && <span style={{ ...font, fontSize: 11, color, fontWeight: 700, flexShrink: 0 }}>+{a.xpReward}</span>}
+                  <span style={{ ...font, fontSize: 11, color: 'rgba(255,255,255,0.22)', flexShrink: 0 }}>{formatRelTime(a.createdAt)}</span>
                 </div>
               )
             })}
@@ -675,40 +690,36 @@ function GrowthMapView({
 
 // ── Right Panel ───────────────────────────────────────────────────────────────
 
-function RightPanel({
-  patternCards, unheardVoices, growthMarkers, stats, pulse,
-}: {
+function RightPanel({ patternCards, unheardVoices, growthMarkers, stats, pulse }: {
   patternCards: PatternCard[]
   unheardVoices: UnheardVoice[]
   growthMarkers: GrowthMarker[]
   stats: { totalEntries: number; totalCompleted: number; activeStreak: number; mostActiveDay: string }
   pulse: PulseDay[]
 }) {
-  // Mini pulse — last 14 days
   const last14 = pulse.slice(-14)
-  const maxScore = 5
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-      {/* Stats strip */}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {/* Stats */}
       <div style={{
         background: 'rgba(255,255,255,0.03)', borderRadius: 14, padding: '14px 16px',
-        border: '1px solid rgba(255,255,255,0.07)',
+        border: '1px solid rgba(255,255,255,0.06)',
       }}>
-        <p style={{ ...font, fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.35)', letterSpacing: '1.3px', marginBottom: 12 }}>
-          YOUR STATS
-        </p>
+        <p style={{ ...font, fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.3)', letterSpacing: '1.4px', marginBottom: 12 }}>YOUR STATS</p>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
           {[
-            { label: 'Entries', value: stats?.totalEntries ?? 0, icon: '📓' },
-            { label: 'Streak', value: `${stats?.activeStreak ?? 0}d`, icon: '🔥' },
-            { label: 'Completed', value: stats?.totalCompleted ?? 0, icon: '⚔️' },
-            { label: 'Peak Day', value: stats?.mostActiveDay ?? '—', icon: '📅' },
-          ].map(({ label, value, icon }) => (
+            { label: 'Entries', value: stats?.totalEntries ?? 0, icon: 'entries' as const },
+            { label: 'Streak', value: `${stats?.activeStreak ?? 0}d`, icon: 'flame' as const, color: '#FF9A5C' },
+            { label: 'Completed', value: stats?.totalCompleted ?? 0, icon: 'sword' as const, color: '#6EE7A4' },
+            { label: 'Peak Day', value: stats?.mostActiveDay ?? '—', icon: 'calendar' as const },
+          ].map(({ label, value, icon, color }) => (
             <div key={label} style={{ textAlign: 'center' }}>
-              <p style={{ ...font, fontSize: 18, marginBottom: 2 }}>{icon}</p>
-              <p style={{ ...font, fontSize: 15, fontWeight: 700, color: '#fff' }}>{value}</p>
-              <p style={{ ...font, fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>{label}</p>
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 3 }}>
+                <Icon name={icon} size={14} color={color ?? 'rgba(255,255,255,0.4)'} />
+              </div>
+              <p style={{ ...font, fontSize: 16, fontWeight: 700, color: '#fff' }}>{value}</p>
+              <p style={{ ...font, fontSize: 9, color: 'rgba(255,255,255,0.3)' }}>{label}</p>
             </div>
           ))}
         </div>
@@ -718,28 +729,21 @@ function RightPanel({
       {last14.some(d => d.hasEntry) && (
         <div style={{
           background: 'rgba(255,255,255,0.03)', borderRadius: 14, padding: '14px 16px',
-          border: '1px solid rgba(255,255,255,0.07)',
+          border: '1px solid rgba(255,255,255,0.06)',
         }}>
-          <p style={{ ...font, fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.35)', letterSpacing: '1.3px', marginBottom: 10 }}>
+          <p style={{ ...font, fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.3)', letterSpacing: '1.4px', marginBottom: 10 }}>
             14-DAY PULSE
           </p>
-          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: 44 }}>
-            {last14.map((day, i) => {
-              const h = day.score ? (day.score / maxScore) * 100 : 0
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: 40 }}>
+            {last14.map(day => {
+              const h = day.score ? (day.score / 5) * 100 : 0
               const color = day.score ? getScoreColor(day.score) : 'rgba(255,255,255,0.05)'
               return (
-                <div
-                  key={day.date}
-                  title={day.score ? `${day.date}: ${day.score}/5` : day.date}
-                  style={{
-                    flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
-                    justifyContent: 'flex-end', height: '100%',
-                  }}
-                >
+                <div key={day.date} title={day.date}
+                  style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: '100%' }}>
                   <div style={{
                     width: '100%', height: day.hasEntry ? `${Math.max(h, 12)}%` : '6%',
-                    background: color, borderRadius: '3px 3px 2px 2px',
-                    transition: 'height 0.4s ease',
+                    background: color, borderRadius: '2px 2px 1px 1px',
                   }} />
                 </div>
               )
@@ -752,38 +756,24 @@ function RightPanel({
       {patternCards.length > 0 && (
         <div style={{
           background: 'rgba(255,255,255,0.03)', borderRadius: 14, padding: '14px 16px',
-          border: '1px solid rgba(255,255,255,0.07)',
+          border: '1px solid rgba(255,255,255,0.06)',
         }}>
-          <p style={{ ...font, fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.35)', letterSpacing: '1.3px', marginBottom: 10 }}>
-            YOUR FOCUS PATTERNS
-          </p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <p style={{ ...font, fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.3)', letterSpacing: '1.4px', marginBottom: 10 }}>FOCUS PATTERNS</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
             {patternCards.map(pc => {
               const color = DIM_COLORS[pc.dimension as Dimension] ?? '#C4A8FF'
               return (
-                <div key={pc.dimension} style={{
-                  display: 'flex', alignItems: 'center', gap: 10,
-                }}>
-                  <div style={{
-                    width: 8, height: 8, borderRadius: '50%', background: color, flexShrink: 0,
-                    boxShadow: `0 0 6px ${color}88`,
-                  }} />
+                <div key={pc.dimension} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ width: 6, height: 6, borderRadius: '50%', background: color, flexShrink: 0, boxShadow: `0 0 5px ${color}88` }} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
-                      <span style={{ ...font, fontSize: 12, color: 'rgba(255,255,255,0.7)', fontWeight: 600 }}>
+                      <span style={{ ...font, fontSize: 12, color: 'rgba(255,255,255,0.65)', fontWeight: 600 }}>
                         {DIM_LABELS[pc.dimension as Dimension] ?? pc.dimension}
                       </span>
-                      <span style={{ ...font, fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>
-                        {pc.mentionCount}×
-                      </span>
+                      <span style={{ ...font, fontSize: 9, color: 'rgba(255,255,255,0.3)' }}>{pc.mentionCount}×</span>
                     </div>
-                    <div style={{ height: 4, background: 'rgba(255,255,255,0.06)', borderRadius: 2 }}>
-                      <div style={{
-                        height: '100%', borderRadius: 2,
-                        width: `${pc.energyPercent}%`,
-                        background: color,
-                        opacity: 0.7,
-                      }} />
+                    <div style={{ height: 3, background: 'rgba(255,255,255,0.06)', borderRadius: 2 }}>
+                      <div style={{ height: '100%', borderRadius: 2, width: `${pc.energyPercent}%`, background: color, opacity: 0.65 }} />
                     </div>
                   </div>
                 </div>
@@ -796,26 +786,19 @@ function RightPanel({
       {/* Unheard voices */}
       {unheardVoices.length > 0 && (
         <div style={{
-          background: 'rgba(255,107,157,0.05)', borderRadius: 14, padding: '14px 16px',
-          border: '1px solid rgba(255,107,157,0.1)',
+          background: 'rgba(255,107,157,0.04)', borderRadius: 14, padding: '14px 16px',
+          border: '1px solid rgba(255,107,157,0.08)',
         }}>
-          <p style={{ ...font, fontSize: 10, fontWeight: 700, color: '#FF6B9D', letterSpacing: '1.3px', marginBottom: 10 }}>
-            UNHEARD VOICES
-          </p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <p style={{ ...font, fontSize: 9, fontWeight: 700, color: '#FF6B9D', letterSpacing: '1.4px', marginBottom: 10 }}>UNHEARD VOICES</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
             {unheardVoices.slice(0, 3).map(uv => {
               const color = DIM_COLORS[uv.dimension as Dimension] ?? '#C4A8FF'
               return (
-                <div key={uv.dimension} style={{
-                  borderLeft: `2px solid ${color}50`,
-                  paddingLeft: 10,
-                }}>
-                  <p style={{ ...font, fontSize: 11, color, fontWeight: 600, marginBottom: 3 }}>
+                <div key={uv.dimension} style={{ borderLeft: `2px solid ${color}40`, paddingLeft: 9 }}>
+                  <p style={{ ...font, fontSize: 11, color, fontWeight: 600, marginBottom: 2 }}>
                     {DIM_LABELS[uv.dimension as Dimension] ?? uv.dimension}
                   </p>
-                  <p style={{ ...font, fontSize: 11, color: 'rgba(255,255,255,0.4)', lineHeight: 1.5 }}>
-                    {uv.message}
-                  </p>
+                  <p style={{ ...font, fontSize: 11, color: 'rgba(255,255,255,0.35)', lineHeight: 1.5 }}>{uv.message}</p>
                 </div>
               )
             })}
@@ -823,26 +806,22 @@ function RightPanel({
         </div>
       )}
 
-      {/* Growth markers summary */}
+      {/* Growth markers */}
       {growthMarkers.length > 0 && (
         <div style={{
-          background: 'rgba(110,231,164,0.04)', borderRadius: 14, padding: '14px 16px',
-          border: '1px solid rgba(110,231,164,0.08)',
+          background: 'rgba(110,231,164,0.03)', borderRadius: 14, padding: '14px 16px',
+          border: '1px solid rgba(110,231,164,0.07)',
         }}>
-          <p style={{ ...font, fontSize: 10, fontWeight: 700, color: '#6EE7A4', letterSpacing: '1.3px', marginBottom: 10 }}>
-            GROWTH THIS MONTH
-          </p>
+          <p style={{ ...font, fontSize: 9, fontWeight: 700, color: '#6EE7A4', letterSpacing: '1.4px', marginBottom: 10 }}>GROWTH THIS MONTH</p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {growthMarkers.slice(0, 4).map(gm => {
               const color = DIM_COLORS[gm.dimension as Dimension] ?? '#C4A8FF'
               return (
                 <div key={gm.dimension} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ ...font, fontSize: 12, color: 'rgba(255,255,255,0.6)' }}>
+                  <span style={{ ...font, fontSize: 12, color: 'rgba(255,255,255,0.55)' }}>
                     {DIM_LABELS[gm.dimension as Dimension] ?? gm.dimension}
                   </span>
-                  <span style={{ ...font, fontSize: 12, color, fontWeight: 700 }}>
-                    +{gm.xpEarned} XP
-                  </span>
+                  <span style={{ ...font, fontSize: 12, color, fontWeight: 700 }}>+{gm.xpEarned} XP</span>
                 </div>
               )
             })}
@@ -856,9 +835,7 @@ function RightPanel({
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export default function DesktopJournalPage() {
-  const router = useRouter()
   const [userId, setUserId] = useState<string>('')
-  const [checkinDone, setCheckinDone] = useState(false)
 
   // Data
   const [entries, setEntries] = useState<JournalEntry[]>([])
@@ -870,27 +847,26 @@ export default function DesktopJournalPage() {
   const [growthMarkers, setGrowthMarkers] = useState<GrowthMarker[]>([])
   const [stats, setStats] = useState({ totalEntries: 0, totalCompleted: 0, activeStreak: 0, mostActiveDay: '—' })
 
-  // UI state
+  // UI
   const [activeTab, setActiveTab] = useState<Tab>('stream')
   const [activeDimFilter, setActiveDimFilter] = useState<Dimension | null>(null)
   const [loadingEntries, setLoadingEntries] = useState(true)
   const [loadingInsights, setLoadingInsights] = useState(true)
   const [loadingPortrait, setLoadingPortrait] = useState(false)
-  const portraitCacheKey = useRef('')
 
   // Init
   useEffect(() => {
     const id = getUserId()
     setUserId(id)
-    setCheckinDone(isCheckinDoneToday())
-    portraitCacheKey.current = `protagonist-portrait-${id}`
-  }, [])
-
-  // Checkin done listener
-  useEffect(() => {
-    const handler = () => setCheckinDone(true)
-    window.addEventListener('protagonist:checkin-done', handler)
-    return () => window.removeEventListener('protagonist:checkin-done', handler)
+    // Load cached portrait
+    try {
+      const cached = localStorage.getItem(`protagonist-portrait-${id}`)
+      if (cached) {
+        const parsed = JSON.parse(cached) as Portrait
+        const age = Date.now() - new Date(parsed.generatedAt ?? 0).getTime()
+        if (age < 24 * 60 * 60 * 1000) setPortrait(parsed)
+      }
+    } catch { /* ignore */ }
   }, [])
 
   // Load entries
@@ -900,7 +876,7 @@ export default function DesktopJournalPage() {
     const dim = activeDimFilter ?? ''
     fetch(`/api/journal/entries?userId=${userId}&limit=40${dim ? `&dimension=${dim}` : ''}`)
       .then(r => r.json())
-      .then(d => {
+      .then((d: { entries?: JournalEntry[]; achievements?: JournalEntry[] }) => {
         setEntries(d.entries ?? [])
         setAchievements(d.achievements ?? [])
       })
@@ -913,7 +889,7 @@ export default function DesktopJournalPage() {
     if (!userId) return
     fetch(`/api/journal/pulse?userId=${userId}&days=30`)
       .then(r => r.json())
-      .then(d => setPulse(d.pulse ?? []))
+      .then((d: { pulse?: PulseDay[] }) => setPulse(d.pulse ?? []))
       .catch(() => {})
   }, [userId])
 
@@ -923,32 +899,14 @@ export default function DesktopJournalPage() {
     setLoadingInsights(true)
     fetch(`/api/journal/insights?userId=${userId}`)
       .then(r => r.json())
-      .then(d => {
+      .then((d: { patternCards?: PatternCard[]; unheardVoices?: UnheardVoice[]; growthMarkers?: GrowthMarker[]; stats?: typeof stats }) => {
         setPatternCards(d.patternCards ?? [])
         setUnheardVoices(d.unheardVoices ?? [])
         setGrowthMarkers(d.growthMarkers ?? [])
-        setStats(d.stats ?? { totalEntries: 0, totalCompleted: 0, activeStreak: 0, mostActiveDay: '—' })
+        if (d.stats) setStats(d.stats)
       })
       .catch(() => {})
       .finally(() => setLoadingInsights(false))
-  }, [userId])
-
-  // Load cached portrait
-  useEffect(() => {
-    if (!userId) return
-    const key = `protagonist-portrait-${userId}`
-    try {
-      const cached = localStorage.getItem(key)
-      if (cached) {
-        const parsed = JSON.parse(cached) as Portrait
-        // Only use cache if less than 24h old
-        const age = Date.now() - new Date(parsed.generatedAt ?? 0).getTime()
-        if (age < 24 * 60 * 60 * 1000) {
-          setPortrait(parsed)
-          return
-        }
-      }
-    } catch {}
   }, [userId])
 
   const generatePortrait = useCallback(async () => {
@@ -963,14 +921,21 @@ export default function DesktopJournalPage() {
       const d = await r.json() as { portrait?: Portrait }
       if (d.portrait) {
         setPortrait(d.portrait)
-        try { localStorage.setItem(`protagonist-portrait-${userId}`, JSON.stringify(d.portrait)) } catch {}
+        try { localStorage.setItem(`protagonist-portrait-${userId}`, JSON.stringify(d.portrait)) } catch { /* ignore */ }
       }
-    } catch {}
+    } catch { /* ignore */ }
     finally { setLoadingPortrait(false) }
   }, [userId])
 
   const allEntries = [...entries, ...achievements]
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+
+  const tabs: { id: Tab; icon: string; label: string }[] = [
+    { id: 'stream', icon: 'stream', label: 'Stream' },
+    { id: 'pulse', icon: 'pulse', label: 'Pulse' },
+    { id: 'portrait', icon: 'portrait', label: "Arc's Portrait" },
+    { id: 'growth', icon: 'growth', label: 'Growth Map' },
+  ]
 
   return (
     <div style={{
@@ -981,233 +946,135 @@ export default function DesktopJournalPage() {
     }}>
       <style>{PAGE_CSS}</style>
 
-      {/* ── Top Nav ── */}
-      <nav style={{
-        display: 'flex', alignItems: 'center', height: 56, flexShrink: 0,
-        background: 'rgba(19,14,42,0.95)', backdropFilter: 'blur(12px)',
-        borderBottom: '1px solid rgba(255,255,255,0.06)',
-        padding: '0 20px', gap: 6, zIndex: 50,
-      }}>
-        {/* Logo */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginRight: 20 }}>
-          <div style={{
-            width: 30, height: 30, borderRadius: 8,
-            background: 'linear-gradient(135deg, #7B3FE4 0%, #C4A8FF 100%)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 16, flexShrink: 0,
-          }}>⚡</div>
-          <span style={{ ...font, fontWeight: 800, fontSize: 16, color: '#fff', letterSpacing: '-0.3px' }}>
-            Protagonist
-          </span>
-        </div>
+      {/* Shared top nav */}
+      <DesktopTopNav activePage="journal" />
 
-        {/* Nav links */}
-        {[
-          { label: 'Dashboard', href: '/dashboard', active: false },
-          { label: 'Life Areas', href: '/character', active: false },
-          { label: 'Journal', href: '/journal', active: true },
-        ].map(({ label, href, active }) => (
-          <button
-            key={label}
-            onClick={() => router.push(href)}
-            style={{
-              ...font, cursor: 'pointer', fontWeight: 600, fontSize: 13,
-              background: active ? 'rgba(255,255,255,0.1)' : 'none',
-              color: active ? '#fff' : 'rgba(255,255,255,0.45)',
-              border: 'none', borderRadius: 8, padding: '6px 13px',
-              transition: 'all 0.2s',
-            }}
-          >
-            {label}
-          </button>
-        ))}
+      {/* Oracle modal — required for the check-in button to work */}
+      <DesktopOracleModal />
 
-        <div style={{ flex: 1 }} />
-
-        {/* Check-in button */}
-        <button
-          onClick={() => openOracle('', checkinDone ? 'checkin-summary' : 'morning_checkin')}
-          style={{
-            ...font, cursor: 'pointer', fontWeight: 700, fontSize: 12,
-            background: checkinDone ? 'rgba(110,231,164,0.12)' : '#FF7A65',
-            color: checkinDone ? '#6EE7A4' : 'white',
-            border: checkinDone ? '1px solid rgba(110,231,164,0.35)' : 'none',
-            borderRadius: 10, padding: '7px 14px',
-            animation: checkinDone ? 'none' : 'jrn-pulse-btn 3s ease-in-out infinite',
-          }}
-        >
-          {checkinDone ? '✓ Daily Brief' : 'Morning Check-In'}
-        </button>
-
-        {/* Settings */}
-        <button
-          onClick={() => router.push('/settings')}
-          style={{
-            ...font, cursor: 'pointer', background: 'none',
-            color: 'rgba(255,255,255,0.4)', border: 'none',
-            width: 36, height: 36, borderRadius: 8, display: 'flex',
-            alignItems: 'center', justifyContent: 'center',
-          }}
-        >
-          <SettingsIcon />
-        </button>
-
-        {/* Avatar */}
-        <div style={{
-          width: 32, height: 32, borderRadius: '50%',
-          background: 'linear-gradient(135deg, #7B3FE4, #C4A8FF)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          ...font, fontWeight: 800, fontSize: 13, color: '#fff', cursor: 'pointer',
-        }}>I</div>
-      </nav>
-
-      {/* ── Body ── */}
+      {/* Body */}
       <div style={{ display: 'flex', flex: 1, minHeight: 0, overflow: 'hidden' }}>
         {/* Left sidebar */}
         <DesktopLeftSidebar scores={{}} />
 
-        {/* ── Main content ── */}
+        {/* Main content */}
         <div style={{
           flex: 1, display: 'flex', flexDirection: 'column',
           minWidth: 0, overflow: 'hidden', padding: '20px 16px 0',
         }}>
           {/* Header */}
-          <div style={{ marginBottom: 16, flexShrink: 0 }}>
-            <h1 style={{ ...font, fontWeight: 800, fontSize: 22, color: '#fff', marginBottom: 4 }}>
-              📓 Your Journal
-            </h1>
-            <p style={{ ...font, fontSize: 13, color: 'rgba(255,255,255,0.4)' }}>
-              Your thoughts, growth, and story — all in one place.
-            </p>
+          <div style={{ marginBottom: 16, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
+            <Icon name="journal" size={22} color="rgba(255,255,255,0.7)" />
+            <div>
+              <h1 style={{ ...font, fontWeight: 800, fontSize: 21, color: '#fff', lineHeight: 1.2 }}>Your Journal</h1>
+              <p style={{ ...font, fontSize: 12, color: 'rgba(255,255,255,0.35)' }}>
+                Your thoughts, growth, and story — all in one place.
+              </p>
+            </div>
           </div>
 
           {/* Tab bar + dim filter */}
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 4,
-            marginBottom: 14, flexShrink: 0, flexWrap: 'wrap',
-          }}>
-            {(['stream', 'pulse', 'portrait', 'growth'] as Tab[]).map(tab => (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 3, marginBottom: 14, flexShrink: 0, flexWrap: 'wrap' }}>
+            {tabs.map(tab => (
               <button
-                key={tab}
-                className={`jrn-tab-btn${activeTab === tab ? ' active' : ''}`}
-                onClick={() => setActiveTab(tab)}
+                key={tab.id}
+                className={`jrn-tab-btn${activeTab === tab.id ? ' active' : ''}`}
+                onClick={() => setActiveTab(tab.id)}
               >
-                {tab === 'stream' && '🌊 Stream'}
-                {tab === 'pulse' && '💓 Pulse'}
-                {tab === 'portrait' && '🪩 Arc\'s Portrait'}
-                {tab === 'growth' && '📈 Growth Map'}
+                <Icon name={tab.icon} size={13} color={activeTab === tab.id ? '#fff' : 'rgba(255,255,255,0.4)'} />
+                {tab.label}
               </button>
             ))}
 
-            {/* Dim filter pills (stream tab only) */}
             {activeTab === 'stream' && (
-              <div style={{ display: 'flex', gap: 5, marginLeft: 8, flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: 4, marginLeft: 8, flexWrap: 'wrap' }}>
                 <button
                   className="jrn-dim-pill"
                   onClick={() => setActiveDimFilter(null)}
                   style={{
-                    background: !activeDimFilter ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.04)',
-                    color: !activeDimFilter ? '#fff' : 'rgba(255,255,255,0.4)',
-                    border: '1px solid rgba(255,255,255,0.1)',
+                    background: !activeDimFilter ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.03)',
+                    color: !activeDimFilter ? '#fff' : 'rgba(255,255,255,0.35)',
+                    border: '1px solid rgba(255,255,255,0.08)',
                   }}
-                >
-                  All
-                </button>
+                >All</button>
                 {ALL_DIMS.map(dim => (
                   <button
                     key={dim}
                     className="jrn-dim-pill"
                     onClick={() => setActiveDimFilter(activeDimFilter === dim ? null : dim)}
                     style={{
-                      background: activeDimFilter === dim ? `${DIM_COLORS[dim]}22` : 'rgba(255,255,255,0.03)',
-                      color: activeDimFilter === dim ? DIM_COLORS[dim] : 'rgba(255,255,255,0.35)',
-                      border: `1px solid ${activeDimFilter === dim ? DIM_COLORS[dim] + '44' : 'rgba(255,255,255,0.07)'}`,
+                      background: activeDimFilter === dim ? `${DIM_COLORS[dim]}20` : 'rgba(255,255,255,0.02)',
+                      color: activeDimFilter === dim ? DIM_COLORS[dim] : 'rgba(255,255,255,0.3)',
+                      border: `1px solid ${activeDimFilter === dim ? DIM_COLORS[dim] + '35' : 'rgba(255,255,255,0.06)'}`,
                     }}
-                  >
-                    {DIM_LABELS[dim]}
-                  </button>
+                  >{DIM_LABELS[dim]}</button>
                 ))}
               </div>
             )}
           </div>
 
-          {/* Tab content + right panel */}
+          {/* Content + right panel */}
           <div style={{ display: 'flex', flex: 1, minHeight: 0, gap: 14 }}>
             {/* Main panel */}
-            <div style={{ flex: 1, overflow: 'auto', minWidth: 0, paddingRight: 4 }}>
-              {/* Stream */}
+            <div style={{ flex: 1, overflow: 'auto', minWidth: 0, paddingBottom: 20 }}>
               {activeTab === 'stream' && (
-                <div>
-                  {loadingEntries ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                      {[1, 2, 3].map(i => (
-                        <div key={i} style={{
-                          height: 90, borderRadius: 14,
-                          background: 'linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.07) 50%, rgba(255,255,255,0.04) 75%)',
-                          backgroundSize: '200% 100%',
-                          animation: 'jrn-shimmer 1.5s infinite',
-                          animationDelay: `${i * 0.15}s`,
-                        }} />
-                      ))}
-                    </div>
-                  ) : allEntries.length === 0 ? (
-                    <div style={{
-                      display: 'flex', flexDirection: 'column', alignItems: 'center',
-                      justifyContent: 'center', minHeight: 260, gap: 14,
-                    }}>
-                      <span style={{ fontSize: 52 }}>🌀</span>
-                      <h3 style={{ ...font, color: '#fff', fontSize: 17, fontWeight: 700 }}>
-                        Your story begins here
-                      </h3>
-                      <p style={{ ...font, color: 'rgba(255,255,255,0.4)', fontSize: 13, textAlign: 'center', maxWidth: 320, lineHeight: 1.7 }}>
-                        {activeDimFilter
-                          ? `No journal entries for ${DIM_LABELS[activeDimFilter]} yet. Start sharing with Oracle.`
-                          : 'Start journaling with Oracle — speak your thoughts, share your wins, or check in each morning.'
-                        }
-                      </p>
-                      <button
-                        onClick={() => openOracle('', 'morning_checkin')}
-                        style={{
-                          ...font, cursor: 'pointer', fontWeight: 700, fontSize: 13,
-                          background: '#FF7A65', color: '#fff',
-                          border: 'none', borderRadius: 12, padding: '11px 24px',
-                        }}
-                      >
-                        Start Morning Check-In
-                      </button>
-                    </div>
-                  ) : (
-                    allEntries.map(entry => <EntryCard key={entry.id} entry={entry} />)
-                  )}
-                </div>
+                loadingEntries ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {[1, 2, 3].map(i => (
+                      <div key={i} style={{
+                        height: 88, borderRadius: 14,
+                        background: 'linear-gradient(90deg, rgba(255,255,255,0.03) 25%, rgba(255,255,255,0.06) 50%, rgba(255,255,255,0.03) 75%)',
+                        backgroundSize: '200% 100%',
+                        animation: `jrn-shimmer 1.6s infinite`,
+                        animationDelay: `${i * 0.1}s`,
+                      }} />
+                    ))}
+                  </div>
+                ) : allEntries.length === 0 ? (
+                  <div style={{
+                    display: 'flex', flexDirection: 'column', alignItems: 'center',
+                    justifyContent: 'center', minHeight: 260, gap: 14,
+                  }}>
+                    <Icon name="waves" size={52} color="rgba(255,255,255,0.1)" />
+                    <h3 style={{ ...font, color: '#fff', fontSize: 17, fontWeight: 700 }}>Your story begins here</h3>
+                    <p style={{ ...font, color: 'rgba(255,255,255,0.35)', fontSize: 13, textAlign: 'center', maxWidth: 310, lineHeight: 1.7 }}>
+                      {activeDimFilter
+                        ? `No entries for ${DIM_LABELS[activeDimFilter]} yet.`
+                        : 'Start journaling with Oracle — speak your thoughts, share your wins, or check in each morning.'
+                      }
+                    </p>
+                    <button
+                      onClick={() => openOracle('', 'morning_checkin')}
+                      style={{
+                        ...font, cursor: 'pointer', fontWeight: 700, fontSize: 13,
+                        background: '#FF7A65', color: '#fff',
+                        border: 'none', borderRadius: 10, padding: '10px 22px',
+                      }}
+                    >Morning Check-In</button>
+                  </div>
+                ) : (
+                  allEntries.map(entry => <EntryCard key={entry.id} entry={entry} />)
+                )
               )}
 
-              {/* Pulse */}
               {activeTab === 'pulse' && (
-                <div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                   <div style={{
                     background: 'rgba(255,255,255,0.03)', borderRadius: 16, padding: 20,
-                    border: '1px solid rgba(255,255,255,0.07)', marginBottom: 16,
+                    border: '1px solid rgba(255,255,255,0.06)',
                   }}>
-                    <h3 style={{ ...font, fontSize: 15, fontWeight: 700, color: '#fff', marginBottom: 4 }}>
-                      30-Day Emotional Pulse
-                    </h3>
-                    <p style={{ ...font, fontSize: 12, color: 'rgba(255,255,255,0.4)', marginBottom: 20 }}>
-                      Your mood energy across the last month — highs, lows, and everything in between.
-                    </p>
+                    <h3 style={{ ...font, fontSize: 14, fontWeight: 700, color: '#fff', marginBottom: 3 }}>30-Day Emotional Pulse</h3>
+                    <p style={{ ...font, fontSize: 12, color: 'rgba(255,255,255,0.35)', marginBottom: 18 }}>Your mood energy across the last month.</p>
                     <PulseChart pulse={pulse} />
                   </div>
 
-                  {/* Mood distribution */}
                   {pulse.some(p => p.hasEntry) && (
                     <div style={{
                       background: 'rgba(255,255,255,0.03)', borderRadius: 16, padding: 20,
-                      border: '1px solid rgba(255,255,255,0.07)',
+                      border: '1px solid rgba(255,255,255,0.06)',
                     }}>
-                      <h3 style={{ ...font, fontSize: 14, fontWeight: 700, color: '#fff', marginBottom: 14 }}>
-                        Mood Distribution
-                      </h3>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <h3 style={{ ...font, fontSize: 14, fontWeight: 700, color: '#fff', marginBottom: 14 }}>Mood Distribution</h3>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
                         {[
                           { label: 'Great (4–5)', min: 3.5, color: '#6EE7A4' },
                           { label: 'Good (3–4)', min: 2.5, max: 3.5, color: '#FFD47A' },
@@ -1225,15 +1092,11 @@ export default function DesktopJournalPage() {
                           return (
                             <div key={label}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                                <span style={{ ...font, fontSize: 12, color: 'rgba(255,255,255,0.6)' }}>{label}</span>
+                                <span style={{ ...font, fontSize: 12, color: 'rgba(255,255,255,0.55)' }}>{label}</span>
                                 <span style={{ ...font, fontSize: 12, color, fontWeight: 700 }}>{count} days</span>
                               </div>
                               <div style={{ height: 6, background: 'rgba(255,255,255,0.06)', borderRadius: 3 }}>
-                                <div style={{
-                                  height: '100%', borderRadius: 3, width: `${pct}%`,
-                                  background: color, opacity: 0.8,
-                                  transition: 'width 0.8s ease',
-                                }} />
+                                <div style={{ height: '100%', borderRadius: 3, width: `${pct}%`, background: color, opacity: 0.75, transition: 'width 0.8s ease' }} />
                               </div>
                             </div>
                           )
@@ -1244,28 +1107,17 @@ export default function DesktopJournalPage() {
                 </div>
               )}
 
-              {/* Portrait */}
               {activeTab === 'portrait' && (
-                <div>
-                  <PortraitView
-                    portrait={portrait}
-                    loading={loadingPortrait}
-                    onGenerate={() => void generatePortrait()}
-                  />
-                </div>
+                <PortraitView portrait={portrait} loading={loadingPortrait} onGenerate={() => void generatePortrait()} />
               )}
 
-              {/* Growth Map */}
               {activeTab === 'growth' && (
                 <GrowthMapView growthMarkers={growthMarkers} achievements={achievements} />
               )}
             </div>
 
             {/* Right panel */}
-            <div style={{
-              width: 240, flexShrink: 0,
-              overflow: 'auto', paddingBottom: 20,
-            }}>
+            <div style={{ width: 230, flexShrink: 0, overflow: 'auto', paddingBottom: 20 }}>
               {!loadingInsights && (
                 <RightPanel
                   patternCards={patternCards}

@@ -1,7 +1,6 @@
 'use client'
 
 import React, { useEffect, useState, type ComponentType } from 'react'
-import { useRouter } from 'next/navigation'
 import type { CSSProperties } from 'react'
 import { CHARACTERS, type Dimension } from '@/lib/character'
 import { DIMENSION_TO_SLUG, getTierName } from '@/lib/tierName'
@@ -15,8 +14,7 @@ import { HallOfKills } from '@/components/characters/HallOfKills'
 import { MedalsRow } from '@/components/characters/MedalsRow'
 import { LegendCard } from '@/components/characters/LegendCard'
 import { DesktopLeftSidebar, DIM_COLORS } from './DesktopLeftSidebar'
-import { openOracle } from '@/lib/oracle-events'
-import { isCheckinDoneToday } from './DesktopOracleModal'
+import DesktopTopNav from './DesktopTopNav'
 import {
   ForgeCharacterLarge,
   EchoCharacterLarge,
@@ -82,17 +80,6 @@ const PAGE_CSS = `
   ::-webkit-scrollbar { display: none; }
 `
 
-// ── Settings icon ─────────────────────────────────────────────────────────────
-
-function SettingsIcon() {
-  return (
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="3" />
-      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-    </svg>
-  )
-}
-
 // ── Score ring SVG ────────────────────────────────────────────────────────────
 
 function ScoreRing({ score, color, size = 120 }: { score: number; color: string; size?: number }) {
@@ -137,7 +124,6 @@ interface DesktopCharacterPageProps {
 }
 
 export function DesktopCharacterPage({ dimension }: DesktopCharacterPageProps) {
-  const router = useRouter()
   const userId = getUserId()
   const char = CHARACTERS[dimension]
   const accentColor = DIM_COLORS[dimension]
@@ -156,13 +142,6 @@ export function DesktopCharacterPage({ dimension }: DesktopCharacterPageProps) {
   const [killStats, setKillStats] = useState({ slain: 0, escaped: 0 })
   const [earnedMedals, setEarnedMedals] = useState<string[]>([])
   const [dimScores, setDimScores] = useState<Record<string, number>>({})
-  const [checkinDone, setCheckinDone] = useState(() => isCheckinDoneToday())
-
-  useEffect(() => {
-    const handler = () => setCheckinDone(true)
-    window.addEventListener('protagonist:checkin-done', handler)
-    return () => window.removeEventListener('protagonist:checkin-done', handler)
-  }, [])
 
   // ── Data loading ──────────────────────────────────────────────────────────
 
@@ -302,82 +281,8 @@ export function DesktopCharacterPage({ dimension }: DesktopCharacterPageProps) {
     <div style={{ ...font, minHeight: '100dvh', background: '#0D0820', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <style>{PAGE_CSS}</style>
 
-      {/* ── Top nav (identical to dashboard) ─────────────────────────────── */}
-      <nav style={{
-        display: 'flex', alignItems: 'center', height: 56,
-        padding: '0 24px',
-        background: '#130E2A',
-        borderBottom: '1px solid rgba(255,255,255,0.08)',
-        boxShadow: '0 2px 20px rgba(0,0,0,0.5)',
-        flexShrink: 0, zIndex: 20,
-      }}>
-        {/* Logo */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginRight: 28 }}>
-          <div style={{ width: 9, height: 9, borderRadius: '50%', background: '#FF7A65', animation: 'dcp-pulse-dot 2.5s ease-in-out infinite' }} />
-          <span style={{ color: 'white', fontWeight: 700, fontSize: 15, letterSpacing: -0.3 }}>Protagonist</span>
-        </div>
-
-        {/* Nav links */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <button type="button" onClick={() => router.push('/dashboard')}
-            style={{ color: 'rgba(255,255,255,0.6)', padding: '6px 14px', fontSize: 13, background: 'transparent', border: 'none', cursor: 'pointer', ...font }}>
-            Dashboard
-          </button>
-          <div style={{ background: '#7B3FE4', color: 'white', padding: '6px 14px', borderRadius: 8, fontSize: 13, fontWeight: 500 }}>
-            Life Areas
-          </div>
-          <button type="button" onClick={() => router.push('/journal')}
-            style={{ color: 'rgba(255,255,255,0.6)', padding: '6px 14px', fontSize: 13, background: 'transparent', border: 'none', cursor: 'pointer', ...font }}>
-            Journal
-          </button>
-        </div>
-
-        <div style={{ flex: 1 }} />
-
-        {/* Morning Check-In / Daily Brief */}
-        <button
-          type="button"
-          onClick={() => openOracle('', checkinDone ? 'checkin-summary' : 'morning_checkin')}
-          style={{
-            background: checkinDone ? 'rgba(110,231,164,0.12)' : '#FF7A65',
-            color: checkinDone ? '#6EE7A4' : 'white',
-            padding: '9px 22px',
-            borderRadius: 100, fontSize: 13, fontWeight: 600, cursor: 'pointer',
-            marginRight: 12,
-            border: checkinDone ? '1px solid rgba(110,231,164,0.35)' : 'none',
-            animation: checkinDone ? 'none' : 'dcp-pulse-btn 3s ease-in-out infinite',
-            letterSpacing: 0.1, ...font,
-          }}
-        >
-          {checkinDone ? '✓ Daily Brief' : 'Morning Check-In'}
-        </button>
-
-        {/* Settings */}
-        <button
-          type="button"
-          onClick={() => router.push('/settings')}
-          style={{
-            width: 34, height: 34, borderRadius: 8,
-            border: '1px solid rgba(255,255,255,0.1)',
-            background: 'transparent',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            cursor: 'pointer', marginRight: 10,
-            color: 'rgba(255,255,255,0.45)',
-          }}
-          aria-label="Settings"
-        >
-          <SettingsIcon />
-        </button>
-
-        {/* Avatar */}
-        <div style={{
-          width: 34, height: 34, borderRadius: '50%', background: '#7B3FE4',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 13, fontWeight: 600, color: 'white', flexShrink: 0,
-        }}>
-          I
-        </div>
-      </nav>
+      {/* ── Top nav (shared component) ───────────────────────────────────── */}
+      <DesktopTopNav activePage="character" animPrefix="dcp" />
 
       {/* ── Three columns ─────────────────────────────────────────────────── */}
       <div style={{ display: 'flex', flex: 1, minHeight: 0, overflow: 'hidden' }}>
