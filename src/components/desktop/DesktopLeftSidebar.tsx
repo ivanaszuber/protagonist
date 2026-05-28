@@ -1,12 +1,14 @@
 'use client'
 
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { CSSProperties } from 'react'
 import { ALL_DIMENSIONS, type Dimension } from '@/lib/character'
 import { DIMENSION_TO_SLUG } from '@/lib/tierName'
+import type { UserProfile } from '@/app/api/user-profile/route'
+import type { IdentityData } from '@/app/api/identity/synthesize/route'
 
-// ── Constants (shared with DesktopDashboardV2) ────────────────────────────────
+// ── Constants ─────────────────────────────────────────────────────────────────
 
 export const DIM_COLORS: Record<Dimension, string> = {
   family:   '#C4A8FF',
@@ -28,20 +30,32 @@ const CATEGORY_LABELS: Record<Dimension, string> = {
   family:   'Family',
 }
 
-/** Fixed display order */
 const AREA_ORDER: Dimension[] = ['family', 'career', 'wealth', 'love', 'social', 'vitality', 'mind']
 
 const font: CSSProperties = { fontFamily: "'Space Grotesk', system-ui, sans-serif" }
 
 const metaLabel: CSSProperties = {
-  color: 'rgba(255,255,255,0.5)',
+  color: 'rgba(255,255,255,0.38)',
   fontSize: 9,
   fontWeight: 600,
-  letterSpacing: '1.6px',
+  letterSpacing: '1.7px',
   textTransform: 'uppercase' as const,
   display: 'block',
-  marginBottom: 10,
+  marginBottom: 8,
 }
+
+const PILL_COLORS: Record<string, string> = {
+  blue:   '#4DC4FF',
+  green:  '#6EE7A4',
+  purple: '#C4A8FF',
+  orange: '#FF9A5C',
+  amber:  '#FFD47A',
+}
+
+const IDENTITY_CACHE_KEY = (uid: string) => `protagonist-identity-${uid}`
+const IDENTITY_CACHE_TTL = 12 * 60 * 60 * 1000
+const PROFILE_CACHE_KEY  = (uid: string) => `protagonist-profile-${uid}`
+const PROFILE_CACHE_TTL  = 60 * 60 * 1000 // 1 hour
 
 // ── Robot SVG ─────────────────────────────────────────────────────────────────
 
@@ -97,24 +111,16 @@ export function RobotChar({ dim, color }: { dim: Dimension; color: string }) {
   )
 }
 
-// ── Component ─────────────────────────────────────────────────────────────────
+// ── Props ─────────────────────────────────────────────────────────────────────
 
 interface DesktopLeftSidebarProps {
-  /**
-   * Pre-computed scores per dimension (value 1–10).
-   * Used to render the score pills and sort life areas.
-   */
   scores: Partial<Record<Dimension, number>>
-  /** Which dimension is currently active (highlighted). Omit on the dashboard. */
   activeDimension?: Dimension
-  /**
-   * When true, shows a "← Dashboard" back-navigation button instead of the
-   * Life Score ring + identity block. Use on all nested pages.
-   */
   showBackButton?: boolean
-  /** Single letter for the avatar circle. Defaults to 'I'. */
   userInitial?: string
 }
+
+// ── Component ─────────────────────────────────────────────────────────────────
 
 export function DesktopLeftSidebar({
   scores,
@@ -124,21 +130,80 @@ export function DesktopLeftSidebar({
 }: DesktopLeftSidebarProps) {
   const router = useRouter()
 
-  // Life score: average of all known dimension scores
-  const scoreValues = ALL_DIMENSIONS.map(d => scores[d] ?? 0)
-  const lifeScoreNum = scoreValues.reduce((a, b) => a + b, 0) / Math.max(scoreValues.filter(Boolean).length, 1)
+  // ── Local data state ───────────────────────────────────────────────────────
+  const [profile, setProfile]   = useState<UserProfile | null>(null)
+  const [identity, setIdentity] = useState<IdentityData | null>(null)
+
+  useEffect(() => {
+    const userId = document.cookie
+      .split('; ')
+      .find(r => r.startsWith('protagonist_user_id='))
+      ?.split('=')[1]
+    if (!userId) return
+
+    // ── Load profile ──
+    try {
+      const cp = localStorage.getItem(PROFILE_CACHE_KEY(userId))
+      if (cp) {
+        const p = JSON.parse(cp) as UserProfile & { cachedAt?: number }
+        if (Date.now() - (p.cachedAt ?? 0) < PROFILE_CACHE_TTL) { setProfile(p); }
+        else localStorage.removeItem(PROFILE_CACHE_KEY(userId))
+      }
+    } catch { /* ignore */ }
+
+    fetch(`/api/user-profile?userId=${userId}`)
+      .then(r => r.ok ? r.json() : null)
+      .then((d: { profile?: UserProfile } | null) => {
+        if (d?.profile) {
+          const toCache = { ...d.profile, cachedAt: Date.now() }
+          try { localStorage.setItem(PROFILE_CACHE_KEY(userId), JSON.stringify(toCache)) } catch { /* ignore */ }
+          setProfile(d.profile)
+        }
+      })
+      .catch(() => {/* silent */})
+
+    // ── Load identity ──
+    try {
+      const ci = localStorage.getItem(IDENTITY_CACHE_KEY(userId))
+      if (ci) {
+        const id = JSON.parse(ci) as IdentityData & { cachedAt?: number }
+        if (Date.now() - (id.cachedAt ?? 0) < IDENTITY_CACHE_TTL && id.chapterTitle) setIdentity(id)
+        else localStorage.removeItem(IDENTITY_CACHE_KEY(userId))
+      }
+    } catch { /* ignore */ }
+
+    fetch(`/api/identity/synthesize?userId=${userId}`)
+      .then(r => r.ok ? r.json() : null)
+      .then((d: IdentityData | null) => {
+        if (d?.chapterTitle) {
+          const toCache = { ...d, cachedAt: Date.now() }
+          try { localStorage.setItem(IDENTITY_CACHE_KEY(userId), JSON.stringify(toCache)) } catch { /* ignore */ }
+          setIdentity(d)
+        }
+      })
+      .catch(() => {/* silent */})
+  }, [])
+
+  // ── Derived values ─────────────────────────────────────────────────────────
+  const scoreValues     = ALL_DIMENSIONS.map(d => scores[d] ?? 0)
+  const lifeScoreNum    = scoreValues.reduce((a, b) => a + b, 0) / Math.max(scoreValues.filter(Boolean).length, 1)
   const lifeScoreDisplay = lifeScoreNum.toFixed(1)
 
-  // Ring gauge
-  const RING_R = 46
+  const RING_R       = 40
   const circumference = 2 * Math.PI * RING_R
-  const ringOffset = circumference * (1 - Math.min(lifeScoreNum / 10, 1))
+  const ringOffset    = circumference * (1 - Math.min(lifeScoreNum / 10, 1))
 
-  // Sort life areas by score descending
-  const scored = AREA_ORDER.map(dim => ({ dim, score: scores[dim] ?? 0 }))
-    .sort((a, b) => b.score - a.score)
+  const scored   = AREA_ORDER.map(dim => ({ dim, score: scores[dim] ?? 0 })).sort((a, b) => b.score - a.score)
   const maxScore = scored[0]?.score ?? -1
   const minScore = scored[scored.length - 1]?.score ?? -1
+
+  // ── Helpers ────────────────────────────────────────────────────────────────
+
+  const divider = (
+    <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', margin: '10px -16px' }} />
+  )
+
+  // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
     <div style={{
@@ -146,13 +211,13 @@ export function DesktopLeftSidebar({
       width: 248, minWidth: 248,
       background: '#1A1335',
       borderRight: '1px solid rgba(255,255,255,0.07)',
-      padding: '20px 16px',
+      padding: '18px 16px 20px',
       display: 'flex', flexDirection: 'column',
       overflowY: 'auto', overflowX: 'hidden',
       scrollbarWidth: 'none',
     }}>
 
-      {/* ── Top section: back button OR life score ring ── */}
+      {/* ── Back button ── */}
       {showBackButton ? (
         <button
           type="button"
@@ -163,7 +228,6 @@ export function DesktopLeftSidebar({
             background: 'transparent', border: 'none',
             color: 'rgba(255,255,255,0.5)', fontSize: 12, fontWeight: 500,
             cursor: 'pointer', padding: '4px 0', marginBottom: 22,
-            transition: 'color 0.15s',
           }}
           onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.85)' }}
           onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.5)' }}
@@ -174,27 +238,174 @@ export function DesktopLeftSidebar({
           Dashboard
         </button>
       ) : (
-        <div style={{ textAlign: 'center', marginBottom: 20 }}>
-          <svg width="110" height="110" viewBox="0 0 110 110" style={{ display: 'block', margin: '0 auto 2px' }}>
-            <circle cx="55" cy="55" r={RING_R} fill="none" stroke="rgba(123,63,228,0.15)" strokeWidth="6" />
-            <circle
-              cx="55" cy="55" r={RING_R} fill="none" stroke="#7B3FE4" strokeWidth="6"
-              strokeLinecap="round"
-              strokeDasharray={circumference}
-              strokeDashoffset={ringOffset}
-              transform="rotate(-90 55 55)"
-              style={{ transition: 'stroke-dashoffset 0.8s ease-out' }}
-            />
-            <circle cx="55" cy="55" r="38" fill="#130E2A" />
-            <text x="55" y="66" textAnchor="middle" fill="white" fontSize="36" fontWeight="700" fontFamily="Space Grotesk, sans-serif">{lifeScoreDisplay}</text>
-          </svg>
-          <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: 10, fontWeight: 500, letterSpacing: '1.8px', marginBottom: 8 }}>LIFE SCORE</div>
-          <div style={{ color: 'white', fontSize: 16, fontWeight: 600, letterSpacing: -0.3 }}>Ivana</div>
-          <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, marginTop: 2, letterSpacing: 0.3 }}>The Protagonist</div>
-        </div>
+        <>
+          {/* ── Life score ring ── */}
+          <div style={{ textAlign: 'center', marginBottom: 12 }}>
+            <svg width="96" height="96" viewBox="0 0 96 96" style={{ display: 'block', margin: '0 auto 4px' }}>
+              <circle cx="48" cy="48" r={RING_R} fill="none" stroke="rgba(123,63,228,0.18)" strokeWidth="6"/>
+              <circle
+                cx="48" cy="48" r={RING_R} fill="none" stroke="#7B3FE4" strokeWidth="6"
+                strokeLinecap="round"
+                strokeDasharray={circumference}
+                strokeDashoffset={ringOffset}
+                transform="rotate(-90 48 48)"
+                style={{ transition: 'stroke-dashoffset 0.8s ease-out' }}
+              />
+              <circle cx="48" cy="48" r="33" fill="#130E2A"/>
+              <text x="48" y="57" textAnchor="middle" fill="white" fontSize="28" fontWeight="700" fontFamily="Space Grotesk, sans-serif">{lifeScoreDisplay}</text>
+            </svg>
+            <div style={{ color: 'rgba(255,255,255,0.38)', fontSize: 9, fontWeight: 600, letterSpacing: '1.8px', marginBottom: 4 }}>LIFE SCORE</div>
+            <div style={{ color: 'white', fontSize: 15, fontWeight: 600, letterSpacing: -0.3 }}>
+              {profile?.displayName || 'Ivana'}
+            </div>
+          </div>
+
+          {/* ── Life facts ── */}
+          {(profile?.location || profile?.age || profile?.familyInfo || profile?.financialStatus) && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, justifyContent: 'center', marginBottom: 10 }}>
+              {profile?.location && (
+                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.48)', display: 'flex', alignItems: 'center', gap: 3 }}>
+                  <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
+                    <circle cx="12" cy="9" r="2.5"/>
+                  </svg>
+                  {profile.location}
+                </span>
+              )}
+              {profile?.age && (
+                <><span style={{ fontSize: 10, color: 'rgba(255,255,255,0.22)' }}>·</span>
+                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.48)' }}>{profile.age}</span></>
+              )}
+              {profile?.familyInfo && (
+                <><span style={{ fontSize: 10, color: 'rgba(255,255,255,0.22)' }}>·</span>
+                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.48)', display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <svg width="9" height="9" viewBox="0 0 24 24" fill="rgba(255,107,157,0.8)" stroke="none">
+                    <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                  </svg>
+                  {profile.familyInfo}
+                </span></>
+              )}
+              {profile?.financialStatus && (
+                <><span style={{ fontSize: 10, color: 'rgba(255,255,255,0.22)' }}>·</span>
+                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.38)' }}>{profile.financialStatus}</span></>
+              )}
+            </div>
+          )}
+
+          {/* ── Archetypes ── */}
+          {(profile?.enneagram || profile?.sunSign || profile?.neurodivergentNotes) && (
+            <>
+              {divider}
+              <span style={metaLabel}>Archetypes</span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginBottom: 10 }}>
+                {profile?.enneagram && (
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: 7,
+                    padding: '5px 9px',
+                    background: 'rgba(255,212,122,0.08)', border: '1px solid rgba(255,212,122,0.18)', borderRadius: 8,
+                  }}>
+                    <span style={{
+                      width: 17, height: 17, borderRadius: '50%',
+                      background: 'rgba(255,212,122,0.18)',
+                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: 9, fontWeight: 700, color: '#FFD47A', flexShrink: 0,
+                    }}>
+                      {profile.enneagram.charAt(0)}
+                    </span>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: '#FFD47A' }}>{profile.enneagram}</span>
+                    <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginLeft: 1 }}>Achiever-Artist</span>
+                  </div>
+                )}
+                {(profile?.sunSign || profile?.risingSign) && (
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: 7,
+                    padding: '5px 9px',
+                    background: 'rgba(255,154,92,0.07)', border: '1px solid rgba(255,154,92,0.18)', borderRadius: 8,
+                  }}>
+                    <span style={{ fontSize: 12, flexShrink: 0, lineHeight: 1 }}>
+                      {profile?.sunSign === 'Aries' ? '♈' :
+                       profile?.sunSign === 'Taurus' ? '♉' :
+                       profile?.sunSign === 'Gemini' ? '♊' :
+                       profile?.sunSign === 'Cancer' ? '♋' :
+                       profile?.sunSign === 'Leo' ? '♌' :
+                       profile?.sunSign === 'Virgo' ? '♍' :
+                       profile?.sunSign === 'Libra' ? '♎' :
+                       profile?.sunSign === 'Scorpio' ? '♏' :
+                       profile?.sunSign === 'Sagittarius' ? '♐' :
+                       profile?.sunSign === 'Capricorn' ? '♑' :
+                       profile?.sunSign === 'Aquarius' ? '♒' :
+                       profile?.sunSign === 'Pisces' ? '♓' : '★'}
+                    </span>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: '#FF9A5C' }}>
+                      {profile?.sunSign || ''}{profile?.sunSign ? ' Sun' : ''}
+                    </span>
+                    {profile?.risingSign && (
+                      <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>
+                        {profile.risingSign === 'Aries' ? '♈' :
+                         profile.risingSign === 'Taurus' ? '♉' :
+                         profile.risingSign === 'Gemini' ? '♊' :
+                         profile.risingSign === 'Cancer' ? '♋' :
+                         profile.risingSign === 'Leo' ? '♌' :
+                         profile.risingSign === 'Virgo' ? '♍' :
+                         profile.risingSign === 'Libra' ? '♎' :
+                         profile.risingSign === 'Scorpio' ? '♏' :
+                         profile.risingSign === 'Sagittarius' ? '♐' :
+                         profile.risingSign === 'Capricorn' ? '♑' :
+                         profile.risingSign === 'Aquarius' ? '♒' :
+                         profile.risingSign === 'Pisces' ? '♓' : ''} {profile.risingSign} Rising
+                      </span>
+                    )}
+                  </div>
+                )}
+                {profile?.neurodivergentNotes && (
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: 7,
+                    padding: '5px 9px',
+                    background: 'rgba(196,168,255,0.07)', border: '1px solid rgba(196,168,255,0.18)', borderRadius: 8,
+                  }}>
+                    <span style={{ fontSize: 11, flexShrink: 0, color: '#C4A8FF' }}>✦</span>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: '#C4A8FF' }}>{profile.neurodivergentNotes}</span>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+
+          {/* ── Character pills ── */}
+          {identity && (identity.strengths?.length > 0 || identity.growthEdges?.length > 0) && (
+            <>
+              {divider}
+              <span style={metaLabel}>Character</span>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 10 }}>
+                {identity.strengths?.map((pill, i) => {
+                  const c = PILL_COLORS[pill.color] ?? '#C4A8FF'
+                  return (
+                    <span key={i} style={{
+                      fontSize: 10, fontWeight: 600,
+                      background: `${c}14`, color: c,
+                      border: `1px solid ${c}28`,
+                      padding: '2px 8px', borderRadius: 100,
+                      whiteSpace: 'nowrap' as const,
+                    }}>{pill.label}</span>
+                  )
+                })}
+                {identity.growthEdges?.map((pill, i) => (
+                  <span key={`g${i}`} style={{
+                    fontSize: 10, fontWeight: 600,
+                    background: 'rgba(255,212,122,0.1)', color: '#FFD47A',
+                    border: '1px solid rgba(255,212,122,0.22)',
+                    padding: '2px 8px', borderRadius: 100,
+                    whiteSpace: 'nowrap' as const,
+                  }}>△ {pill.label}</span>
+                ))}
+              </div>
+            </>
+          )}
+        </>
       )}
 
-      {/* ── Life Areas list ── */}
+      {/* ── Life Areas ── */}
+      {divider}
       <span style={metaLabel}>Life Areas</span>
       <div>
         {scored.map(({ dim, score }, i) => {
@@ -213,9 +424,9 @@ export function DesktopLeftSidebar({
               onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') router.push(`/${slug}`) }}
               style={{
                 display: 'flex', alignItems: 'center', gap: 8,
-                padding: '6px 8px',
+                padding: '5px 8px',
                 marginLeft: -8, marginRight: -8,
-                borderBottom: isLast ? 'none' : '1px solid rgba(255,255,255,0.05)',
+                borderBottom: isLast ? 'none' : '1px solid rgba(255,255,255,0.04)',
                 borderRadius: 8,
                 background: isActive ? `${color}12` : 'transparent',
                 borderLeft: isActive ? `3px solid ${color}` : '3px solid transparent',
@@ -224,20 +435,18 @@ export function DesktopLeftSidebar({
               }}
             >
               <RobotChar dim={dim} color={color} />
-              <span style={{ color: isActive ? color : color, fontSize: 12, fontWeight: isActive ? 600 : 500, flex: 1, opacity: isActive ? 1 : 0.85 }}>
+              <span style={{ color, fontSize: 12, fontWeight: isActive ? 600 : 500, flex: 1, opacity: isActive ? 1 : 0.85 }}>
                 {CATEGORY_LABELS[dim]}
               </span>
               {isTop && <span style={{ fontSize: 10, color: '#4DC4FF', fontWeight: 700, lineHeight: 1 }}>↑</span>}
               {isBot && <span style={{ fontSize: 10, color: '#FF6B9D', fontWeight: 700, lineHeight: 1 }}>↓</span>}
-              <span
-                style={{
-                  color, fontSize: 15, fontWeight: 700,
-                  background: isActive ? `${color}22` : 'rgba(255,255,255,0.06)',
-                  padding: '2px 8px', borderRadius: 6,
-                  minWidth: 30, textAlign: 'center',
-                  display: 'inline-block',
-                }}
-              >
+              <span style={{
+                color, fontSize: 14, fontWeight: 700,
+                background: isActive ? `${color}22` : 'rgba(255,255,255,0.06)',
+                padding: '2px 7px', borderRadius: 5,
+                minWidth: 28, textAlign: 'center',
+                display: 'inline-block',
+              }}>
                 {score > 0 ? score : '—'}
               </span>
             </div>
