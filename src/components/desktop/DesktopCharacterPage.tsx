@@ -14,6 +14,8 @@ import { BossCard } from '@/components/characters/BossCard'
 import { HallOfKills } from '@/components/characters/HallOfKills'
 import { MedalsRow } from '@/components/characters/MedalsRow'
 import { LegendCard } from '@/components/characters/LegendCard'
+import { DesktopLeftSidebar, DIM_COLORS } from './DesktopLeftSidebar'
+import { openOracle } from '@/lib/oracle-events'
 import {
   ForgeCharacterLarge,
   EchoCharacterLarge,
@@ -57,29 +59,7 @@ interface QuestData {
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-
-/** New color palette matching the dashboard */
-const DIM_COLORS: Record<Dimension, string> = {
-  family:   '#C4A8FF',
-  career:   '#FFD47A',
-  wealth:   '#4DC4FF',
-  vitality: '#FF9A5C',
-  mind:     '#7B3FE4',
-  love:     '#FF6B9D',
-  social:   '#1EEFB8',
-}
-
-const AREA_LABELS: Record<Dimension, string> = {
-  family:   'Family',
-  career:   'Career',
-  wealth:   'Finances',
-  vitality: 'Body',
-  mind:     'Mind',
-  love:     'Relationship',
-  social:   'Friends',
-}
-
-const AREA_ORDER: Dimension[] = ['family', 'career', 'wealth', 'love', 'social', 'vitality', 'mind']
+// DIM_COLORS is imported from DesktopLeftSidebar (single source of truth)
 
 const HERO_ART: Record<Dimension, ComponentType> = {
   career:   ForgeCharacterLarge,
@@ -94,65 +74,20 @@ const HERO_ART: Record<Dimension, ComponentType> = {
 const font: CSSProperties = { fontFamily: "'Space Grotesk', system-ui, sans-serif" }
 
 const PAGE_CSS = `
-  @keyframes dcp-float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
-  @keyframes dcp-spin   { to{transform:rotate(360deg)} }
+  @keyframes dcp-float    { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
+  @keyframes dcp-spin     { to{transform:rotate(360deg)} }
+  @keyframes dcp-pulse-dot{ 0%,100%{transform:scale(1);opacity:1} 50%{transform:scale(1.15);opacity:0.75} }
+  @keyframes dcp-pulse-btn{ 0%,100%{box-shadow:0 0 0 0 rgba(255,122,101,0.4)} 50%{box-shadow:0 0 0 8px rgba(255,122,101,0)} }
   ::-webkit-scrollbar { display: none; }
 `
 
-// ── Mini robot SVG for sidebar nav ────────────────────────────────────────────
+// ── Settings icon ─────────────────────────────────────────────────────────────
 
-function SidebarRobot({ dim, color, size = 28 }: { dim: Dimension; color: string; size?: number }) {
-  const accessory = (() => {
-    switch (dim) {
-      case 'family':
-        return <>
-          <line x1="12" y1="7" x2="12" y2="2" stroke={color} strokeWidth="1.3" strokeLinecap="round"/>
-          <line x1="12" y1="4" x2="9"  y2="1" stroke={color} strokeWidth="1.1" strokeLinecap="round"/>
-          <line x1="12" y1="4" x2="15" y2="1" stroke={color} strokeWidth="1.1" strokeLinecap="round"/>
-        </>
-      case 'career':
-        return <>
-          <line x1="12" y1="7" x2="12" y2="2" stroke={color} strokeWidth="1.3" strokeLinecap="round"/>
-          <circle cx="12" cy="1.5" r="1.5" fill={color}/>
-        </>
-      case 'wealth':
-        return <>
-          <circle cx="12" cy="2.5" r="2.5" fill={color} opacity="0.9"/>
-          <text x="12" y="4" textAnchor="middle" fill="#130E2A" fontSize="3" fontWeight="700" fontFamily="sans-serif">$</text>
-        </>
-      case 'love':
-        return <path d="M10 5 C10 3.5 8 2 8 3.5 C8 5 10 6.5 12 8 C14 6.5 16 5 16 3.5 C16 2 14 3.5 14 5 C13 4 12 3 12 3 C12 3 11 4 10 5Z" fill={color} transform="scale(0.7) translate(5,-2)"/>
-      case 'social':
-        return <path d="M8 4 Q10 2 12 4 Q14 6 16 4" stroke={color} strokeWidth="1.3" fill="none" strokeLinecap="round"/>
-      case 'vitality':
-        return <path d="M12 7 C11 5 9 4 10 2 C10.5 3 11.5 3.5 12 2 C12.5 3.5 13.5 3 14 2 C15 4 13 5 12 7Z" fill={color} opacity="0.9"/>
-      case 'mind':
-        return <>
-          <polygon points="8,7 16,7 14,3 10,3" fill={color} opacity="0.9"/>
-          <rect x="7" y="6.5" width="10" height="1.5" rx="0.75" fill={color}/>
-        </>
-      default:
-        return null
-    }
-  })()
-
+function SettingsIcon() {
   return (
-    <svg width={size} height={size * 1.3} viewBox="0 0 24 32" style={{ flexShrink: 0 }}>
-      {accessory}
-      {/* Ears */}
-      <rect x="1"  y="9" width="3" height="7" rx="1.5" fill={color} opacity="0.65"/>
-      <rect x="20" y="9" width="3" height="7" rx="1.5" fill={color} opacity="0.65"/>
-      {/* Head */}
-      <rect x="4" y="7" width="16" height="14" rx="5" fill={color}/>
-      {/* Eyes */}
-      <rect x="7"  y="11" width="4" height="4" rx="1.5" fill="#130E2A"/>
-      <rect x="13" y="11" width="4" height="4" rx="1.5" fill="#130E2A"/>
-      <circle cx="8"  cy="12" r="1.2" fill="white" opacity="0.8"/>
-      <circle cx="14" cy="12" r="1.2" fill="white" opacity="0.8"/>
-      {/* Smile */}
-      <path d="M9 18 Q12 20 15 18" stroke="#130E2A" strokeWidth="1" fill="none" strokeLinecap="round"/>
-      {/* Body */}
-      <rect x="6" y="22" width="12" height="9" rx="4" fill={color} opacity="0.8"/>
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
     </svg>
   )
 }
@@ -356,72 +291,92 @@ export function DesktopCharacterPage({ dimension }: DesktopCharacterPageProps) {
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div style={{ ...font, minHeight: '100dvh', background: '#0D0820', display: 'flex', overflow: 'hidden' }}>
+    <div style={{ ...font, minHeight: '100dvh', background: '#0D0820', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <style>{PAGE_CSS}</style>
 
-      {/* ── Left sidebar: dimension switcher ──────────────────────────────── */}
-      <div style={{
-        width: 220, flexShrink: 0,
-        background: '#1A1335',
-        borderRight: '1px solid rgba(255,255,255,0.06)',
-        display: 'flex', flexDirection: 'column',
-        overflowY: 'auto', padding: '20px 0',
+      {/* ── Top nav (identical to dashboard) ─────────────────────────────── */}
+      <nav style={{
+        display: 'flex', alignItems: 'center', height: 56,
+        padding: '0 24px',
+        background: '#130E2A',
+        borderBottom: '1px solid rgba(255,255,255,0.08)',
+        boxShadow: '0 2px 20px rgba(0,0,0,0.5)',
+        flexShrink: 0, zIndex: 20,
       }}>
-        {/* Logo/home link */}
-        <div
-          role="button" tabIndex={0}
-          onClick={() => router.push('/dashboard')}
-          onKeyDown={e => e.key === 'Enter' && router.push('/dashboard')}
-          style={{ padding: '0 20px 20px', cursor: 'pointer' }}
-        >
-          <div style={{ fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.6)', letterSpacing: '0.08em' }}>
-            ← Dashboard
+        {/* Logo */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginRight: 28 }}>
+          <div style={{ width: 9, height: 9, borderRadius: '50%', background: '#FF7A65', animation: 'dcp-pulse-dot 2.5s ease-in-out infinite' }} />
+          <span style={{ color: 'white', fontWeight: 700, fontSize: 15, letterSpacing: -0.3 }}>Protagonist</span>
+        </div>
+
+        {/* Nav links */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <button type="button" onClick={() => router.push('/dashboard')}
+            style={{ color: 'rgba(255,255,255,0.6)', padding: '6px 14px', fontSize: 13, background: 'transparent', border: 'none', cursor: 'pointer', ...font }}>
+            Dashboard
+          </button>
+          <div style={{ background: '#7B3FE4', color: 'white', padding: '6px 14px', borderRadius: 8, fontSize: 13, fontWeight: 500 }}>
+            Life Areas
           </div>
+          <button type="button" onClick={() => router.push('/journal')}
+            style={{ color: 'rgba(255,255,255,0.6)', padding: '6px 14px', fontSize: 13, background: 'transparent', border: 'none', cursor: 'pointer', ...font }}>
+            Journal
+          </button>
         </div>
 
-        <div style={{ padding: '0 12px 8px', fontSize: 9, fontWeight: 600, letterSpacing: '1.6px', color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase' }}>
-          Life Areas
+        <div style={{ flex: 1 }} />
+
+        {/* Morning Check-In */}
+        <button
+          type="button"
+          onClick={() => openOracle('', 'morning_checkin')}
+          style={{
+            background: '#FF7A65', color: 'white', padding: '9px 22px',
+            borderRadius: 100, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+            marginRight: 12, border: 'none',
+            animation: 'dcp-pulse-btn 3s ease-in-out infinite',
+            letterSpacing: 0.1, ...font,
+          }}
+        >
+          Morning Check-In
+        </button>
+
+        {/* Settings */}
+        <button
+          type="button"
+          onClick={() => router.push('/settings')}
+          style={{
+            width: 34, height: 34, borderRadius: 8,
+            border: '1px solid rgba(255,255,255,0.1)',
+            background: 'transparent',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer', marginRight: 10,
+            color: 'rgba(255,255,255,0.45)',
+          }}
+          aria-label="Settings"
+        >
+          <SettingsIcon />
+        </button>
+
+        {/* Avatar */}
+        <div style={{
+          width: 34, height: 34, borderRadius: '50%', background: '#7B3FE4',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 13, fontWeight: 600, color: 'white', flexShrink: 0,
+        }}>
+          I
         </div>
+      </nav>
 
-        {AREA_ORDER.map(dim => {
-          const dimColor = DIM_COLORS[dim]
-          const dimScore = dimScores[dim] ?? null
-          const slug = DIMENSION_TO_SLUG[dim]
-          const isActive = dim === dimension
+      {/* ── Three columns ─────────────────────────────────────────────────── */}
+      <div style={{ display: 'flex', flex: 1, minHeight: 0, overflow: 'hidden' }}>
 
-          return (
-            <button
-              key={dim}
-              type="button"
-              onClick={() => router.push(`/${slug}`)}
-              style={{
-                width: '100%', display: 'flex', alignItems: 'center', gap: 10,
-                padding: '10px 16px',
-                background: isActive ? `${dimColor}14` : 'transparent',
-                border: 'none',
-                borderLeft: isActive ? `3px solid ${dimColor}` : '3px solid transparent',
-                cursor: 'pointer', fontFamily: 'inherit',
-                transition: 'all 0.12s',
-              }}
-            >
-              <SidebarRobot dim={dim} color={dimColor} size={24} />
-              <div style={{ flex: 1, textAlign: 'left' }}>
-                <div style={{ fontSize: 12, fontWeight: isActive ? 600 : 400, color: isActive ? dimColor : 'rgba(255,255,255,0.65)' }}>
-                  {AREA_LABELS[dim]}
-                </div>
-                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>
-                  {CHARACTERS[dim].name}
-                </div>
-              </div>
-              {dimScore != null && (
-                <span style={{ fontSize: 12, fontWeight: 700, color: isActive ? dimColor : 'rgba(255,255,255,0.35)' }}>
-                  {dimScore}
-                </span>
-              )}
-            </button>
-          )
-        })}
-      </div>
+      {/* ── Left sidebar (shared component) ──────────────────────────────── */}
+      <DesktopLeftSidebar
+        scores={dimScores as Partial<Record<Dimension, number>>}
+        activeDimension={dimension}
+        showBackButton
+      />
 
       {/* ── Center panel ─────────────────────────────────────────────────── */}
       <div style={{
@@ -560,6 +515,8 @@ export function DesktopCharacterPage({ dimension }: DesktopCharacterPageProps) {
           stats={killStats}
         />
       </div>
+
+      </div>{/* end three-columns */}
 
       {/* XP toasts */}
       <XpToastOverlay xpToast={xpToast} levelUpToast={levelUpToast} />

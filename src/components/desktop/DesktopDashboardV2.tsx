@@ -8,6 +8,7 @@ import { DIMENSION_TO_SLUG } from '@/lib/tierName'
 import { getLevel, getLevelProgress } from '@/lib/xp'
 import { openOracle } from '@/lib/oracle-events'
 import type { DesktopDashboardProps } from './DesktopDashboard'
+import { DesktopLeftSidebar, DIM_COLORS } from './DesktopLeftSidebar'
 
 // ── Extended props ────────────────────────────────────────────────────────────
 
@@ -22,6 +23,7 @@ export interface DesktopDashboardV2Props extends DesktopDashboardProps {
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
+// DIM_COLORS is imported from DesktopLeftSidebar (single source of truth)
 
 const CATEGORY_LABELS: Record<Dimension, string> = {
   career:   'Career',
@@ -32,19 +34,6 @@ const CATEGORY_LABELS: Record<Dimension, string> = {
   love:     'Relationship',
   family:   'Family',
 }
-
-const DIM_COLORS: Record<Dimension, string> = {
-  family:   '#C4A8FF',  // lavender
-  career:   '#FFD47A',  // gold
-  wealth:   '#4DC4FF',  // sky blue
-  vitality: '#FF9A5C',  // orange
-  mind:     '#7B3FE4',  // deep purple
-  love:     '#FF6B9D',  // hot pink
-  social:   '#1EEFB8',  // teal
-}
-
-/** Fixed display order for life areas */
-const AREA_ORDER: Dimension[] = ['family', 'career', 'wealth', 'love', 'social', 'vitality', 'mind']
 
 const MOOD_OPTIONS_V2 = [
   { value: 1, color: '#E57373', label: 'Rough' },
@@ -102,76 +91,7 @@ function getTomorrowStr(): string {
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-function RobotChar({ dim, color }: { dim: Dimension; color: string }) {
-  // Unique top accessory per dimension
-  const accessory: React.ReactNode = (() => {
-    switch (dim) {
-      case 'family':
-        // branches
-        return <>
-          <line x1="12" y1="7" x2="12" y2="2" stroke={color} strokeWidth="1.3" strokeLinecap="round"/>
-          <line x1="12" y1="4" x2="9"  y2="1" stroke={color} strokeWidth="1.1" strokeLinecap="round"/>
-          <line x1="12" y1="4" x2="15" y2="1" stroke={color} strokeWidth="1.1" strokeLinecap="round"/>
-        </>
-      case 'career':
-        // antenna + circle
-        return <>
-          <line x1="12" y1="7" x2="12" y2="2" stroke={color} strokeWidth="1.3" strokeLinecap="round"/>
-          <circle cx="12" cy="1.5" r="1.5" fill={color}/>
-        </>
-      case 'wealth':
-        // coin with $
-        return <>
-          <circle cx="12" cy="2.5" r="2.5" fill={color} opacity="0.9"/>
-          <text x="12" y="4" textAnchor="middle" fill="#130E2A" fontSize="3" fontWeight="700" fontFamily="sans-serif">$</text>
-        </>
-      case 'love':
-        // heart
-        return <path d="M10 5 C10 3.5 8 2 8 3.5 C8 5 10 6.5 12 8 C14 6.5 16 5 16 3.5 C16 2 14 3.5 14 5 C13 4 12 3 12 3 C12 3 11 4 10 5Z" fill={color} transform="scale(0.7) translate(5,-2)"/>
-      case 'social':
-        // waves
-        return <path d="M8 4 Q10 2 12 4 Q14 6 16 4" stroke={color} strokeWidth="1.3" fill="none" strokeLinecap="round"/>
-      case 'vitality':
-        // flame
-        return <path d="M12 7 C11 5 9 4 10 2 C10.5 3 11.5 3.5 12 2 C12.5 3.5 13.5 3 14 2 C15 4 13 5 12 7Z" fill={color} opacity="0.9"/>
-      case 'mind':
-        // hat
-        return <>
-          <polygon points="8,7 16,7 14,3 10,3" fill={color} opacity="0.9"/>
-          <rect x="7" y="6.5" width="10" height="1.5" rx="0.75" fill={color}/>
-        </>
-      default:
-        return null
-    }
-  })()
-
-  return (
-    <svg width="26" height="32" viewBox="0 0 24 32" style={{ flexShrink: 0 }}>
-      {/* Accessory */}
-      {accessory}
-      {/* Body */}
-      <rect x="2" y="7" width="20" height="16" rx="4" fill={color}/>
-      {/* Left eye outer */}
-      <rect x="4" y="10" width="7" height="7" rx="2.5" fill="#130E2A"/>
-      {/* Right eye outer */}
-      <rect x="13" y="10" width="7" height="7" rx="2.5" fill="#130E2A"/>
-      {/* Shine L */}
-      <circle cx="6.5" cy="12" r="1.8" fill="white" opacity="0.9"/>
-      {/* Shine R */}
-      <circle cx="15.5" cy="12" r="1.8" fill="white" opacity="0.9"/>
-      {/* Pupil L */}
-      <circle cx="7.8" cy="13.2" r="1.1" fill="#130E2A"/>
-      {/* Pupil R */}
-      <circle cx="16.8" cy="13.2" r="1.1" fill="#130E2A"/>
-      {/* Smile */}
-      <path d="M9 20 Q12 22 15 20" stroke="#130E2A" strokeWidth="1.2" fill="none" strokeLinecap="round"/>
-      {/* Left leg */}
-      <rect x="5" y="24" width="5" height="7" rx="2.5" fill={color} opacity="0.8"/>
-      {/* Right leg */}
-      <rect x="14" y="24" width="5" height="7" rx="2.5" fill={color} opacity="0.8"/>
-    </svg>
-  )
-}
+// RobotChar is now in DesktopLeftSidebar — imported as needed
 
 function SettingsIcon() {
   return (
@@ -229,18 +149,13 @@ export default function DesktopDashboardV2(props: DesktopDashboardV2Props) {
     return d
   })
 
-  // Life score: average of all 7 dimension scores
-  const allScores = ALL_DIMENSIONS.map(dim => {
-    const xp = Math.max(dimXpMap[dim] ?? 0, quests.find(q => q.dimension === dim)?.xp ?? 0)
-    return getDimScore(xp, dimBaselineMap[dim])
-  })
-  const lifeScoreNum = allScores.length > 0 ? allScores.reduce((a, b) => a + b, 0) / allScores.length : 0
-  const lifeScoreDisplay = lifeScoreNum.toFixed(1)
-
-  // Ring gauge
-  const RING_R = 46
-  const circumference = 2 * Math.PI * RING_R
-  const ringOffset = circumference * (1 - Math.min(lifeScoreNum / 10, 1))
+  // Pre-computed scores record for the shared sidebar
+  const sidebarScores = Object.fromEntries(
+    ALL_DIMENSIONS.map(dim => {
+      const xp = Math.max(dimXpMap[dim] ?? 0, quests.find(q => q.dimension === dim)?.xp ?? 0)
+      return [dim, getDimScore(xp, dimBaselineMap[dim])] as const
+    })
+  ) as Partial<Record<Dimension, number>>
 
   // Today's items split
   const calendarEvents = todayItems.filter(i => i.type === 'event')
@@ -409,89 +324,11 @@ export default function DesktopDashboardV2(props: DesktopDashboardV2Props) {
         {/* ══════════════════ THREE COLUMNS ══════════════════ */}
         <div style={{ position: 'relative', zIndex: 5, display: 'flex', flex: 1, minHeight: 0, overflow: 'hidden' }}>
 
-          {/* ═══════ LEFT PANEL ═══════ */}
-          <div style={{
-            ...colScroll,
-            width: 248, minWidth: 248,
-            background: '#1A1335',
-            borderRight: '1px solid rgba(255,255,255,0.07)',
-            padding: '20px 16px',
-            display: 'flex', flexDirection: 'column',
-          }}>
-
-            {/* Identity + Life Score ring */}
-            <div style={{ textAlign: 'center', marginBottom: 20 }}>
-              <svg width="110" height="110" viewBox="0 0 110 110" style={{ display: 'block', margin: '0 auto 2px' }}>
-                <circle cx="55" cy="55" r={RING_R} fill="none" stroke="rgba(123,63,228,0.15)" strokeWidth="6" />
-                <circle
-                  cx="55" cy="55" r={RING_R} fill="none" stroke="#7B3FE4" strokeWidth="6"
-                  strokeLinecap="round"
-                  strokeDasharray={circumference}
-                  strokeDashoffset={ringOffset}
-                  transform="rotate(-90 55 55)"
-                  style={{ transition: 'stroke-dashoffset 0.8s ease-out' }}
-                />
-                <circle cx="55" cy="55" r="38" fill="#130E2A" />
-                <text x="55" y="66" textAnchor="middle" fill="white" fontSize="36" fontWeight="700" fontFamily="Space Grotesk, sans-serif">{lifeScoreDisplay}</text>
-              </svg>
-              <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: 10, fontWeight: 500, letterSpacing: '1.8px', marginBottom: 8 }}>LIFE SCORE</div>
-              <div style={{ color: 'white', fontSize: 16, fontWeight: 600, letterSpacing: -0.3 }}>Ivana</div>
-              <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, marginTop: 2, letterSpacing: 0.3 }}>The Protagonist</div>
-            </div>
-
-            {/* Life Areas — sorted by score descending */}
-            <span style={metaLabel}>Life Areas</span>
-            <div>
-              {(() => {
-                const scored = AREA_ORDER.map(dim => {
-                  const xp    = Math.max(dimXpMap[dim] ?? 0, quests.find(q => q.dimension === dim)?.xp ?? 0)
-                  const score = getDimScore(xp, dimBaselineMap[dim])
-                  return { dim, score }
-                }).sort((a, b) => b.score - a.score)
-                const maxScore = scored[0]?.score ?? -1
-                const minScore = scored[scored.length - 1]?.score ?? -1
-                return scored.map(({ dim, score }, i) => {
-                  const color  = DIM_COLORS[dim]
-                  const isLast = i === scored.length - 1
-                  const isTop  = score === maxScore
-                  const isBot  = score === minScore && score !== maxScore
-                  return (
-                    <div
-                      key={dim}
-                      role="button" tabIndex={0}
-                      onClick={() => router.push(`/${DIMENSION_TO_SLUG[dim]}`)}
-                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') router.push(`/${DIMENSION_TO_SLUG[dim]}`) }}
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: 8,
-                        padding: '6px 4px',
-                        borderBottom: isLast ? 'none' : '1px solid rgba(255,255,255,0.05)',
-                        cursor: 'pointer',
-                        transition: 'opacity 0.15s',
-                      }}
-                    >
-                      <RobotChar dim={dim} color={color} />
-                      <span style={{ color, fontSize: 12, fontWeight: 500, flex: 1 }}>{CATEGORY_LABELS[dim]}</span>
-                      {isTop && <span style={{ fontSize: 10, color: '#4DC4FF', fontWeight: 700, lineHeight: 1 }}>↑</span>}
-                      {isBot && <span style={{ fontSize: 10, color: '#FF6B9D', fontWeight: 700, lineHeight: 1 }}>↓</span>}
-                      <span
-                        key={score}
-                        style={{
-                          color, fontSize: 15, fontWeight: 700,
-                          background: 'rgba(255,255,255,0.06)',
-                          padding: '2px 8px', borderRadius: 6,
-                          minWidth: 30, textAlign: 'center',
-                          display: 'inline-block',
-                          animation: 'v2-score-pop 0.35s cubic-bezier(0.34,1.56,0.64,1) both',
-                        }}
-                      >
-                        {score}
-                      </span>
-                    </div>
-                  )
-                })
-              })()}
-            </div>
-          </div>
+          {/* ═══════ LEFT PANEL (shared component) ═══════ */}
+          <DesktopLeftSidebar
+            scores={sidebarScores}
+            userInitial={userInitial}
+          />
 
           {/* ═══════ CENTER PANEL ═══════ */}
           <div style={{ ...colScroll, flex: 1, padding: '26px 28px 20px', minWidth: 0 }}>
