@@ -15,6 +15,7 @@ import { MedalsRow } from '@/components/characters/MedalsRow'
 import { LegendCard } from '@/components/characters/LegendCard'
 import { DesktopLeftSidebar, DIM_COLORS } from './DesktopLeftSidebar'
 import DesktopTopNav from './DesktopTopNav'
+import { DesktopOracleModal } from './DesktopOracleModal'
 import {
   ForgeCharacterLarge,
   EchoCharacterLarge,
@@ -283,6 +284,9 @@ export function DesktopCharacterPage({ dimension }: DesktopCharacterPageProps) {
 
       {/* ── Top nav (shared component) ───────────────────────────────────── */}
       <DesktopTopNav activePage="character" animPrefix="dcp" />
+
+      {/* ── Oracle modal — needed for quest/challenge buttons on this page ── */}
+      <DesktopOracleModal />
 
       {/* ── Three columns ─────────────────────────────────────────────────── */}
       <div style={{ display: 'flex', flex: 1, minHeight: 0, overflow: 'hidden' }}>
