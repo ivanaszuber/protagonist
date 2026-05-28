@@ -419,6 +419,13 @@ export function DesktopCharacterPage({ dimension }: DesktopCharacterPageProps) {
           onQuestSaved={(v) => setQuest(prev => prev ? { ...prev, vision: v } : { id: '', vision: v, character_name: char.name, character_class: 'Adventurer', milestones: [], recent_tasks: [], xp: 0 })}
         />
 
+        {/* ── Vault Net Worth (wealth dimension only) ──────────────────── */}
+        {dimension === 'wealth' && (
+          <div style={{ marginBottom: 24 }}>
+            <VaultNetWorthCard userId={userId} accentColor={accentColor} />
+          </div>
+        )}
+
         {/* ── Oracle's Read — dimension insight + conversation notes ── */}
         {(dimensionInsight || recentNotes.length > 0) && (
           <div style={{ marginBottom: 20 }}>
@@ -572,13 +579,6 @@ export function DesktopCharacterPage({ dimension }: DesktopCharacterPageProps) {
             Chat with Oracle →
           </button>
         </div>
-
-        {/* ── Vault Net Worth (wealth dimension only) ──────────────────── */}
-        {dimension === 'wealth' && (
-          <div style={{ marginBottom: 20 }}>
-            <VaultNetWorthCard userId={userId} accentColor={accentColor} />
-          </div>
-        )}
 
         {/* Active challenge */}
         <BossCard
