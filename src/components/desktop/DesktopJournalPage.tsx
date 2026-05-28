@@ -218,7 +218,7 @@ function Icon({ name, size = 14, color = 'currentColor' }: { name: string; size?
       return <svg style={s} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
         <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
       </svg>
-    case 'arc':
+    case 'oracle':
       return <svg style={s} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
         <circle cx="12" cy="8" r="4"/><path d="M6 20v-2a6 6 0 0 1 12 0v2"/>
         <path d="M19 11a7 7 0 0 1-7 7"/>
@@ -582,7 +582,7 @@ function PortraitView({ portrait, identity, identityLoading, loading, profile, i
           animation: 'jrn-pulse 2s ease-in-out infinite',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
-          <Icon name="arc" size={28} color="white" />
+          <Icon name="oracle" size={28} color="white" />
         </div>
         <p style={{ ...font, color: 'rgba(255,255,255,0.5)', fontSize: 14 }}>
           Oracle is synthesizing your story…
@@ -739,7 +739,138 @@ function PortraitView({ portrait, identity, identityLoading, loading, profile, i
         </div>
       )}
 
-      {/* ══ BLUEPRINT ══ */}
+      {/* ══ YOUR WIRING (from archetype insights) ══ */}
+      {insights?.wiring && insights.wiring.length > 0 && (
+        <div className="jrn-portrait-section">
+          <p style={{ ...font, fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.3)', letterSpacing: '1.6px', textTransform: 'uppercase' as const, marginBottom: 10 }}>
+            Your Wiring
+          </p>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
+            {insights.wiring.map((w, i) => {
+              const c = PILL_COLORS[w.color] ?? '#C4A8FF'
+              return (
+                <div key={i} title={w.tooltip} style={{
+                  background: `${c}12`, border: `1px solid ${c}28`,
+                  borderRadius: 100, padding: '6px 14px',
+                  display: 'flex', alignItems: 'center', gap: 6, cursor: 'default',
+                }}>
+                  <div style={{ width: 5, height: 5, borderRadius: '50%', background: c, flexShrink: 0 }} />
+                  <span style={{ ...font, fontSize: 12, fontWeight: 600, color: c }}>{w.label}</span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ══ ORACLE'S LENS by dimension ══ */}
+      {identity?.dimensionInsights && identity.dimensionInsights.length > 0 && (
+        <div className="jrn-portrait-section">
+          <p style={{ ...font, fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.3)', letterSpacing: '1.6px', textTransform: 'uppercase' as const, marginBottom: 10 }}>
+            Oracle's Lens
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+            {identity.dimensionInsights.map((d, i) => (
+              <div key={i} style={{
+                background: 'rgba(255,255,255,0.022)', borderRadius: 11, padding: '10px 14px',
+                display: 'flex', gap: 10, alignItems: 'flex-start',
+                border: `1px solid ${d.color}18`,
+              }}>
+                <div style={{ width: 6, height: 6, borderRadius: '50%', flexShrink: 0, background: d.color, marginTop: 5 }} />
+                <div>
+                  <p style={{ ...font, fontSize: 9, fontWeight: 700, color: d.color, marginBottom: 3, letterSpacing: '1px', textTransform: 'uppercase' as const }}>
+                    {d.dimension}
+                  </p>
+                  <p style={{ ...font, fontSize: 12.5, color: 'rgba(255,255,255,0.68)', lineHeight: 1.6 }}>
+                    {toSecondPerson(d.insight)}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ══ YOUR GROWTH — sentence-grouped for readability ══ */}
+      {portrait?.growth && (() => {
+        const raw = toSecondPerson(portrait.growth)
+        // Split into sentences, then group into 2-sentence paragraphs
+        const sentences = raw.match(/[^.!?]+[.!?]+/g) ?? [raw]
+        const paras: string[] = []
+        for (let i = 0; i < sentences.length; i += 2) {
+          paras.push([sentences[i], sentences[i + 1]].filter(Boolean).join(' ').trim())
+        }
+        const highlight = paras[0] ?? ''
+        const rest = paras.slice(1)
+        return (
+          <div className="jrn-portrait-section" style={{
+            background: 'rgba(110,231,164,0.06)', borderRadius: 14, padding: '18px 20px',
+            border: '1px solid rgba(110,231,164,0.14)',
+          }}>
+            <p style={{ ...font, fontSize: 9, fontWeight: 700, color: '#6EE7A4', letterSpacing: '1.5px', textTransform: 'uppercase' as const, marginBottom: 14 }}>Your Growth</p>
+            {/* First 2 sentences — highlighted quote style */}
+            <div style={{
+              borderLeft: '3px solid rgba(110,231,164,0.45)',
+              paddingLeft: 14, marginBottom: rest.length > 0 ? 14 : 0,
+            }}>
+              <p style={{ ...font, fontSize: 14, color: 'rgba(255,255,255,0.9)', lineHeight: 1.8, fontWeight: 500 }}>
+                {highlight}
+              </p>
+            </div>
+            {/* Remaining paragraphs */}
+            {rest.map((para, i) => (
+              <React.Fragment key={i}>
+                <div style={{ height: '1px', background: 'rgba(110,231,164,0.08)', marginBottom: 12 }} />
+                <p style={{ ...font, fontSize: 13.5, color: 'rgba(255,255,255,0.72)', lineHeight: 1.8 }}>
+                  {para}
+                </p>
+              </React.Fragment>
+            ))}
+          </div>
+        )
+      })()}
+
+      {/* ══ WHAT TO WATCH ══ */}
+      {insights?.watch && insights.watch.length > 0 && (
+        <div className="jrn-portrait-section" style={{
+          background: 'rgba(255,212,122,0.05)', borderRadius: 14, padding: '16px 18px',
+          border: '1px solid rgba(255,212,122,0.12)',
+        }}>
+          <p style={{ ...font, fontSize: 9, fontWeight: 700, color: '#FFD47A', letterSpacing: '1.5px', textTransform: 'uppercase' as const, marginBottom: 12 }}>What to Watch</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {insights.watch.map((w, i) => (
+              <div key={i} style={{ display: 'flex', gap: 11, alignItems: 'flex-start' }}>
+                <span style={{
+                  ...font, fontSize: 10, fontWeight: 700, color: '#FFD47A',
+                  background: 'rgba(255,212,122,0.15)', border: '1px solid rgba(255,212,122,0.25)',
+                  padding: '4px 9px', borderRadius: 100, flexShrink: 0, whiteSpace: 'nowrap' as const,
+                  marginTop: 1,
+                }}>△ {w.label}</span>
+                <p style={{ ...font, fontSize: 12.5, color: 'rgba(255,255,255,0.6)', lineHeight: 1.6 }}>
+                  {w.tooltip}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Fallback What to Watch from identity growthEdges (if no insights) */}
+      {!insights?.watch?.length && identity?.growthEdges && identity.growthEdges.length > 0 && (
+        <div className="jrn-portrait-section" style={{
+          background: 'rgba(255,212,122,0.05)', borderRadius: 14, padding: '16px 18px',
+          border: '1px solid rgba(255,212,122,0.12)',
+        }}>
+          <p style={{ ...font, fontSize: 9, fontWeight: 700, color: '#FFD47A', letterSpacing: '1.5px', textTransform: 'uppercase' as const, marginBottom: 10 }}>What to Watch</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {identity.growthEdges.map((edge, i) => (
+              <p key={i} style={{ ...font, fontSize: 13, color: 'rgba(255,255,255,0.62)', lineHeight: 1.6 }}>△ {edge.label}</p>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ══ BLUEPRINT (astrology + wiring — shown at bottom) ══ */}
       {hasBlueprint && (
         <div className="jrn-portrait-section">
           <p style={{ ...font, fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.3)', letterSpacing: '1.6px', textTransform: 'uppercase' as const, marginBottom: 10 }}>
@@ -782,109 +913,6 @@ function PortraitView({ portrait, identity, identityLoading, loading, profile, i
                 </div>
               )
             })}
-          </div>
-        </div>
-      )}
-
-      {/* ══ YOUR GROWTH — full-width narrative ══ */}
-      {portrait?.growth && (
-        <div className="jrn-portrait-section" style={{
-          background: 'rgba(110,231,164,0.06)', borderRadius: 14, padding: '16px 18px',
-          border: '1px solid rgba(110,231,164,0.14)',
-        }}>
-          <p style={{ ...font, fontSize: 9, fontWeight: 700, color: '#6EE7A4', letterSpacing: '1.5px', textTransform: 'uppercase' as const, marginBottom: 10 }}>Your Growth</p>
-          <p style={{ ...font, fontSize: 14, color: 'rgba(255,255,255,0.82)', lineHeight: 1.8 }}>{toSecondPerson(portrait.growth)}</p>
-        </div>
-      )}
-
-      {/* ══ WHAT TO WATCH ══ */}
-      {insights?.watch && insights.watch.length > 0 && (
-        <div className="jrn-portrait-section" style={{
-          background: 'rgba(255,212,122,0.05)', borderRadius: 14, padding: '16px 18px',
-          border: '1px solid rgba(255,212,122,0.12)',
-        }}>
-          <p style={{ ...font, fontSize: 9, fontWeight: 700, color: '#FFD47A', letterSpacing: '1.5px', textTransform: 'uppercase' as const, marginBottom: 12 }}>What to Watch</p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {insights.watch.map((w, i) => (
-              <div key={i} style={{ display: 'flex', gap: 11, alignItems: 'flex-start' }}>
-                <span style={{
-                  ...font, fontSize: 10, fontWeight: 700, color: '#FFD47A',
-                  background: 'rgba(255,212,122,0.15)', border: '1px solid rgba(255,212,122,0.25)',
-                  padding: '4px 9px', borderRadius: 100, flexShrink: 0, whiteSpace: 'nowrap' as const,
-                  marginTop: 1,
-                }}>△ {w.label}</span>
-                <p style={{ ...font, fontSize: 12.5, color: 'rgba(255,255,255,0.6)', lineHeight: 1.6 }}>
-                  {w.tooltip}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Fallback What to Watch from identity growthEdges (if no insights) */}
-      {!insights?.watch?.length && identity?.growthEdges && identity.growthEdges.length > 0 && (
-        <div className="jrn-portrait-section" style={{
-          background: 'rgba(255,212,122,0.05)', borderRadius: 14, padding: '16px 18px',
-          border: '1px solid rgba(255,212,122,0.12)',
-        }}>
-          <p style={{ ...font, fontSize: 9, fontWeight: 700, color: '#FFD47A', letterSpacing: '1.5px', textTransform: 'uppercase' as const, marginBottom: 10 }}>What to Watch</p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {identity.growthEdges.map((edge, i) => (
-              <p key={i} style={{ ...font, fontSize: 13, color: 'rgba(255,255,255,0.62)', lineHeight: 1.6 }}>△ {edge.label}</p>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ══ YOUR WIRING (from archetype insights) ══ */}
-      {insights?.wiring && insights.wiring.length > 0 && (
-        <div className="jrn-portrait-section">
-          <p style={{ ...font, fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.3)', letterSpacing: '1.6px', textTransform: 'uppercase' as const, marginBottom: 10 }}>
-            Your Wiring
-          </p>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
-            {insights.wiring.map((w, i) => {
-              const c = PILL_COLORS[w.color] ?? '#C4A8FF'
-              return (
-                <div key={i} title={w.tooltip} style={{
-                  background: `${c}12`, border: `1px solid ${c}28`,
-                  borderRadius: 100, padding: '6px 14px',
-                  display: 'flex', alignItems: 'center', gap: 6, cursor: 'default',
-                }}>
-                  <div style={{ width: 5, height: 5, borderRadius: '50%', background: c, flexShrink: 0 }} />
-                  <span style={{ ...font, fontSize: 12, fontWeight: 600, color: c }}>{w.label}</span>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* ══ ARC'S LENS by dimension ══ */}
-      {identity?.dimensionInsights && identity.dimensionInsights.length > 0 && (
-        <div className="jrn-portrait-section">
-          <p style={{ ...font, fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.3)', letterSpacing: '1.6px', textTransform: 'uppercase' as const, marginBottom: 10 }}>
-            Oracle's Lens
-          </p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-            {identity.dimensionInsights.map((d, i) => (
-              <div key={i} style={{
-                background: 'rgba(255,255,255,0.022)', borderRadius: 11, padding: '10px 14px',
-                display: 'flex', gap: 10, alignItems: 'flex-start',
-                border: `1px solid ${d.color}18`,
-              }}>
-                <div style={{ width: 6, height: 6, borderRadius: '50%', flexShrink: 0, background: d.color, marginTop: 5 }} />
-                <div>
-                  <p style={{ ...font, fontSize: 9, fontWeight: 700, color: d.color, marginBottom: 3, letterSpacing: '1px', textTransform: 'uppercase' as const }}>
-                    {d.dimension}
-                  </p>
-                  <p style={{ ...font, fontSize: 12.5, color: 'rgba(255,255,255,0.68)', lineHeight: 1.6 }}>
-                    {toSecondPerson(d.insight)}
-                  </p>
-                </div>
-              </div>
-            ))}
           </div>
         </div>
       )}
@@ -1176,7 +1204,7 @@ export default function DesktopJournalPage() {
   const [insights, setInsights] = useState<import('@/app/api/user-profile/archetype-insights/route').ArchetypeInsights | null>(null)
 
   // UI
-  const [activeTab, setActiveTab] = useState<Tab>('stream')
+  const [activeTab, setActiveTab] = useState<Tab>('portrait')
   const [activeDimFilter, setActiveDimFilter] = useState<Dimension | null>(null)
   const [loadingEntries, setLoadingEntries] = useState(true)
   const [loadingInsights, setLoadingInsights] = useState(true)
@@ -1369,9 +1397,9 @@ export default function DesktopJournalPage() {
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
 
   const tabs: { id: Tab; icon: string; label: string }[] = [
+    { id: 'portrait', icon: 'portrait', label: "Oracle's Portrait" },
     { id: 'stream', icon: 'stream', label: 'Stream' },
     { id: 'pulse', icon: 'pulse', label: 'Pulse' },
-    { id: 'portrait', icon: 'portrait', label: "Oracle's Portrait" },
     { id: 'growth', icon: 'growth', label: 'Growth Map' },
   ]
 
