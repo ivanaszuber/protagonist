@@ -34,6 +34,7 @@ interface ClassifyResult {
   intent: 'TASK' | 'COMPLETED_ACTIVITY' | 'NOTE' | 'LEGEND' | 'BOSS'
     | 'CALENDAR_CREATE' | 'CALENDAR_UPDATE' | 'CALENDAR_DELETE' | 'VAULT_UPDATE' | 'CHAT'
   task: ParsedTask | null
+  tasks?: ParsedTask[]
   completed_task?: { title: string; dimension: string | null; date: string | null; xpReward: number } | null
   note: { text: string } | null
   legend?: { dimension: string; vision: string | null } | null
@@ -198,22 +199,49 @@ export function DesktopOracleModal() {
       })
       const data = (await classRes.json()) as ClassifyResult
 
-      if (data.intent === 'TASK' && data.task) {
-        const taskRes = await fetch('/api/quests/tasks', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId, dimension: data.task.dimension ?? 'career', title: data.task.title, xpReward: data.task.xpReward, taskDate: data.task.date }),
-        })
-        if (taskRes.ok) {
-          window.dispatchEvent(new CustomEvent('protagonist:task-added'))
-          const reply = data.oracleReply ?? `Task added: "${data.task.title}"`
-          setChatMessages(prev => [...prev, { role: 'oracle', text: reply }])
+      if (data.intent === 'TASK') {
+        // Normalize: use tasks[] if present, fall back to single task
+        const taskList: ParsedTask[] =
+          data.tasks && data.tasks.length > 0
+            ? data.tasks
+            : data.task ? [data.task] : []
+
+        if (taskList.length === 0) {
+          setChatMessages(prev => [...prev, { role: 'oracle', text: "I caught that you want to add a task, but couldn't quite extract the details. Try something like: **\"Add task: book flights to Croatia\"** or **\"Remind me to call the dentist tomorrow\"**" }])
         } else {
-          setChatMessages(prev => [...prev, { role: 'oracle', text: "Couldn't save that task — try again." }])
+          const results = await Promise.all(
+            taskList.map(t =>
+              fetch('/api/quests/tasks', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  userId,
+                  dimension: t.dimension ?? 'career',
+                  title: t.title,
+                  xpReward: t.xpReward ?? 50,
+                  taskDate: t.date,
+                  milestoneId: t.milestoneId ?? undefined,
+                }),
+              })
+            )
+          )
+          const allOk = results.every(r => r.ok)
+          const savedCount = results.filter(r => r.ok).length
+          if (savedCount > 0) {
+            window.dispatchEvent(new CustomEvent('protagonist:task-added'))
+          }
+          if (allOk) {
+            const reply = data.oracleReply ??
+              (taskList.length === 1
+                ? `Task added: "${taskList[0].title}"`
+                : `Added ${taskList.length} tasks: ${taskList.map(t => `"${t.title}"`).join(', ')}`)
+            setChatMessages(prev => [...prev, { role: 'oracle', text: reply }])
+          } else if (savedCount > 0) {
+            setChatMessages(prev => [...prev, { role: 'oracle', text: `Saved ${savedCount} of ${taskList.length} tasks — one or more couldn't be saved. Try adding the missing ones individually.` }])
+          } else {
+            setChatMessages(prev => [...prev, { role: 'oracle', text: "Couldn't save that task — try again." }])
+          }
         }
-      } else if (data.intent === 'TASK' && !data.task) {
-        // Classifier recognised a task intent but couldn't extract task details
-        setChatMessages(prev => [...prev, { role: 'oracle', text: "I caught that you want to add a task, but couldn't quite extract the details. Try something like: **\"Add task: book flights to Croatia\"** or **\"Remind me to call the dentist tomorrow\"**" }])
       } else if (data.intent === 'COMPLETED_ACTIVITY' && data.completed_task) {
         const ct = data.completed_task
         const createRes = await fetch('/api/quests/tasks', {

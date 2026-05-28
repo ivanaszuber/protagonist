@@ -103,6 +103,7 @@ interface ClassifyResult {
     | 'VAULT_UPDATE'
     | 'CHAT'
   task: ParsedTask | null
+  tasks?: ParsedTask[]
   completed_task?: {
     title: string
     dimension: string | null
@@ -614,23 +615,41 @@ export function OracleSheet() {
         })
         window.dispatchEvent(new CustomEvent('protagonist:task-added'))
         setState('activity-done')
-      } else if (data.intent === 'TASK' && data.task) {
-        const taskRes = await fetch('/api/quests/tasks', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            userId,
-            dimension: data.task.dimension ?? 'career',
-            title: data.task.title,
-            xpReward: data.task.xpReward,
-            taskDate: data.task.date,
-            milestoneId: data.task.milestoneId,
-          }),
-        })
-        await taskRes.json()
-        // Tell any open Tasks page to refresh
-        window.dispatchEvent(new CustomEvent('protagonist:task-added'))
-        setState('task-done')
+      } else if (data.intent === 'TASK') {
+        // Normalize: use tasks[] if present, fall back to single task
+        const taskList: ParsedTask[] =
+          data.tasks && data.tasks.length > 0
+            ? data.tasks
+            : data.task ? [data.task] : []
+
+        if (taskList.length > 0) {
+          await Promise.all(
+            taskList.map(t =>
+              fetch('/api/quests/tasks', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  userId,
+                  dimension: t.dimension ?? 'career',
+                  title: t.title,
+                  xpReward: t.xpReward ?? 50,
+                  taskDate: t.date,
+                  milestoneId: t.milestoneId ?? undefined,
+                }),
+              })
+            )
+          )
+          // For multi-task, update the result task to summarise
+          if (taskList.length > 1) {
+            setResult({
+              ...data,
+              task: taskList[0],
+              oracleReply: data.oracleReply ?? `Added ${taskList.length} tasks!`,
+            })
+          }
+          window.dispatchEvent(new CustomEvent('protagonist:task-added'))
+          setState('task-done')
+        }
       } else if (data.intent === 'LEGEND' && data.legend?.dimension && data.legend.vision) {
         await fetch('/api/quests/vision', {
           method: 'PATCH',
