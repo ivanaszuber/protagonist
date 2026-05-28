@@ -2,7 +2,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { getCalendarEvents, getOuraDaily } from '@/lib/db'
 import { computeDimensionStreak } from '@/lib/streak'
 import { isQuestDbConfigured } from '@/lib/quest-db'
-import { supabase } from '@/lib/supabase'
+import { supabase, supabaseAdmin } from '@/lib/supabase'
 
 const VALID_DIMENSIONS = new Set([
   'career',
@@ -377,7 +377,8 @@ export async function runMorningCheckin(
       }
     }
 
-    await supabase.from('voice_notes').insert({
+    // Use admin client to bypass RLS — server-side insert on behalf of user
+    const { error: noteError } = await supabaseAdmin.from('voice_notes').insert({
       user_id: userId,
       content: transcript,
       oracle_reply: result.oracle_message,
@@ -386,6 +387,9 @@ export async function runMorningCheckin(
       suggestions: result.suggestions,
       calendar_matches: result.calendar_matches,
     })
+    if (noteError) {
+      console.error('[morning-checkin] voice_notes insert error:', noteError.message)
+    }
   }
 
   return {

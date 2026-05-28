@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { supabaseAdmin as supabase } from '@/lib/supabase'
 
 export async function POST(request: Request) {
   const { userId, content, oracleReply } = await request.json()

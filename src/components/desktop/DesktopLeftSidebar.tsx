@@ -130,14 +130,19 @@ interface DesktopLeftSidebarProps {
   userInitial?: string
 }
 
-// ── Pill component with tooltip ───────────────────────────────────────────────
+// ── Pill component with custom tooltip ───────────────────────────────────────
 
 function InsightPill({ pill, isWatch = false }: { pill: ArchetypePill; isWatch?: boolean }) {
+  const [hovered, setHovered] = React.useState(false)
   const c = PILL_HEX[pill.color] ?? '#C4A8FF'
+
   return (
     <span
-      title={pill.tooltip}
-      style={{
+      style={{ position: 'relative', display: 'block' }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      <span style={{
         fontSize: 9, fontWeight: 600,
         background: `${c}14`, color: c,
         border: `1px solid ${c}28`,
@@ -147,9 +152,44 @@ function InsightPill({ pill, isWatch = false }: { pill: ArchetypePill; isWatch?:
         whiteSpace: 'nowrap' as const,
         cursor: 'default',
         display: 'block',
-      }}
-    >
-      {isWatch ? `△ ${pill.label}` : pill.label}
+      }}>
+        {isWatch ? `△ ${pill.label}` : pill.label}
+      </span>
+      {hovered && pill.tooltip && (
+        <span style={{
+          position: 'absolute',
+          bottom: 'calc(100% + 6px)',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 200,
+          background: '#1E1540',
+          border: `1px solid ${c}40`,
+          borderRadius: 8,
+          padding: '7px 10px',
+          fontSize: 10,
+          fontWeight: 400,
+          color: 'rgba(255,255,255,0.85)',
+          lineHeight: 1.5,
+          whiteSpace: 'normal' as const,
+          width: 180,
+          boxShadow: `0 4px 16px rgba(0,0,0,0.5)`,
+          pointerEvents: 'none',
+        }}>
+          {pill.tooltip}
+          {/* Arrow */}
+          <span style={{
+            position: 'absolute',
+            bottom: -5,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            width: 8, height: 8,
+            background: '#1E1540',
+            border: `1px solid ${c}40`,
+            borderTop: 'none', borderLeft: 'none',
+            rotate: '45deg',
+          }} />
+        </span>
+      )}
     </span>
   )
 }
