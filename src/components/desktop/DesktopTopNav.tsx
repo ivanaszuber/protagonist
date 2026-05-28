@@ -6,7 +6,7 @@ import type { CSSProperties } from 'react'
 import { openOracle } from '@/lib/oracle-events'
 import { isCheckinDoneToday } from './DesktopOracleModal'
 
-export type NavPage = 'dashboard' | 'character' | 'journal'
+export type NavPage = 'dashboard' | 'character' | 'journal' | 'memories'
 
 interface DesktopTopNavProps {
   activePage: NavPage
@@ -52,6 +52,7 @@ export default function DesktopTopNav({
   const links: { label: string; page: NavPage; href: string }[] = [
     { label: 'Dashboard', page: 'dashboard', href: '/dashboard' },
     { label: 'Journal', page: 'journal', href: '/journal' },
+    { label: 'Memories', page: 'memories', href: '/memories' },
   ]
 
   return (
