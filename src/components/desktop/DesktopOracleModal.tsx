@@ -448,6 +448,8 @@ export function DesktopOracleModal() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ userId, content: text, oracleReply: reply }),
+        }).then(() => {
+          window.dispatchEvent(new CustomEvent('protagonist:note-saved'))
         }).catch(() => {})
         setChatMessages(prev => [...prev, { role: 'oracle', text: reply }])
       }

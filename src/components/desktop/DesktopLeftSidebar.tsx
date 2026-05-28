@@ -138,15 +138,15 @@ function InsightPill({ pill, isWatch = false }: { pill: ArchetypePill; isWatch?:
 
   return (
     <span
-      style={{ position: 'relative', display: 'block' }}
+      style={{ position: 'relative', display: 'block', minWidth: 0 }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
       <span style={{
-        fontSize: 9, fontWeight: 600,
+        fontSize: 11, fontWeight: 600,
         background: `${c}14`, color: c,
         border: `1px solid ${c}28`,
-        padding: '4px 7px', borderRadius: 100,
+        padding: '5px 8px', borderRadius: 100,
         overflow: 'hidden',
         textOverflow: 'ellipsis',
         whiteSpace: 'nowrap' as const,
@@ -456,7 +456,7 @@ export function DesktopLeftSidebar({
               {insights?.wiring && insights.wiring.length > 0 && (
                 <>
                   <span style={metaLabel}>Wiring</span>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginBottom: 10 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginBottom: 10, minWidth: 0 }}>
                     {insights.wiring.map((pill, i) => (
                       <InsightPill key={i} pill={pill} />
                     ))}
@@ -468,7 +468,7 @@ export function DesktopLeftSidebar({
               {insights?.watch && insights.watch.length > 0 && (
                 <>
                   <span style={metaLabel}>Watch</span>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginBottom: 10 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginBottom: 10, minWidth: 0 }}>
                     {insights.watch.map((pill, i) => (
                       <InsightPill key={i} pill={pill} isWatch />
                     ))}
@@ -481,18 +481,19 @@ export function DesktopLeftSidebar({
                 <>
                   {divider}
                   <span style={metaLabel}>Now</span>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginBottom: 4 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginBottom: 4, minWidth: 0 }}>
                     {nowPills.map((pill, i) => {
                       const c = PILL_HEX[pill.color] ?? '#FF6B9D'
                       return (
                         <span key={i} title={pill.label} style={{
-                          fontSize: 9, fontWeight: 600,
+                          fontSize: 11, fontWeight: 600,
                           background: `${c}14`, color: c,
                           border: `1px solid ${c}28`,
-                          padding: '4px 7px', borderRadius: 100,
+                          padding: '5px 8px', borderRadius: 100,
                           overflow: 'hidden', textOverflow: 'ellipsis',
                           whiteSpace: 'nowrap' as const,
                           cursor: 'default',
+                          minWidth: 0,
                         }}>
                           {pill.label}
                         </span>

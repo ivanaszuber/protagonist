@@ -974,11 +974,9 @@ export default function DesktopJournalPage() {
   }, [])
 
   // Load entries
-  useEffect(() => {
-    if (!userId) return
+  const loadEntries = useCallback((uid: string, dim: string) => {
     setLoadingEntries(true)
-    const dim = activeDimFilter ?? ''
-    fetch(`/api/journal/entries?userId=${userId}&limit=40${dim ? `&dimension=${dim}` : ''}`)
+    fetch(`/api/journal/entries?userId=${uid}&limit=40${dim ? `&dimension=${dim}` : ''}`)
       .then(r => r.json())
       .then((d: { entries?: JournalEntry[]; achievements?: JournalEntry[] }) => {
         setEntries(d.entries ?? [])
@@ -986,7 +984,25 @@ export default function DesktopJournalPage() {
       })
       .catch(() => {})
       .finally(() => setLoadingEntries(false))
-  }, [userId, activeDimFilter])
+  }, [])
+
+  useEffect(() => {
+    if (!userId) return
+    loadEntries(userId, activeDimFilter ?? '')
+  }, [userId, activeDimFilter, loadEntries])
+
+  // Refresh stream when a check-in or Oracle note is saved
+  useEffect(() => {
+    const handler = () => {
+      if (userId) loadEntries(userId, activeDimFilter ?? '')
+    }
+    window.addEventListener('protagonist:checkin-done', handler)
+    window.addEventListener('protagonist:note-saved', handler)
+    return () => {
+      window.removeEventListener('protagonist:checkin-done', handler)
+      window.removeEventListener('protagonist:note-saved', handler)
+    }
+  }, [userId, activeDimFilter, loadEntries])
 
   // Load pulse
   useEffect(() => {

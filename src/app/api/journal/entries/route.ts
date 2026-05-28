@@ -19,7 +19,7 @@ export async function GET(request: Request) {
   // Fetch voice_notes
   let notesQuery = supabase
     .from('voice_notes')
-    .select('id, content, oracle_reply, mood_signal, focus_list, brief, created_at')
+    .select('id, content, oracle_reply, mood_signal, focus_list, created_at')
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1)
@@ -39,7 +39,6 @@ export async function GET(request: Request) {
   // Map to journal entries
   const entries = (notes ?? []).map((n) => {
     // Determine entry type
-    const hasBrief = !!n.brief
     const focusList = (() => {
       try {
         if (typeof n.focus_list === 'string') return JSON.parse(n.focus_list) as { text: string; dimension: string; done: boolean }[]
@@ -49,12 +48,9 @@ export async function GET(request: Request) {
 
     const dimensions = [...new Set(focusList.map((f: { dimension: string }) => f.dimension).filter(Boolean))]
 
-    let type: 'morning-checkin' | 'voice-reflection' | 'achievement'
-    if (hasBrief) {
-      type = 'morning-checkin'
-    } else {
-      type = 'voice-reflection'
-    }
+    // Detect morning check-in by the presence of a structured focus_list
+    const type: 'morning-checkin' | 'voice-reflection' =
+      focusList.length > 0 ? 'morning-checkin' : 'voice-reflection'
 
     return {
       id: n.id as string,
@@ -63,7 +59,7 @@ export async function GET(request: Request) {
       oracleReply: n.oracle_reply as string | null,
       moodSignal: n.mood_signal as string | null,
       dimensions,
-      brief: n.brief as string | null,
+      brief: null,
       createdAt: n.created_at as string,
     }
   })
