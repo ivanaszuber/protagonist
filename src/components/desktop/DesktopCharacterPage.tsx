@@ -61,7 +61,7 @@ interface QuestData {
 // ── Constants ─────────────────────────────────────────────────────────────────
 // DIM_COLORS is imported from DesktopLeftSidebar (single source of truth)
 
-const HERO_ART: Record<Dimension, ComponentType> = {
+const HERO_ART: Record<Dimension, ComponentType<{ color: string }>> = {
   career:   ForgeCharacterLarge,
   social:   EchoCharacterLarge,
   wealth:   VaultCharacterLarge,
@@ -365,7 +365,7 @@ export function DesktopCharacterPage({ dimension }: DesktopCharacterPageProps) {
 
           {/* Character art */}
           <div style={{ flexShrink: 0, animation: 'dcp-float 3.2s ease-in-out infinite', marginTop: -8 }}>
-            <HeroArt />
+            <HeroArt color={accentColor} />
           </div>
 
           {/* Info */}
@@ -406,14 +406,6 @@ export function DesktopCharacterPage({ dimension }: DesktopCharacterPageProps) {
           </div>
         </div>
 
-        {/* Score block */}
-        <ScoreBlock
-          dimension={dimension}
-          xp={xp}
-          userId={userId}
-          accentColor={accentColor}
-        />
-
         {/* Quest vision */}
         <LegendCard
           characterName={char.name}
@@ -432,15 +424,15 @@ export function DesktopCharacterPage({ dimension }: DesktopCharacterPageProps) {
             {/* Oracle's Read card */}
             {dimensionInsight && (
               <div style={{
-                background: 'linear-gradient(135deg, rgba(123,63,228,0.13) 0%, rgba(77,196,255,0.05) 100%)',
-                border: '1px solid rgba(123,63,228,0.28)',
+                background: `linear-gradient(135deg, ${accentColor}20 0%, ${accentColor}08 100%)`,
+                border: `1px solid ${accentColor}38`,
                 borderRadius: 14, padding: '16px 18px', marginBottom: 12,
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 10 }}>
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="#C4A8FF">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill={accentColor}>
                     <path d="M12 2l2.4 7.6H22l-6.4 4.6 2.4 7.6L12 17.2l-6 4.6 2.4-7.6L2 9.6h7.6L12 2z"/>
                   </svg>
-                  <span style={{ ...font, fontSize: 9, fontWeight: 700, color: '#C4A8FF', letterSpacing: '1.4px', textTransform: 'uppercase' as const }}>
+                  <span style={{ ...font, fontSize: 9, fontWeight: 700, color: accentColor, letterSpacing: '1.4px', textTransform: 'uppercase' as const }}>
                     Oracle&apos;s Read · {char.categoryLabel}
                   </span>
                 </div>
@@ -510,6 +502,14 @@ export function DesktopCharacterPage({ dimension }: DesktopCharacterPageProps) {
         <MedalsRow
           definitions={medalDefs}
           earned={earnedMedals}
+          accentColor={accentColor}
+        />
+
+        {/* Score block — at the bottom since it changes rarely */}
+        <ScoreBlock
+          dimension={dimension}
+          xp={xp}
+          userId={userId}
           accentColor={accentColor}
         />
       </div>
