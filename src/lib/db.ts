@@ -1,4 +1,4 @@
-import { supabase, isSupabaseConfigured } from './supabase'
+import { supabaseAdmin as supabase, isSupabaseConfigured } from './supabase'
 import { getUserId } from './user'
 import {
   DimensionId,

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
-import { supabase, isSupabaseConfigured } from '@/lib/supabase'
+import { supabaseAdmin as supabase, isSupabaseConfigured } from '@/lib/supabase'
 import { ALL_DIMENSIONS } from '@/lib/character'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
