@@ -22,6 +22,7 @@ export async function GET(request: Request) {
     const limit = Math.min(Number(limitParam) || 10, 50)
     const events = rows.slice(0, limit).map((row) => ({
       id: String(row.id ?? row.google_event_id ?? row.title),
+      googleEventId: String(row.google_event_id ?? ''),
       title: String(row.title ?? 'Event'),
       start: String(row.start_time ?? ''),
       end: String(row.end_time ?? ''),

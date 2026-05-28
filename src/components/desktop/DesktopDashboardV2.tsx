@@ -54,7 +54,6 @@ const CSS_ANIMATIONS = `
   @keyframes v2-twinkle  { 0%,100%{opacity:0.1} 50%{opacity:0.65} }
   @keyframes v2-score-pop{ 0%{transform:scale(0.75);opacity:0} 60%{transform:scale(1.12);opacity:1} 100%{transform:scale(1);opacity:1} }
   @keyframes v2-sparkle  { 0%,100%{opacity:0;transform:scale(0.4) rotate(0deg)} 40%,60%{opacity:1;transform:scale(1) rotate(45deg)} }
-  ::-webkit-scrollbar { display: none; }
 `
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -88,6 +87,116 @@ function getTomorrowStr(): string {
   const d = new Date()
   d.setDate(d.getDate() + 1)
   return d.toISOString().split('T')[0]
+}
+
+// ── MiniCalendar ─────────────────────────────────────────────────────────────
+const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December']
+const DAY_LABELS_SHORT = ['Mo','Tu','We','Th','Fr','Sa','Su']
+
+function MiniCalendar({
+  onSelect, onClose, minDateStr,
+}: {
+  onSelect: (dateStr: string) => void
+  onClose: () => void
+  minDateStr?: string
+}) {
+  const today = new Date()
+  const [viewYear, setViewYear] = React.useState(today.getFullYear())
+  const [viewMonth, setViewMonth] = React.useState(today.getMonth())
+
+  const minDate = minDateStr ? new Date(minDateStr + 'T00:00:00') : today
+
+  function prevMonth() {
+    if (viewMonth === 0) { setViewYear(y => y - 1); setViewMonth(11) }
+    else setViewMonth(m => m - 1)
+  }
+  function nextMonth() {
+    if (viewMonth === 11) { setViewYear(y => y + 1); setViewMonth(0) }
+    else setViewMonth(m => m + 1)
+  }
+
+  const firstDayOfMonth = new Date(viewYear, viewMonth, 1).getDay() // 0=Sun
+  const startOffset = (firstDayOfMonth + 6) % 7 // shift to Mon start
+  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate()
+  const cells: (number | null)[] = [...Array(startOffset).fill(null)]
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d)
+  while (cells.length % 7 !== 0) cells.push(null)
+
+  function handleDay(day: number) {
+    const selected = new Date(viewYear, viewMonth, day)
+    if (selected < minDate) return
+    const str = `${viewYear}-${String(viewMonth + 1).padStart(2,'0')}-${String(day).padStart(2,'0')}`
+    onSelect(str)
+    onClose()
+  }
+
+  const font = "'Space Grotesk', system-ui, sans-serif"
+  const todayStr = toDateStr(today)
+
+  return (
+    <div
+      style={{
+        position: 'absolute', zIndex: 200,
+        background: '#1A1335',
+        border: '1px solid rgba(123,63,228,0.35)',
+        borderRadius: 14, padding: '12px 14px',
+        boxShadow: '0 12px 40px rgba(0,0,0,0.7)',
+        width: 224,
+        fontFamily: font,
+      }}
+      onClick={e => e.stopPropagation()}
+    >
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+        <button type="button" onClick={prevMonth}
+          style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', fontSize: 18, cursor: 'pointer', padding: '0 4px', lineHeight: 1, fontFamily: font }}>‹</button>
+        <span style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.85)' }}>
+          {MONTH_NAMES[viewMonth]} {viewYear}
+        </span>
+        <button type="button" onClick={nextMonth}
+          style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', fontSize: 18, cursor: 'pointer', padding: '0 4px', lineHeight: 1, fontFamily: font }}>›</button>
+      </div>
+      {/* Day labels */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 2, marginBottom: 4 }}>
+        {DAY_LABELS_SHORT.map(d => (
+          <div key={d} style={{ textAlign: 'center', fontSize: 9, color: 'rgba(255,255,255,0.3)', fontWeight: 600, padding: '2px 0' }}>{d}</div>
+        ))}
+      </div>
+      {/* Day cells */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 2 }}>
+        {cells.map((day, i) => {
+          if (!day) return <div key={`e${i}`} />
+          const cellDate = new Date(viewYear, viewMonth, day)
+          const disabled = cellDate < minDate
+          const isToday = toDateStr(cellDate) === todayStr
+          return (
+            <button key={day} type="button"
+              onClick={() => !disabled && handleDay(day)}
+              style={{
+                padding: '4px 2px', borderRadius: 6, border: 'none',
+                background: isToday ? 'rgba(123,63,228,0.3)' : 'transparent',
+                color: disabled ? 'rgba(255,255,255,0.18)' : isToday ? '#C4A8FF' : 'rgba(255,255,255,0.75)',
+                fontSize: 11, cursor: disabled ? 'not-allowed' : 'pointer',
+                fontFamily: font, textAlign: 'center',
+                transition: 'background 0.1s',
+              }}
+              onMouseEnter={e => { if (!disabled) (e.currentTarget as HTMLButtonElement).style.background = 'rgba(123,63,228,0.2)' }}
+              onMouseLeave={e => { if (!disabled) (e.currentTarget as HTMLButtonElement).style.background = isToday ? 'rgba(123,63,228,0.3)' : 'transparent' }}
+            >
+              {day}
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function getGreeting(): string {
+  const h = new Date().getHours()
+  if (h < 12) return 'Good morning,'
+  if (h < 17) return 'Good afternoon,'
+  return 'Good evening,'
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -133,6 +242,48 @@ export default function DesktopDashboardV2(props: DesktopDashboardV2Props) {
     window.addEventListener('protagonist:checkin-done', handler)
     return () => window.removeEventListener('protagonist:checkin-done', handler)
   }, [])
+
+  // ── Calendar event actions ────────────────────────────────────────────────
+  const [userId, setUserId] = useState('')
+  const [expandedEventId,  setExpandedEventId]  = useState<string | null>(null)
+  const [eventPickerId,    setEventPickerId]     = useState<string | null>(null)
+  const [deletingEventId,  setDeletingEventId]   = useState<string | null>(null)
+
+  useEffect(() => {
+    const uid = document.cookie.split('; ').find(r => r.startsWith('protagonist_user_id='))?.split('=')[1] ?? ''
+    setUserId(uid)
+  }, [])
+
+  async function handleDeleteEvent(googleEventId: string, evId: string) {
+    if (!userId || !googleEventId) return
+    setDeletingEventId(evId)
+    try {
+      await fetch('/api/calendar/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, eventId: googleEventId }),
+      })
+      window.dispatchEvent(new Event('protagonist:calendar-updated'))
+    } finally {
+      setDeletingEventId(null)
+      setExpandedEventId(null)
+    }
+  }
+
+  async function handleRescheduleEvent(googleEventId: string, evId: string, newDate: string) {
+    if (!userId || !googleEventId) return
+    try {
+      await fetch('/api/calendar/update', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, eventId: googleEventId, newDate }),
+      })
+      window.dispatchEvent(new Event('protagonist:calendar-updated'))
+    } finally {
+      setEventPickerId(null)
+      setExpandedEventId(null)
+    }
+  }
 
 
   const font: CSSProperties = { fontFamily: "'Space Grotesk', system-ui, sans-serif" }
@@ -248,7 +399,7 @@ export default function DesktopDashboardV2(props: DesktopDashboardV2Props) {
     <>
       <style>{CSS_ANIMATIONS}</style>
 
-      <div style={{ ...font, background: '#0D0820', minHeight: '100dvh', display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden' }}>
+      <div style={{ ...font, background: '#0D0820', height: '100dvh', display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden' }}>
 
         {/* Starfield */}
         <div ref={starsRef} style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 0 }} />
@@ -348,11 +499,13 @@ export default function DesktopDashboardV2(props: DesktopDashboardV2Props) {
 
             {/* Greeting — always visible */}
             <div style={{ marginBottom: 22 }}>
-              <div style={{ color: 'rgba(255,255,255,0.72)', fontSize: 26, fontWeight: 300, lineHeight: 1.1 }}>
-                Good morning,
-              </div>
-              <div style={{ color: '#FF7A65', fontSize: 40, fontStyle: 'italic', fontWeight: 700, lineHeight: 1.05 }}>
-                Ivana.
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+                <span style={{ color: 'rgba(255,255,255,0.72)', fontSize: 28, fontWeight: 300, lineHeight: 1.1 }}>
+                  {getGreeting()}
+                </span>
+                <span style={{ color: '#FF7A65', fontSize: 36, fontStyle: 'italic', fontWeight: 700, lineHeight: 1.05 }}>
+                  Ivana.
+                </span>
               </div>
               {!isToday && (
                 <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 4 }}>
@@ -424,30 +577,74 @@ export default function DesktopDashboardV2(props: DesktopDashboardV2Props) {
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                       {calendarEvents.map(ev => {
-                        const isPast    = ev.endIso ? new Date(ev.endIso) < new Date() : false
-                        const dimColor  = ev.dimension ? DIM_COLORS[ev.dimension] : '#FFD47A'
-                        const dimLabel  = ev.dimension ? CATEGORY_LABELS[ev.dimension] : null
-                        const timeLabel = ev.time ? (ev.timeEnd ? `${ev.time}–${ev.timeEnd}` : ev.time) : ''
+                        const isPast      = ev.endIso ? new Date(ev.endIso) < new Date() : false
+                        const timeLabel   = ev.time ? (ev.timeEnd ? `${ev.time}–${ev.timeEnd}` : ev.time) : ''
+                        const isExpanded  = expandedEventId === ev.id
+                        const isDeleting  = deletingEventId === ev.id
+                        const gId         = ev.googleEventId ?? ev.id
                         return (
-                          <div key={ev.id} style={{
-                            display: 'flex', alignItems: 'center', gap: 10,
-                            background: 'rgba(255,183,77,0.08)', border: '1px solid rgba(255,183,77,0.18)',
-                            borderRadius: 10, padding: '10px 14px',
-                            opacity: isPast ? 0.5 : 1,
-                          }}>
-                            {timeLabel && (
+                          <div key={ev.id}>
+                            <div
+                              role="button" tabIndex={0}
+                              onClick={() => setExpandedEventId(isExpanded ? null : ev.id)}
+                              onKeyDown={e => { if (e.key === 'Enter') setExpandedEventId(isExpanded ? null : ev.id) }}
+                              style={{
+                                display: 'flex', alignItems: 'center', gap: 10,
+                                background: isExpanded ? 'rgba(255,183,77,0.12)' : 'rgba(255,183,77,0.08)',
+                                border: `1px solid ${isExpanded ? 'rgba(255,183,77,0.35)' : 'rgba(255,183,77,0.18)'}`,
+                                borderRadius: isExpanded ? '10px 10px 0 0' : 10,
+                                padding: '10px 14px',
+                                opacity: isPast ? 0.5 : 1,
+                                cursor: 'pointer',
+                                transition: 'background 0.12s, border-color 0.12s',
+                              }}
+                            >
+                              {timeLabel && (
+                                <div style={{
+                                  background: 'rgba(255,183,77,0.18)', color: '#FFB74D',
+                                  fontSize: 11, fontWeight: 600, padding: '3px 8px',
+                                  borderRadius: 6, whiteSpace: 'nowrap', minWidth: 72, textAlign: 'center',
+                                }}>
+                                  {timeLabel}
+                                </div>
+                              )}
+                              <div style={{ flex: 1, color: 'rgba(255,255,255,0.82)', fontSize: 13, fontWeight: 500 }}>{ev.title}</div>
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="rgba(255,183,77,0.5)" strokeWidth="2" strokeLinecap="round"
+                                style={{ transform: isExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', flexShrink: 0 }}>
+                                <polyline points="6 9 12 15 18 9"/>
+                              </svg>
+                            </div>
+                            {/* Expanded actions */}
+                            {isExpanded && (
                               <div style={{
-                                background: 'rgba(255,183,77,0.18)', color: '#FFB74D',
-                                fontSize: 11, fontWeight: 600, padding: '3px 8px',
-                                borderRadius: 6, whiteSpace: 'nowrap', minWidth: 72, textAlign: 'center',
+                                background: 'rgba(255,183,77,0.05)',
+                                border: '1px solid rgba(255,183,77,0.18)',
+                                borderTop: 'none',
+                                borderRadius: '0 0 10px 10px',
+                                padding: '8px 14px 10px',
                               }}>
-                                {timeLabel}
-                              </div>
-                            )}
-                            <div style={{ flex: 1, color: 'rgba(255,255,255,0.82)', fontSize: 13, fontWeight: 500 }}>{ev.title}</div>
-                            {dimLabel && (
-                              <div style={{ background: `${dimColor}18`, color: dimColor, fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 6 }}>
-                                {dimLabel}
+                                {eventPickerId === ev.id ? (
+                                  <div style={{ position: 'relative' }}>
+                                    <MiniCalendar
+                                      onSelect={(dateStr) => handleRescheduleEvent(gId, ev.id, dateStr)}
+                                      onClose={() => setEventPickerId(null)}
+                                    />
+                                  </div>
+                                ) : (
+                                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                                    <button type="button"
+                                      onClick={e => { e.stopPropagation(); setEventPickerId(ev.id) }}
+                                      style={{ padding: '5px 12px', borderRadius: 20, fontSize: 11, cursor: 'pointer', border: '0.5px solid rgba(255,183,77,0.3)', color: '#FFB74D', background: 'rgba(255,183,77,0.08)', ...font }}>
+                                      Reschedule
+                                    </button>
+                                    <button type="button"
+                                      onClick={e => { e.stopPropagation(); void handleDeleteEvent(gId, ev.id) }}
+                                      disabled={isDeleting}
+                                      style={{ padding: '5px 12px', borderRadius: 20, fontSize: 11, cursor: 'pointer', border: '0.5px solid rgba(239,68,68,0.3)', color: '#F87171', background: 'rgba(239,68,68,0.06)', ...font }}>
+                                      {isDeleting ? 'Deleting…' : 'Delete'}
+                                    </button>
+                                  </div>
+                                )}
                               </div>
                             )}
                           </div>
@@ -562,10 +759,13 @@ export default function DesktopDashboardV2(props: DesktopDashboardV2Props) {
                                   </div>
                                 )}
                                 {pickerTaskId === item.id && (
-                                  <input type="date" autoFocus min={getTomorrowStr()}
-                                    onChange={(e) => { if (e.target.value) { onPickerToggle(null); onReschedule(item.id, e.target.value) } }}
-                                    style={{ marginTop: 8, width: '100%', background: '#0D0820', border: '0.5px solid rgba(255,255,255,0.12)', borderRadius: 8, padding: '8px 12px', fontSize: 12, color: 'white', outline: 'none', ...font, colorScheme: 'dark', boxSizing: 'border-box' }}
-                                  />
+                                  <div style={{ position: 'relative', marginTop: 8 }}>
+                                    <MiniCalendar
+                                      minDateStr={getTomorrowStr()}
+                                      onSelect={(dateStr) => { onReschedule(item.id, dateStr) }}
+                                      onClose={() => onPickerToggle(null)}
+                                    />
+                                  </div>
                                 )}
                               </div>
                             )}

@@ -47,6 +47,7 @@ export interface MainQuest {
 
 export interface TodayItem {
   id: string
+  googleEventId?: string  // Google Calendar event ID (events only)
   type: 'task' | 'event'
   title: string
   time: string | null

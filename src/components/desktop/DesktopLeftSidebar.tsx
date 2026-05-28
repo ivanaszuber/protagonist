@@ -206,19 +206,16 @@ export function DesktopLeftSidebar({
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div style={{
+    <div className="protagonist-sidebar" style={{
       ...font,
       width: 272, minWidth: 272,
-      height: '100vh',
-      position: 'sticky',
-      top: 0,
       background: '#1A1335',
       borderRight: '1px solid rgba(255,255,255,0.07)',
       padding: '18px 16px 20px',
       display: 'flex', flexDirection: 'column',
       overflowY: 'auto', overflowX: 'hidden',
       scrollbarWidth: 'thin',
-      scrollbarColor: 'rgba(123,63,228,0.3) transparent',
+      scrollbarColor: 'rgba(123,63,228,0.35) transparent',
       boxSizing: 'border-box',
     }}>
 

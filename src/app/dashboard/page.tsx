@@ -69,6 +69,7 @@ interface CalendarEventRow {
 
 interface TodayItem {
   id: string
+  googleEventId?: string  // Google Calendar event ID (events only)
   type: 'task' | 'event'
   title: string
   time: string | null
@@ -676,6 +677,7 @@ export default function DashboardPage() {
     for (const ev of events) {
       items.push({
         id: ev.id,
+        googleEventId: (ev as { googleEventId?: string }).googleEventId ?? ev.id,
         type: 'event',
         title: ev.title,
         time: formatTimeFromIso(ev.start),

@@ -34,6 +34,19 @@ body::-webkit-scrollbar {
   display: none;
 }
 
+/* Thin visible scrollbar for sidebar */
+.protagonist-sidebar::-webkit-scrollbar {
+  display: block;
+  width: 4px;
+}
+.protagonist-sidebar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.protagonist-sidebar::-webkit-scrollbar-thumb {
+  background: rgba(123, 63, 228, 0.35);
+  border-radius: 2px;
+}
+
 @keyframes spin {
   from {
     transform: rotate(0deg);
