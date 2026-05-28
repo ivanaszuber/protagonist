@@ -484,11 +484,25 @@ function PortraitView({ portrait, loading, onGenerate }: {
 
   if (portrait.summary && !portrait.essence) {
     return (
-      <div className="jrn-portrait-section" style={{
-        background: 'rgba(123,63,228,0.08)', borderRadius: 16, padding: 24,
-        border: '1px solid rgba(196,168,255,0.15)',
-      }}>
-        <p style={{ ...font, fontSize: 15, color: 'rgba(255,255,255,0.8)', lineHeight: 1.75 }}>{portrait.summary}</p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div className="jrn-portrait-section" style={{
+          background: 'rgba(123,63,228,0.08)', borderRadius: 16, padding: 24,
+          border: '1px solid rgba(196,168,255,0.15)',
+        }}>
+          <p style={{ ...font, fontSize: 15, color: 'rgba(255,255,255,0.8)', lineHeight: 1.75 }}>{portrait.summary}</p>
+        </div>
+        <button
+          onClick={onGenerate}
+          style={{
+            ...font, cursor: 'pointer', fontWeight: 700, fontSize: 13,
+            background: '#7B3FE4', color: '#fff',
+            border: 'none', borderRadius: 12, padding: '11px 28px', alignSelf: 'flex-start',
+            display: 'flex', alignItems: 'center', gap: 7,
+          }}
+        >
+          <Icon name="sparkle" size={13} color="white" />
+          Generate My Portrait
+        </button>
       </div>
     )
   }
@@ -871,7 +885,9 @@ export default function DesktopJournalPage() {
       if (cached) {
         const parsed = JSON.parse(cached) as Portrait
         const age = Date.now() - new Date(parsed.generatedAt ?? 0).getTime()
-        if (age < 24 * 60 * 60 * 1000) setPortrait(parsed)
+        // Only restore if fresh AND has real content (not the empty-state fallback)
+        if (age < 24 * 60 * 60 * 1000 && parsed.essence) setPortrait(parsed)
+        else if (!parsed.essence) localStorage.removeItem(`protagonist-portrait-${id}`)
       }
     } catch { /* ignore */ }
   }, [])
