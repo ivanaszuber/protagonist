@@ -1188,10 +1188,8 @@ export default function DesktopJournalPage() {
             )}
           </div>
 
-          {/* Content + right panel */}
-          <div style={{ display: 'flex', flex: 1, minHeight: 0, gap: 14 }}>
-            {/* Main panel */}
-            <div style={{ flex: 1, overflow: 'auto', minWidth: 0, paddingBottom: 20 }}>
+          {/* Content area (no right panel here — it lives as a sibling at body level) */}
+          <div style={{ flex: 1, overflow: 'auto', minWidth: 0, paddingBottom: 20 }}>
               {activeTab === 'stream' && (
                 loadingEntries ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -1325,21 +1323,27 @@ export default function DesktopJournalPage() {
               {activeTab === 'growth' && (
                 <GrowthMapView growthMarkers={growthMarkers} achievements={achievements} />
               )}
-            </div>
-
-            {/* Right panel */}
-            <div style={{ width: 230, flexShrink: 0, overflow: 'auto', paddingBottom: 20 }}>
-              {!loadingInsights && (
-                <RightPanel
-                  patternCards={patternCards}
-                  unheardVoices={unheardVoices}
-                  growthMarkers={growthMarkers}
-                  stats={stats}
-                  pulse={pulse}
-                />
-              )}
-            </div>
           </div>
+        </div>
+
+        {/* Right sidebar — true sibling of left sidebar and main content */}
+        <div style={{
+          width: 240, flexShrink: 0,
+          borderLeft: '1px solid rgba(255,255,255,0.06)',
+          overflowY: 'auto', overflowX: 'hidden',
+          padding: '20px 14px',
+          scrollbarWidth: 'thin',
+          scrollbarColor: 'rgba(123,63,228,0.25) transparent',
+        }}>
+          {!loadingInsights && (
+            <RightPanel
+              patternCards={patternCards}
+              unheardVoices={unheardVoices}
+              growthMarkers={growthMarkers}
+              stats={stats}
+              pulse={pulse}
+            />
+          )}
         </div>
       </div>
     </div>

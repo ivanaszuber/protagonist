@@ -157,6 +157,11 @@ export function DesktopOracleModal() {
   const chatInputRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  // ── Chat history persistence ────────────────────────────────────────────────
+  const chatHistoryKey = `protagonist-oracle-chat-${userId}`
+  const CHAT_MAX_MESSAGES = 40
+  const CHAT_MAX_AGE_DAYS = 7
+
   // Check-in state
   const [morningContext, setMorningContext] = useState<MorningContext | null>(null)
   const [checkinInput, setCheckinInput] = useState('')
@@ -170,6 +175,7 @@ export function DesktopOracleModal() {
     setChatInput('')
     setCheckinInput('')
     setAttachment(null)
+    // Don't clear chatMessages — they persist for next open
     window.dispatchEvent(new CustomEvent('protagonist:oracle-closed'))
   }, [])
 
@@ -228,6 +234,31 @@ export function DesktopOracleModal() {
   useEffect(() => {
     setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
   }, [chatMessages])
+
+  // ── Persist chat history to localStorage ───────────────────────────────────
+  useEffect(() => {
+    if (!userId || chatMessages.length === 0) return
+    try {
+      const payload = { messages: chatMessages.slice(-CHAT_MAX_MESSAGES), savedAt: Date.now() }
+      localStorage.setItem(chatHistoryKey, JSON.stringify(payload))
+    } catch { /* ignore */ }
+  }, [chatMessages, userId, chatHistoryKey])
+
+  // ── Restore chat history on first open ─────────────────────────────────────
+  useEffect(() => {
+    if (!userId) return
+    try {
+      const raw = localStorage.getItem(chatHistoryKey)
+      if (!raw) return
+      const parsed = JSON.parse(raw) as { messages: { role: 'user' | 'oracle'; text: string }[]; savedAt: number }
+      const ageMs = Date.now() - (parsed.savedAt ?? 0)
+      if (ageMs < CHAT_MAX_AGE_DAYS * 86400000 && parsed.messages?.length > 0) {
+        setChatMessages(parsed.messages)
+      } else {
+        localStorage.removeItem(chatHistoryKey)
+      }
+    } catch { /* ignore */ }
+  }, [userId, chatHistoryKey])
 
   // ── Handle file attach ──────────────────────────────────────────────────────
   const handleFileAttach = useCallback(async (file: File) => {
@@ -378,13 +409,12 @@ export function DesktopOracleModal() {
         })
         const arcData = await arcRes.json()
         const reply = (arcData.response as string) ?? arcData.oracleReply ?? "I'm here with you."
-        if (data.intent === 'NOTE') {
-          fetch('/api/notes', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId, content: text, oracleReply: reply }),
-          }).catch(() => {})
-        }
+        // Save all chat + note exchanges to voice_notes so they appear in the journal stream
+        fetch('/api/notes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, content: text, oracleReply: reply }),
+        }).catch(() => {})
         setChatMessages(prev => [...prev, { role: 'oracle', text: reply }])
       }
     } catch {
@@ -464,6 +494,10 @@ export function DesktopOracleModal() {
           onAttach={handleFileAttach}
           onClearAttach={() => setAttachment(null)}
           fileInputRef={fileInputRef}
+          onClearHistory={() => {
+            setChatMessages([])
+            try { localStorage.removeItem(chatHistoryKey) } catch { /* ignore */ }
+          }}
         />}
         {(mode === 'checkin-loading' || mode === 'checkin-input' || mode === 'checkin-thinking') && <CheckinInputView
           mode={mode}
@@ -490,7 +524,7 @@ export function DesktopOracleModal() {
 
 // ── Chat view ─────────────────────────────────────────────────────────────────
 
-function ChatView({ messages, input, setInput, onSubmit, loading, inputRef, chatEndRef, onClose, attachment, onAttach, onClearAttach, fileInputRef }: {
+function ChatView({ messages, input, setInput, onSubmit, loading, inputRef, chatEndRef, onClose, attachment, onAttach, onClearAttach, fileInputRef, onClearHistory }: {
   messages: { role: 'user' | 'oracle'; text: string }[]
   input: string
   setInput: (v: string) => void
@@ -503,6 +537,7 @@ function ChatView({ messages, input, setInput, onSubmit, loading, inputRef, chat
   onAttach: (file: File) => void
   onClearAttach: () => void
   fileInputRef: React.RefObject<HTMLInputElement | null>
+  onClearHistory: () => void
 }) {
   const QUICK = ['Plan my day', 'Review my week', 'Add a task', 'Log something I did', 'What should I focus on?']
   const [isRecording, setIsRecording] = React.useState(false)
@@ -584,6 +619,20 @@ function ChatView({ messages, input, setInput, onSubmit, loading, inputRef, chat
             ))}
           </div>
         </div>
+
+        {messages.length > 0 && (
+          <div style={{ width: '100%', marginTop: 'auto', paddingTop: 16 }}>
+            <button
+              onClick={onClearHistory}
+              style={{ width: '100%', background: 'transparent', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '6px 10px', color: 'rgba(255,255,255,0.3)', fontSize: 10, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 5, justifyContent: 'center' }}
+            >
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.87"/>
+              </svg>
+              New conversation
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Chat main */}
