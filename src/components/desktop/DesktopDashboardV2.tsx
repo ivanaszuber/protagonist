@@ -354,7 +354,7 @@ export default function DesktopDashboardV2(props: DesktopDashboardV2Props) {
             </div>
             <button type="button" onClick={() => router.push('/characters')}
               style={{ color: 'rgba(255,255,255,0.6)', padding: '6px 14px', fontSize: 13, background: 'transparent', border: 'none', cursor: 'pointer', ...font }}>
-              Characters
+              Life Areas
             </button>
             <button type="button" onClick={() => router.push('/journal')}
               style={{ color: 'rgba(255,255,255,0.6)', padding: '6px 14px', fontSize: 13, background: 'transparent', border: 'none', cursor: 'pointer', ...font }}>

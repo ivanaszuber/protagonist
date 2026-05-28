@@ -2,6 +2,8 @@
 
 import Link from 'next/link'
 import { useEffect, useState, type ComponentType, type CSSProperties, type ReactNode } from 'react'
+import { useIsDesktop } from '@/lib/useIsDesktop'
+import { DesktopCharacterPage } from '@/components/desktop/DesktopCharacterPage'
 import {
   BlazeCharacterLarge,
   EchoCharacterLarge,
@@ -126,6 +128,7 @@ interface CharacterPageProps {
 }
 
 export function CharacterPage({ dimension }: CharacterPageProps) {
+  const isDesktop = useIsDesktop()
   const char = CHARACTERS[dimension]
   const characterSlug = DIMENSION_TO_SLUG[dimension]
   const accentColor = char.color
@@ -326,6 +329,8 @@ export function CharacterPage({ dimension }: CharacterPageProps) {
     quest?.milestones.find((m) => !m.completed && m.is_focused) ??
     quest?.milestones.find((m) => !m.completed) ??
     null
+
+  if (isDesktop) return <DesktopCharacterPage dimension={dimension} />
 
   const pageShellStyle: CSSProperties = {
     minHeight: '100dvh',
