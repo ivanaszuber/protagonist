@@ -63,6 +63,37 @@ interface Portrait {
   summary?: string
 }
 
+interface TraitPill {
+  label: string
+  color: 'blue' | 'green' | 'purple' | 'orange' | 'amber'
+}
+
+interface DimensionInsight {
+  dimension: string
+  insight: string
+  color: string
+}
+
+interface IdentityData {
+  chapterTitle: string
+  essenceQuote: string
+  strengths: TraitPill[]
+  growthEdges: TraitPill[]
+  dimensionInsights: DimensionInsight[]
+  generatedAt: string
+}
+
+const PILL_COLORS: Record<string, string> = {
+  blue:   '#4DC4FF',
+  green:  '#6EE7A4',
+  purple: '#C4A8FF',
+  orange: '#FF9A5C',
+  amber:  '#FFD47A',
+}
+
+const IDENTITY_CACHE_KEY_J = (uid: string) => `protagonist-identity-${uid}`
+const IDENTITY_CACHE_TTL_J = 12 * 60 * 60 * 1000
+
 type Tab = 'stream' | 'pulse' | 'portrait' | 'growth'
 
 const ALL_DIMS: Dimension[] = ['career', 'social', 'wealth', 'vitality', 'mind', 'love', 'family']
@@ -429,10 +460,13 @@ function PulseChart({ pulse }: { pulse: PulseDay[] }) {
 
 // ── Arc Portrait Tab ──────────────────────────────────────────────────────────
 
-function PortraitView({ portrait, loading, onGenerate }: {
+function PortraitView({ portrait, identity, identityLoading, loading, onGenerate, onRefreshIdentity }: {
   portrait: Portrait | null
+  identity: IdentityData | null
+  identityLoading: boolean
   loading: boolean
   onGenerate: () => void
+  onRefreshIdentity: () => void
 }) {
   if (loading) {
     return (
@@ -452,7 +486,8 @@ function PortraitView({ portrait, loading, onGenerate }: {
     )
   }
 
-  if (!portrait) {
+  // No data at all — show empty state
+  if (!portrait && !identity) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 300, gap: 16 }}>
         <div style={{
@@ -482,34 +517,135 @@ function PortraitView({ portrait, loading, onGenerate }: {
     )
   }
 
-  if (portrait.summary && !portrait.essence) {
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <div className="jrn-portrait-section" style={{
-          background: 'rgba(123,63,228,0.08)', borderRadius: 16, padding: 24,
-          border: '1px solid rgba(196,168,255,0.15)',
-        }}>
-          <p style={{ ...font, fontSize: 15, color: 'rgba(255,255,255,0.8)', lineHeight: 1.75 }}>{portrait.summary}</p>
-        </div>
-        <button
-          onClick={onGenerate}
-          style={{
-            ...font, cursor: 'pointer', fontWeight: 700, fontSize: 13,
-            background: '#7B3FE4', color: '#fff',
-            border: 'none', borderRadius: 12, padding: '11px 28px', alignSelf: 'flex-start',
-            display: 'flex', alignItems: 'center', gap: 7,
-          }}
-        >
-          <Icon name="sparkle" size={13} color="white" />
-          Generate My Portrait
-        </button>
-      </div>
-    )
-  }
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-      {portrait.essence && (
+
+      {/* ── Identity pills block (from /api/identity/synthesize) ── */}
+      {identity && (
+        <>
+          {/* Chapter header */}
+          <div className="jrn-portrait-section" style={{
+            background: 'linear-gradient(135deg, rgba(123,63,228,0.18) 0%, rgba(77,196,255,0.07) 100%)',
+            border: '1px solid rgba(123,63,228,0.3)',
+            borderRadius: 16, padding: '16px 18px',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+              <div style={{
+                background: 'rgba(123,63,228,0.35)', color: '#C4A8FF',
+                fontSize: 9, fontWeight: 700, letterSpacing: '1.4px',
+                padding: '3px 10px', borderRadius: 100, textTransform: 'uppercase' as const,
+              }}>
+                Arc's Portrait
+              </div>
+              <span style={{ color: 'white', fontSize: 14, fontWeight: 600 }}>{identity.chapterTitle}</span>
+            </div>
+
+            {/* Essence from identity synthesis */}
+            <p style={{ ...font, fontSize: 13, fontStyle: 'italic', color: 'rgba(255,255,255,0.65)', lineHeight: 1.6, marginBottom: 14 }}>
+              "{identity.essenceQuote}"
+            </p>
+
+            {/* YOU ARE pills */}
+            {identity.strengths?.length > 0 && (
+              <div style={{ marginBottom: 10 }}>
+                <span style={{ ...font, fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.32)', letterSpacing: '1.3px', textTransform: 'uppercase' as const, display: 'block', marginBottom: 7 }}>You Are</span>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                  {identity.strengths.map((pill, i) => {
+                    const c = PILL_COLORS[pill.color] ?? '#C4A8FF'
+                    return (
+                      <span key={i} style={{
+                        ...font, background: `${c}15`, color: c,
+                        border: `1px solid ${c}30`,
+                        fontSize: 11, fontWeight: 600,
+                        padding: '4px 11px', borderRadius: 100,
+                      }}>{pill.label}</span>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* STILL GROWING pills */}
+            {identity.growthEdges?.length > 0 && (
+              <div>
+                <span style={{ ...font, fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.32)', letterSpacing: '1.3px', textTransform: 'uppercase' as const, display: 'block', marginBottom: 7 }}>Still Growing</span>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                  {identity.growthEdges.map((pill, i) => (
+                    <span key={i} style={{
+                      ...font, background: 'rgba(255,212,122,0.1)', color: '#FFD47A',
+                      border: '1px solid rgba(255,212,122,0.25)',
+                      fontSize: 11, fontWeight: 600,
+                      padding: '4px 11px', borderRadius: 100,
+                    }}>△ {pill.label}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* 2-col: Your Growth + What to Watch */}
+          {(portrait?.growth || identity.growthEdges?.length > 0) && (
+            <div className="jrn-portrait-section" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              {portrait?.growth && (
+                <div style={{
+                  background: 'rgba(110,231,164,0.07)', borderRadius: 14, padding: '14px 16px',
+                  border: '1px solid rgba(110,231,164,0.14)',
+                }}>
+                  <p style={{ ...font, fontSize: 9, fontWeight: 700, color: '#6EE7A4', letterSpacing: '1.3px', textTransform: 'uppercase' as const, marginBottom: 8 }}>Your Growth</p>
+                  <p style={{ ...font, fontSize: 13, color: 'rgba(255,255,255,0.78)', lineHeight: 1.7 }}>{portrait.growth}</p>
+                </div>
+              )}
+              {identity.growthEdges?.length > 0 && (
+                <div style={{
+                  background: 'rgba(255,212,122,0.06)', borderRadius: 14, padding: '14px 16px',
+                  border: '1px solid rgba(255,212,122,0.14)',
+                }}>
+                  <p style={{ ...font, fontSize: 9, fontWeight: 700, color: '#FFD47A', letterSpacing: '1.3px', textTransform: 'uppercase' as const, marginBottom: 8 }}>What to Watch</p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                    {identity.growthEdges.map((edge, i) => (
+                      <p key={i} style={{ ...font, fontSize: 12.5, color: 'rgba(255,255,255,0.65)', lineHeight: 1.55 }}>△ {edge.label}</p>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Arc's Lens by Dimension */}
+          {identity.dimensionInsights?.length > 0 && (
+            <div className="jrn-portrait-section">
+              <p style={{ ...font, fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.3)', letterSpacing: '1.4px', textTransform: 'uppercase' as const, marginBottom: 10 }}>
+                Arc's Lens
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+                {identity.dimensionInsights.map((d, i) => (
+                  <div key={i} style={{
+                    background: 'rgba(255,255,255,0.022)', borderRadius: 11, padding: '10px 14px',
+                    display: 'flex', gap: 10, alignItems: 'flex-start',
+                    border: `1px solid ${d.color}15`,
+                  }}>
+                    <div style={{
+                      width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
+                      background: d.color, marginTop: 5,
+                    }} />
+                    <div>
+                      <p style={{ ...font, fontSize: 9, fontWeight: 700, color: d.color, marginBottom: 3, letterSpacing: '1px', textTransform: 'uppercase' as const }}>
+                        {d.dimension}
+                      </p>
+                      <p style={{ ...font, fontSize: 12.5, color: 'rgba(255,255,255,0.68)', lineHeight: 1.6 }}>
+                        {d.insight}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Fallback: portrait essence only (no identity yet) */}
+      {!identity && portrait?.essence && (
         <div className="jrn-portrait-section" style={{
           background: 'linear-gradient(135deg, rgba(123,63,228,0.15), rgba(196,168,255,0.06))',
           borderRadius: 16, padding: 22, border: '1px solid rgba(196,168,255,0.18)',
@@ -519,104 +655,45 @@ function PortraitView({ portrait, loading, onGenerate }: {
         </div>
       )}
 
-      {portrait.growth && (
-        <div className="jrn-portrait-section" style={{
-          background: 'rgba(110,231,164,0.06)', borderRadius: 14, padding: 18,
-          border: '1px solid rgba(110,231,164,0.1)',
+      {/* Identity loading state */}
+      {!identity && identityLoading && (
+        <div style={{
+          height: 80, borderRadius: 14, background: 'rgba(123,63,228,0.07)',
+          border: '1px solid rgba(123,63,228,0.15)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
-          <p style={{ ...font, fontSize: 10, fontWeight: 700, color: '#6EE7A4', letterSpacing: '1.5px', marginBottom: 8 }}>YOUR GROWTH</p>
-          <p style={{ ...font, fontSize: 14, color: 'rgba(255,255,255,0.8)', lineHeight: 1.75 }}>{portrait.growth}</p>
+          <span style={{ ...font, color: 'rgba(255,255,255,0.3)', fontSize: 12 }}>Arc is reading your memories…</span>
         </div>
       )}
 
-      {portrait.strengths && portrait.strengths.length > 0 && (
-        <div className="jrn-portrait-section">
-          <p style={{ ...font, fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.35)', letterSpacing: '1.5px', marginBottom: 10 }}>
-            WHAT MAKES YOU POWERFUL
-          </p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {portrait.strengths.map((s, i) => (
-              <div key={i} style={{
-                background: 'rgba(255,255,255,0.03)', borderRadius: 12, padding: '12px 16px',
-                border: '1px solid rgba(255,255,255,0.06)', display: 'flex', gap: 12, alignItems: 'flex-start',
-              }}>
-                <Icon name="zap" size={14} color="#FFD47A" />
-                <p style={{ ...font, fontSize: 13.5, color: 'rgba(255,255,255,0.75)', lineHeight: 1.65 }}>{s}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {portrait.patterns && portrait.patterns.length > 0 && (
-        <div className="jrn-portrait-section">
-          <p style={{ ...font, fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.35)', letterSpacing: '1.5px', marginBottom: 10 }}>
-            YOUR RECURRING PATTERNS
-          </p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {portrait.patterns.map((p, i) => (
-              <div key={i} style={{
-                background: 'rgba(255,255,255,0.025)', borderRadius: 12, padding: '12px 16px',
-                borderLeft: '3px solid rgba(255,212,122,0.4)',
-              }}>
-                <p style={{ ...font, fontSize: 13.5, color: 'rgba(255,255,255,0.7)', lineHeight: 1.65 }}>{p}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {portrait.calling && (
-        <div className="jrn-portrait-section" style={{
-          background: 'linear-gradient(135deg, rgba(255,107,157,0.08), rgba(255,154,92,0.06))',
-          borderRadius: 14, padding: 18, border: '1px solid rgba(255,107,157,0.12)',
-        }}>
-          <p style={{ ...font, fontSize: 10, fontWeight: 700, color: '#FF6B9D', letterSpacing: '1.5px', marginBottom: 8 }}>WHAT'S CALLING YOU</p>
-          <p style={{ ...font, fontSize: 14, color: 'rgba(255,255,255,0.8)', lineHeight: 1.75, fontStyle: 'italic' }}>{portrait.calling}</p>
-        </div>
-      )}
-
-      {portrait.dimensionInsights && Object.keys(portrait.dimensionInsights).length > 0 && (
-        <div className="jrn-portrait-section">
-          <p style={{ ...font, fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.35)', letterSpacing: '1.5px', marginBottom: 10 }}>
-            ACROSS YOUR LIFE AREAS
-          </p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {ALL_DIMS.filter(d => portrait.dimensionInsights?.[d]).map(dim => (
-              <div key={dim} style={{
-                background: 'rgba(255,255,255,0.025)', borderRadius: 12, padding: '11px 14px',
-                display: 'flex', gap: 10, alignItems: 'flex-start',
-                border: `1px solid ${DIM_COLORS[dim]}18`,
-              }}>
-                <div style={{ width: 3, borderRadius: 4, flexShrink: 0, background: DIM_COLORS[dim], alignSelf: 'stretch', minHeight: 20 }} />
-                <div>
-                  <p style={{ ...font, fontSize: 10, fontWeight: 700, color: DIM_COLORS[dim], marginBottom: 4, letterSpacing: '1px' }}>
-                    {DIM_LABELS[dim].toUpperCase()}
-                  </p>
-                  <p style={{ ...font, fontSize: 13, color: 'rgba(255,255,255,0.7)', lineHeight: 1.65 }}>
-                    {portrait.dimensionInsights?.[dim]}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 4 }}>
-        <p style={{ ...font, fontSize: 11, color: 'rgba(255,255,255,0.22)' }}>
-          {portrait.memoryCount ? `${portrait.memoryCount} memories` : ''}
-          {portrait.generatedAt ? ` · ${formatRelTime(portrait.generatedAt)}` : ''}
+      {/* Footer: generate portrait / refresh */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 4, flexWrap: 'wrap', gap: 8 }}>
+        <p style={{ ...font, fontSize: 11, color: 'rgba(255,255,255,0.2)' }}>
+          {portrait?.memoryCount ? `${portrait.memoryCount} memories` : ''}
+          {identity?.generatedAt ? ` · ${formatRelTime(identity.generatedAt)}` : portrait?.generatedAt ? ` · ${formatRelTime(portrait.generatedAt)}` : ''}
         </p>
-        <button onClick={onGenerate} style={{
-          ...font, cursor: 'pointer', fontSize: 11, fontWeight: 600,
-          background: 'rgba(123,63,228,0.15)', color: '#C4A8FF',
-          border: '1px solid rgba(196,168,255,0.18)', borderRadius: 8, padding: '6px 14px',
-          display: 'flex', alignItems: 'center', gap: 5,
-        }}>
-          <Icon name="refresh" size={11} color="#C4A8FF" />
-          Refresh
-        </button>
+        <div style={{ display: 'flex', gap: 6 }}>
+          {!portrait?.essence && (
+            <button onClick={onGenerate} style={{
+              ...font, cursor: 'pointer', fontSize: 11, fontWeight: 600,
+              background: '#7B3FE4', color: '#fff',
+              border: 'none', borderRadius: 8, padding: '6px 14px',
+              display: 'flex', alignItems: 'center', gap: 5,
+            }}>
+              <Icon name="sparkle" size={11} color="white" />
+              Generate Portrait
+            </button>
+          )}
+          <button onClick={onRefreshIdentity} style={{
+            ...font, cursor: 'pointer', fontSize: 11, fontWeight: 600,
+            background: 'rgba(123,63,228,0.15)', color: '#C4A8FF',
+            border: '1px solid rgba(196,168,255,0.18)', borderRadius: 8, padding: '6px 14px',
+            display: 'flex', alignItems: 'center', gap: 5,
+          }}>
+            <Icon name="refresh" size={11} color="#C4A8FF" />
+            Refresh
+          </button>
+        </div>
       </div>
     </div>
   )
@@ -867,6 +944,10 @@ export default function DesktopJournalPage() {
   const [dimXpMap, setDimXpMap] = useState<Record<string, number>>({})
   const [dimBaselineMap, setDimBaselineMap] = useState<Record<string, number>>({})
 
+  // Identity
+  const [identity, setIdentity] = useState<IdentityData | null>(null)
+  const [identityLoading, setIdentityLoading] = useState(false)
+
   // UI
   const [activeTab, setActiveTab] = useState<Tab>('stream')
   const [activeDimFilter, setActiveDimFilter] = useState<Dimension | null>(null)
@@ -945,6 +1026,40 @@ export default function DesktopJournalPage() {
       setDimBaselineMap(baselines)
     })
   }, [userId])
+
+  // Load identity synthesis
+  const fetchIdentity = useCallback((uid: string, bust = false) => {
+    if (!uid) return
+    if (!bust) {
+      try {
+        const cached = localStorage.getItem(IDENTITY_CACHE_KEY_J(uid))
+        if (cached) {
+          const parsed = JSON.parse(cached) as IdentityData & { cachedAt?: number }
+          if (Date.now() - (parsed.cachedAt ?? 0) < IDENTITY_CACHE_TTL_J && parsed.chapterTitle) {
+            setIdentity(parsed)
+            return
+          }
+          localStorage.removeItem(IDENTITY_CACHE_KEY_J(uid))
+        }
+      } catch { /* ignore */ }
+    }
+    setIdentityLoading(true)
+    fetch(`/api/identity/synthesize?userId=${uid}`)
+      .then(r => r.ok ? r.json() : null)
+      .then((data: IdentityData | null) => {
+        if (data?.chapterTitle) {
+          const toCache = { ...data, cachedAt: Date.now() }
+          try { localStorage.setItem(IDENTITY_CACHE_KEY_J(uid), JSON.stringify(toCache)) } catch { /* ignore */ }
+          setIdentity(data)
+        }
+      })
+      .catch(() => {/* silent */})
+      .finally(() => setIdentityLoading(false))
+  }, [])
+
+  useEffect(() => {
+    if (userId) fetchIdentity(userId)
+  }, [userId, fetchIdentity])
 
   function xpScore(xp: number): number {
     const level = getLevel(xp)
@@ -1196,7 +1311,14 @@ export default function DesktopJournalPage() {
                       Import context →
                     </button>
                   </div>
-                  <PortraitView portrait={portrait} loading={loadingPortrait} onGenerate={() => void generatePortrait()} />
+                  <PortraitView
+                    portrait={portrait}
+                    identity={identity}
+                    identityLoading={identityLoading}
+                    loading={loadingPortrait}
+                    onGenerate={() => void generatePortrait()}
+                    onRefreshIdentity={() => fetchIdentity(userId, true)}
+                  />
                 </div>
               )}
 

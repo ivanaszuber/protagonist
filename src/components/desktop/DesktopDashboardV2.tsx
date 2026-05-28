@@ -11,6 +11,39 @@ import type { DesktopDashboardProps } from './DesktopDashboard'
 import { DesktopLeftSidebar, DIM_COLORS } from './DesktopLeftSidebar'
 import { isCheckinDoneToday } from './DesktopOracleModal'
 
+// ── Identity types ────────────────────────────────────────────────────────────
+
+interface TraitPill {
+  label: string
+  color: 'blue' | 'green' | 'purple' | 'orange' | 'amber'
+}
+
+interface DimensionInsight {
+  dimension: string
+  insight: string
+  color: string
+}
+
+interface IdentityData {
+  chapterTitle: string
+  essenceQuote: string
+  strengths: TraitPill[]
+  growthEdges: TraitPill[]
+  dimensionInsights: DimensionInsight[]
+  generatedAt: string
+}
+
+const PILL_COLORS: Record<string, string> = {
+  blue:   '#4DC4FF',
+  green:  '#6EE7A4',
+  purple: '#C4A8FF',
+  orange: '#FF9A5C',
+  amber:  '#FFD47A',
+}
+
+const IDENTITY_CACHE_KEY = (uid: string) => `protagonist-identity-${uid}`
+const IDENTITY_CACHE_TTL = 12 * 60 * 60 * 1000 // 12 hours
+
 // ── Extended props ────────────────────────────────────────────────────────────
 
 export interface DesktopDashboardV2Props extends DesktopDashboardProps {
@@ -132,6 +165,44 @@ export default function DesktopDashboardV2(props: DesktopDashboardV2Props) {
     const handler = () => setCheckinDone(true)
     window.addEventListener('protagonist:checkin-done', handler)
     return () => window.removeEventListener('protagonist:checkin-done', handler)
+  }, [])
+
+  // ── Identity data ────────────────────────────────────────────────────────
+  const [identity, setIdentity] = useState<IdentityData | null>(null)
+  const [identityLoading, setIdentityLoading] = useState(false)
+
+  useEffect(() => {
+    // Try to read userId from cookie
+    const userId = document.cookie.split('; ').find(r => r.startsWith('protagonist_user_id='))?.split('=')[1]
+    if (!userId) return
+
+    // Check cache first
+    try {
+      const cached = localStorage.getItem(IDENTITY_CACHE_KEY(userId))
+      if (cached) {
+        const parsed = JSON.parse(cached) as IdentityData & { cachedAt?: number }
+        const age = Date.now() - (parsed.cachedAt ?? 0)
+        if (age < IDENTITY_CACHE_TTL && parsed.chapterTitle) {
+          setIdentity(parsed)
+          return
+        }
+        localStorage.removeItem(IDENTITY_CACHE_KEY(userId))
+      }
+    } catch { /* ignore */ }
+
+    // Fetch fresh
+    setIdentityLoading(true)
+    fetch(`/api/identity/synthesize?userId=${userId}`)
+      .then(r => r.ok ? r.json() : null)
+      .then((data: IdentityData | null) => {
+        if (data?.chapterTitle) {
+          const toCache = { ...data, cachedAt: Date.now() }
+          try { localStorage.setItem(IDENTITY_CACHE_KEY(userId), JSON.stringify(toCache)) } catch { /* ignore */ }
+          setIdentity(data)
+        }
+      })
+      .catch(() => {/* silently fail */})
+      .finally(() => setIdentityLoading(false))
   }, [])
 
   const font: CSSProperties = { fontFamily: "'Space Grotesk', system-ui, sans-serif" }
@@ -359,6 +430,103 @@ export default function DesktopDashboardV2(props: DesktopDashboardV2Props) {
                 </div>
               )}
             </div>
+
+            {/* ── Identity Block ── */}
+            {(identity || identityLoading) && (
+              <div style={{ marginBottom: 22 }}>
+                {identityLoading && !identity ? (
+                  <div style={{ height: 100, borderRadius: 16, background: 'rgba(123,63,228,0.08)', border: '1px solid rgba(123,63,228,0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 12 }}>Arc is reading you…</span>
+                  </div>
+                ) : identity && (
+                  <div style={{
+                    background: 'linear-gradient(135deg, rgba(123,63,228,0.15) 0%, rgba(77,196,255,0.08) 100%)',
+                    border: '1px solid rgba(123,63,228,0.3)',
+                    borderRadius: 16,
+                    padding: '16px 18px',
+                  }}>
+                    {/* Chapter badge + title */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                      <div style={{
+                        background: 'rgba(123,63,228,0.3)', color: '#C4A8FF',
+                        fontSize: 9, fontWeight: 700, letterSpacing: '1.4px',
+                        padding: '3px 10px', borderRadius: 100,
+                        textTransform: 'uppercase' as const,
+                      }}>
+                        Current Chapter
+                      </div>
+                      <span style={{ color: 'white', fontSize: 14, fontWeight: 600 }}>{identity.chapterTitle}</span>
+                    </div>
+
+                    {/* Essence quote */}
+                    <p style={{ color: 'rgba(255,255,255,0.65)', fontSize: 12, fontStyle: 'italic', margin: '0 0 12px', lineHeight: 1.5 }}>
+                      "{identity.essenceQuote}"
+                    </p>
+
+                    {/* Strengths */}
+                    {identity.strengths?.length > 0 && (
+                      <div style={{ marginBottom: 8 }}>
+                        <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: 9, fontWeight: 600, letterSpacing: '1.2px', textTransform: 'uppercase' as const, display: 'block', marginBottom: 6 }}>Strengths</span>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                          {identity.strengths.map((pill, i) => {
+                            const c = PILL_COLORS[pill.color] ?? '#C4A8FF'
+                            return (
+                              <span key={i} style={{
+                                background: `${c}18`, color: c,
+                                border: `1px solid ${c}35`,
+                                fontSize: 11, fontWeight: 600,
+                                padding: '4px 10px', borderRadius: 100,
+                              }}>{pill.label}</span>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Growth edges */}
+                    {identity.growthEdges?.length > 0 && (
+                      <div>
+                        <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: 9, fontWeight: 600, letterSpacing: '1.2px', textTransform: 'uppercase' as const, display: 'block', marginBottom: 6 }}>Growth Edges</span>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                          {identity.growthEdges.map((pill, i) => (
+                            <span key={i} style={{
+                              background: 'rgba(255,212,122,0.12)', color: '#FFD47A',
+                              border: '1px solid rgba(255,212,122,0.28)',
+                              fontSize: 11, fontWeight: 600,
+                              padding: '4px 10px', borderRadius: 100,
+                            }}>△ {pill.label}</span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Arc attribution */}
+                    <div style={{ marginTop: 10, color: 'rgba(255,255,255,0.2)', fontSize: 9, letterSpacing: '0.6px' }}>
+                      Arc's read · <button type="button" onClick={() => {
+                        const userId = document.cookie.split('; ').find(r => r.startsWith('protagonist_user_id='))?.split('=')[1]
+                        if (userId) localStorage.removeItem(IDENTITY_CACHE_KEY(userId))
+                        setIdentity(null)
+                        setIdentityLoading(true)
+                        const uid = userId ?? ''
+                        fetch(`/api/identity/synthesize?userId=${uid}`)
+                          .then(r => r.ok ? r.json() : null)
+                          .then((data: IdentityData | null) => {
+                            if (data?.chapterTitle) {
+                              const toCache = { ...data, cachedAt: Date.now() }
+                              try { localStorage.setItem(IDENTITY_CACHE_KEY(uid), JSON.stringify(toCache)) } catch { /* ignore */ }
+                              setIdentity(data)
+                            }
+                          })
+                          .catch(() => {/* ignore */})
+                          .finally(() => setIdentityLoading(false))
+                      }} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.25)', fontSize: 9, cursor: 'pointer', padding: 0, textDecoration: 'underline', fontFamily: 'inherit' }}>
+                        refresh
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Week strip */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 18 }}>
