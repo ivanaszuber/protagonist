@@ -13,6 +13,7 @@ export interface UserProfile {
   sunSign: string          // e.g. "Aries"
   risingSign: string       // e.g. "Cancer"
   neurodivergentNotes: string // e.g. "AuDHD Spectrum"
+  archetypeInsights?: import('./archetype-insights/route').ArchetypeInsights | null
 }
 
 export async function GET(request: Request) {
@@ -48,6 +49,7 @@ export async function GET(request: Request) {
     sunSign:             data.sun_sign ?? '',
     risingSign:          data.rising_sign ?? '',
     neurodivergentNotes: data.neurodivergent_notes ?? '',
+    archetypeInsights:   (data.archetype_insights as UserProfile['archetypeInsights']) ?? null,
   }
 
   return NextResponse.json({ profile })

@@ -131,7 +131,20 @@ function SettingsContent() {
         return
       }
       // Bust sidebar cache so it re-fetches
-      try { localStorage.removeItem(`protagonist-profile-${userId}`) } catch { /* ignore */ }
+      try {
+        localStorage.removeItem(`protagonist-profile-${userId}`)
+        localStorage.removeItem(`protagonist-archetype-insights-${userId}`)
+      } catch { /* ignore */ }
+
+      // Fire archetype insights regeneration in background (enneagram/astro/neurodivergent changed)
+      if (enneagram || sunSign || neurodivergentNotes) {
+        void fetch('/api/user-profile/archetype-insights', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId }),
+        }).catch(() => {/* silent — background op */})
+      }
+
       setProfileSaved(true)
       setTimeout(() => setProfileSaved(false), 2500)
     } catch (e) {
