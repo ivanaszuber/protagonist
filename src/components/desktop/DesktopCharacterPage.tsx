@@ -80,6 +80,9 @@ const PAGE_CSS = `
   @keyframes dcp-spin     { to{transform:rotate(360deg)} }
   @keyframes dcp-pulse-dot{ 0%,100%{transform:scale(1);opacity:1} 50%{transform:scale(1.15);opacity:0.75} }
   @keyframes dcp-pulse-btn{ 0%,100%{box-shadow:0 0 0 0 rgba(255,122,101,0.4)} 50%{box-shadow:0 0 0 8px rgba(255,122,101,0)} }
+  @keyframes dcp-orb-a    { from{transform:rotate(0deg) translateX(30px) rotate(0deg)} to{transform:rotate(360deg) translateX(30px) rotate(-360deg)} }
+  @keyframes dcp-orb-b    { from{transform:rotate(130deg) translateX(30px) rotate(-130deg)} to{transform:rotate(490deg) translateX(30px) rotate(-490deg)} }
+  @keyframes dcp-orb-c    { from{transform:rotate(250deg) translateX(30px) rotate(-250deg)} to{transform:rotate(610deg) translateX(30px) rotate(-610deg)} }
   ::-webkit-scrollbar { display: none; }
 `
 
@@ -542,8 +545,9 @@ export function DesktopCharacterPage({ dimension }: DesktopCharacterPageProps) {
           {/* Robot */}
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}>
             <div style={{ position: 'relative', width: 80, height: 80, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <div style={{ position: 'absolute', top: '50%', left: '50%', margin: -3, width: 6, height: 6, borderRadius: '50%', background: accentColor, animation: 'dcp-float 3.5s linear infinite' }} />
-              <div style={{ position: 'absolute', top: '50%', left: '50%', margin: -2.5, width: 5, height: 5, borderRadius: '50%', background: '#00D4B8', opacity: 0.7, animation: 'dcp-float 4s linear infinite' }} />
+              <div style={{ position: 'absolute', top: '50%', left: '50%', margin: -3, width: 6, height: 6, borderRadius: '50%', background: accentColor, animation: 'dcp-orb-a 3.5s linear infinite' }} />
+              <div style={{ position: 'absolute', top: '50%', left: '50%', margin: -2.5, width: 5, height: 5, borderRadius: '50%', background: '#00D4B8', opacity: 0.7, animation: 'dcp-orb-b 3.5s linear infinite' }} />
+              <div style={{ position: 'absolute', top: '50%', left: '50%', margin: -2, width: 4, height: 4, borderRadius: '50%', background: '#6EE7A4', animation: 'dcp-orb-c 5s linear infinite' }} />
               <svg width="52" height="60" viewBox="0 0 58 66" style={{ animation: 'dcp-float 3s ease-in-out infinite', position: 'relative', zIndex: 1 }}>
                 <polygon points="16,16 22,6 29,13 36,6 42,16" fill="#FFB347"/>
                 <rect x="14" y="14" width="30" height="3" rx="1.5" fill="#FFB347" opacity="0.7"/>

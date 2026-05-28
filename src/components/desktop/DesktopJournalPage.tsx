@@ -122,6 +122,10 @@ const PAGE_CSS = `
   @keyframes jrn-fade-in  { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
   @keyframes jrn-shimmer  { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
   @keyframes jrn-pulse    { 0%,100%{transform:scale(1);opacity:0.6} 50%{transform:scale(1.06);opacity:1} }
+  @keyframes jrn-float    { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
+  @keyframes jrn-orb-a    { from{transform:rotate(0deg) translateX(30px) rotate(0deg)} to{transform:rotate(360deg) translateX(30px) rotate(-360deg)} }
+  @keyframes jrn-orb-b    { from{transform:rotate(130deg) translateX(30px) rotate(-130deg)} to{transform:rotate(490deg) translateX(30px) rotate(-490deg)} }
+  @keyframes jrn-orb-c    { from{transform:rotate(250deg) translateX(30px) rotate(-250deg)} to{transform:rotate(610deg) translateX(30px) rotate(-610deg)} }
 
   .jrn-entry { animation: jrn-fade-in 0.35s ease both; }
   .jrn-tab-btn {
@@ -1621,8 +1625,9 @@ export default function DesktopJournalPage() {
             {/* Robot */}
             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}>
               <div style={{ position: 'relative', width: 80, height: 80, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <div style={{ position: 'absolute', top: '50%', left: '50%', margin: -3, width: 6, height: 6, borderRadius: '50%', background: '#FFB347', animation: 'jrn-float 3.5s ease-in-out infinite' }} />
-                <div style={{ position: 'absolute', top: '50%', left: '50%', margin: -2.5, width: 5, height: 5, borderRadius: '50%', background: '#00D4B8', animation: 'jrn-float 4s ease-in-out infinite', opacity: 0.7 }} />
+                <div style={{ position: 'absolute', top: '50%', left: '50%', margin: -3, width: 6, height: 6, borderRadius: '50%', background: '#FFB347', animation: 'jrn-orb-a 3.5s linear infinite' }} />
+                <div style={{ position: 'absolute', top: '50%', left: '50%', margin: -2.5, width: 5, height: 5, borderRadius: '50%', background: '#00D4B8', animation: 'jrn-orb-b 3.5s linear infinite', opacity: 0.7 }} />
+                <div style={{ position: 'absolute', top: '50%', left: '50%', margin: -2, width: 4, height: 4, borderRadius: '50%', background: '#6EE7A4', animation: 'jrn-orb-c 5s linear infinite' }} />
                 <svg width="52" height="60" viewBox="0 0 58 66" style={{ animation: 'jrn-float 3s ease-in-out infinite', position: 'relative', zIndex: 1 }}>
                   <polygon points="16,16 22,6 29,13 36,6 42,16" fill="#FFB347"/>
                   <rect x="14" y="14" width="30" height="3" rx="1.5" fill="#FFB347" opacity="0.7"/>

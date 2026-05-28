@@ -51,7 +51,6 @@ export default function DesktopTopNav({
 
   const links: { label: string; page: NavPage; href: string }[] = [
     { label: 'Dashboard', page: 'dashboard', href: '/dashboard' },
-    { label: 'Life Areas', page: 'character', href: '/characters' },
     { label: 'Journal', page: 'journal', href: '/journal' },
   ]
 
