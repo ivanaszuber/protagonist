@@ -362,6 +362,39 @@ function ChatView({ messages, input, setInput, onSubmit, loading, inputRef, chat
   onClose: () => void
 }) {
   const QUICK = ['Plan my day', 'Review my week', 'Add a task', 'Log something I did', 'What should I focus on?']
+  const [isRecording, setIsRecording] = React.useState(false)
+  const recognitionRef = React.useRef<SpeechRecognition | null>(null)
+
+  function toggleVoice() {
+    if (isRecording) {
+      recognitionRef.current?.stop()
+      recognitionRef.current = null
+      setIsRecording(false)
+      return
+    }
+    const SR = (window as typeof window & { webkitSpeechRecognition?: typeof SpeechRecognition }).SpeechRecognition
+      || (window as typeof window & { webkitSpeechRecognition?: typeof SpeechRecognition }).webkitSpeechRecognition
+    if (!SR) return
+    const rec = new SR()
+    rec.continuous = true
+    rec.interimResults = true
+    rec.lang = 'en-GB'
+    recognitionRef.current = rec
+    setIsRecording(true)
+    rec.onresult = (e: SpeechRecognitionEvent) => {
+      let t = ''
+      for (let i = 0; i < e.results.length; i++) t += e.results[i][0].transcript
+      setInput(t)
+    }
+    rec.onerror = () => { setIsRecording(false) }
+    rec.onend = () => {
+      setIsRecording(s => {
+        if (s) { try { rec.start() } catch { return false } }
+        return s
+      })
+    }
+    rec.start()
+  }
 
   return (
     <div style={{ display: 'flex', flex: 1, minHeight: 0, height: 520 }}>
@@ -440,17 +473,48 @@ function ChatView({ messages, input, setInput, onSubmit, loading, inputRef, chat
         </div>
 
         {/* Input */}
-        <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', padding: '12px 16px', display: 'flex', gap: 10, alignItems: 'flex-end' }}>
+        <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', padding: '12px 16px', display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+          {/* Mic button */}
+          <button
+            type="button"
+            onClick={toggleVoice}
+            aria-label={isRecording ? 'Stop recording' : 'Start voice input'}
+            style={{
+              width: 40, height: 40, borderRadius: 10, flexShrink: 0,
+              background: isRecording ? 'rgba(255,107,157,0.2)' : 'rgba(255,255,255,0.06)',
+              border: isRecording ? '1.5px solid rgba(255,107,157,0.6)' : '1px solid rgba(255,255,255,0.1)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer', transition: 'all 0.15s',
+              animation: isRecording ? 'dm-spin 2s linear infinite' : 'none',
+            }}
+          >
+            {isRecording ? (
+              /* Stop icon */
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="rgba(255,107,157,0.9)">
+                <rect x="4" y="4" width="16" height="16" rx="2"/>
+              </svg>
+            ) : (
+              /* Mic icon */
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.55)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                <line x1="12" y1="19" x2="12" y2="23"/>
+                <line x1="8" y1="23" x2="16" y2="23"/>
+              </svg>
+            )}
+          </button>
+
           <textarea
             ref={inputRef}
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void onSubmit() } }}
-            placeholder="Ask Arc anything…"
+            placeholder={isRecording ? 'Listening…' : 'Ask Arc anything…'}
             rows={1}
-            style={{ flex: 1, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '10px 14px', color: 'white', fontSize: 13, fontFamily: 'inherit', outline: 'none', resize: 'none', lineHeight: 1.5 }}
+            style={{ flex: 1, background: isRecording ? 'rgba(255,107,157,0.06)' : 'rgba(255,255,255,0.06)', border: `1px solid ${isRecording ? 'rgba(255,107,157,0.3)' : 'rgba(255,255,255,0.1)'}`, borderRadius: 10, padding: '10px 14px', color: 'white', fontSize: 13, fontFamily: 'inherit', outline: 'none', resize: 'none', lineHeight: 1.5, transition: 'all 0.15s' }}
           />
           <button
+            type="button"
             onClick={() => void onSubmit()}
             disabled={!input.trim() || loading}
             style={{ background: input.trim() && !loading ? '#FF7A65' : 'rgba(255,255,255,0.08)', border: 'none', borderRadius: 10, width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: input.trim() && !loading ? 'pointer' : 'default', flexShrink: 0, transition: 'background 0.15s' }}
