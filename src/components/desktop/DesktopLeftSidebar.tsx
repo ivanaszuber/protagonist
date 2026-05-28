@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import type { CSSProperties } from 'react'
 import { ALL_DIMENSIONS, type Dimension } from '@/lib/character'
 import { DIMENSION_TO_SLUG } from '@/lib/tierName'
+import { openOracle } from '@/lib/oracle-events'
 import type { UserProfile } from '@/app/api/user-profile/route'
 import type { IdentityData } from '@/app/api/identity/synthesize/route'
 
@@ -118,6 +119,57 @@ export function RobotChar({ dim, color }: { dim: Dimension; color: string }) {
   )
 }
 
+// ── Oracle Button ─────────────────────────────────────────────────────────────
+
+function OracleButton({ font }: { font: React.CSSProperties }) {
+  const [hovered, setHovered] = React.useState(false)
+  return (
+    <button
+      type="button"
+      onClick={() => openOracle()}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        width: '100%',
+        display: 'flex', alignItems: 'center', gap: 10,
+        background: hovered ? 'rgba(123,63,228,0.28)' : 'rgba(123,63,228,0.15)',
+        border: hovered ? '1px solid rgba(123,63,228,0.55)' : '1px solid rgba(123,63,228,0.28)',
+        borderRadius: 10,
+        padding: '10px 13px',
+        cursor: 'pointer',
+        marginTop: 12, marginBottom: 2,
+        transition: 'all 0.15s',
+        ...font,
+      }}
+    >
+      {/* Icon */}
+      <div style={{
+        width: 30, height: 30, borderRadius: '50%',
+        background: hovered ? 'rgba(123,63,228,0.45)' : 'rgba(123,63,228,0.25)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        flexShrink: 0, transition: 'background 0.15s',
+      }}>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="#C4A8FF">
+          <path d="M12 2l2.4 7.6H22l-6.4 4.6 2.4 7.6L12 17.2l-6 4.6 2.4-7.6L2 9.6h7.6L12 2z"/>
+        </svg>
+      </div>
+      {/* Text */}
+      <div style={{ flex: 1, textAlign: 'left' }}>
+        <div style={{ color: hovered ? '#D4BCFF' : '#C4A8FF', fontSize: 13, fontWeight: 700, lineHeight: 1.2 }}>
+          Oracle
+        </div>
+        <div style={{ color: 'rgba(196,168,255,0.45)', fontSize: 10, lineHeight: 1.3 }}>
+          Your AI companion
+        </div>
+      </div>
+      {/* Chevron */}
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="rgba(196,168,255,0.4)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M9 18l6-6-6-6"/>
+      </svg>
+    </button>
+  )
+}
+
 // ── Props ─────────────────────────────────────────────────────────────────────
 
 interface DesktopLeftSidebarProps {
@@ -125,6 +177,10 @@ interface DesktopLeftSidebarProps {
   activeDimension?: Dimension
   showBackButton?: boolean
   userInitial?: string
+  /** Replaces the Life Areas scrollable section with page-specific content */
+  bottomContent?: React.ReactNode
+  /** Label shown above the scrollable section (default: "Life Areas") */
+  bottomLabel?: string
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -133,6 +189,8 @@ export function DesktopLeftSidebar({
   scores,
   activeDimension,
   showBackButton = false,
+  bottomContent,
+  bottomLabel,
 }: DesktopLeftSidebarProps) {
   const router = useRouter()
 
@@ -418,11 +476,14 @@ export function DesktopLeftSidebar({
             </>
           )}
 
+          {/* ── Oracle button — always persistent ── */}
+          <OracleButton font={font} />
+
           {divider}
-          <span style={metaLabel}>Life Areas</span>
+          <span style={metaLabel}>{bottomLabel ?? 'Life Areas'}</span>
         </div>
 
-        {/* ── Life Areas — independently scrollable ── */}
+        {/* ── Scrollable bottom section ── */}
         <div style={{
           flex: 1,
           overflowY: 'auto', overflowX: 'hidden',
@@ -431,7 +492,7 @@ export function DesktopLeftSidebar({
           scrollbarWidth: 'thin',
           scrollbarColor: 'rgba(123,63,228,0.25) transparent',
         }}>
-          {scored.map(({ dim, score }, i) => {
+          {bottomContent ?? scored.map(({ dim, score }, i) => {
             const color    = DIM_COLORS[dim]
             const isLast   = i === scored.length - 1
             const isTop    = score === maxScore && score > 0

@@ -1371,6 +1371,39 @@ export default function DesktopJournalPage() {
     { id: 'growth', icon: 'growth', label: 'Growth Map' },
   ]
 
+  // Journal-specific sidebar nav (replaces Life Areas in the sidebar)
+  const journalSidebarNav = (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+      {tabs.map(tab => {
+        const isActive = activeTab === tab.id
+        return (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => setActiveTab(tab.id)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 9,
+              padding: '8px 10px',
+              marginLeft: -10, marginRight: -6,
+              borderRadius: 8,
+              background: isActive ? 'rgba(196,168,255,0.1)' : 'transparent',
+              border: isActive ? '1px solid rgba(196,168,255,0.18)' : '1px solid transparent',
+              color: isActive ? '#C4A8FF' : 'rgba(255,255,255,0.42)',
+              fontSize: 12, fontWeight: isActive ? 600 : 500,
+              cursor: 'pointer',
+              fontFamily: "'Space Grotesk', system-ui, sans-serif",
+              textAlign: 'left',
+              transition: 'all 0.12s',
+            }}
+          >
+            <Icon name={tab.icon} size={13} color={isActive ? '#C4A8FF' : 'rgba(255,255,255,0.35)'} />
+            {tab.label}
+          </button>
+        )
+      })}
+    </div>
+  )
+
   return (
     <div style={{
       display: 'flex', flexDirection: 'column',
@@ -1397,7 +1430,11 @@ export default function DesktopJournalPage() {
       {/* Body */}
       <div style={{ display: 'flex', flex: 1, minHeight: 0, overflow: 'hidden' }}>
         {/* Left sidebar */}
-        <DesktopLeftSidebar scores={sidebarScores} />
+        <DesktopLeftSidebar
+          scores={sidebarScores}
+          bottomContent={journalSidebarNav}
+          bottomLabel="Journal"
+        />
 
         {/* Main content */}
         <div style={{
