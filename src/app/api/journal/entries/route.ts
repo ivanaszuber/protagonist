@@ -19,7 +19,7 @@ export async function GET(request: Request) {
   // Fetch voice_notes
   let notesQuery = supabase
     .from('voice_notes')
-    .select('id, content, oracle_reply, mood_signal, focus_list, created_at')
+    .select('id, content, oracle_reply, mood_signal, focus_list, brief, created_at')
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1)
@@ -59,7 +59,7 @@ export async function GET(request: Request) {
       oracleReply: n.oracle_reply as string | null,
       moodSignal: n.mood_signal as string | null,
       dimensions,
-      brief: null,
+      brief: (n.brief as string | null) ?? null,
       createdAt: n.created_at as string,
     }
   })
