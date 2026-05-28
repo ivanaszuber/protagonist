@@ -300,6 +300,28 @@ function getScoreColor(score: number): string {
   return '#FF6B9D'
 }
 
+/**
+ * Voice-to-text often misses sentence breaks, producing "likeThat" or "nowAnd".
+ * Insert ". " at camelCase boundaries so the text reads as sentences.
+ */
+function fixVoiceText(text: string): string {
+  return text
+    .replace(/([a-z])([A-Z])/g, '$1. $2')
+    .replace(/  +/g, ' ')
+    .trim()
+}
+
+/** Split a paragraph into 2-sentence chunks for readability */
+function toParagraphs(text: string): string[] {
+  const sentences = text.match(/[^.!?]+[.!?]+/g) ?? [text]
+  const paras: string[] = []
+  for (let i = 0; i < sentences.length; i += 2) {
+    const chunk = [sentences[i], sentences[i + 1]].filter(Boolean).join(' ').trim()
+    if (chunk) paras.push(chunk)
+  }
+  return paras.length ? paras : [text]
+}
+
 // ── Stream Entry Card ─────────────────────────────────────────────────────────
 
 function EntryCard({ entry }: { entry: JournalEntry }) {
@@ -314,9 +336,16 @@ function EntryCard({ entry }: { entry: JournalEntry }) {
   const primaryDim = entry.dimensions[0] as Dimension | undefined
   const dimColor = primaryDim ? DIM_COLORS[primaryDim] : '#C4A8FF'
 
-  const previewText = entry.type === 'achievement'
-    ? entry.content
-    : entry.brief ?? (entry.content.length > 130 ? entry.content.slice(0, 130) + '…' : entry.content)
+  // Clean voice dictation artefacts
+  const cleanContent = fixVoiceText(entry.content)
+
+  // Collapsed preview: prefer the server-generated brief, fall back to first ~110 chars of cleaned text
+  const summary = entry.brief
+    ? entry.brief
+    : cleanContent.length > 110 ? cleanContent.slice(0, 110).trimEnd() + '…' : cleanContent
+
+  // Oracle reply split into 2-sentence paragraphs
+  const oracleParas = entry.oracleReply ? toParagraphs(entry.oracleReply) : []
 
   return (
     <div
@@ -324,7 +353,7 @@ function EntryCard({ entry }: { entry: JournalEntry }) {
       style={{ background: 'rgba(255,255,255,0.025)', marginBottom: 10, cursor: 'pointer' }}
       onClick={() => setExpanded(e => !e)}
     >
-      {/* Header row */}
+      {/* ── Header row ── */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 10, flexWrap: 'wrap' }}>
         <span style={{
           ...font, fontSize: 11, fontWeight: 700,
@@ -356,7 +385,7 @@ function EntryCard({ entry }: { entry: JournalEntry }) {
         </div>
       </div>
 
-      {/* Content */}
+      {/* ── Content ── */}
       {entry.type === 'achievement' ? (
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <Icon name="sword" size={18} color="#6EE7A4" />
@@ -373,32 +402,59 @@ function EntryCard({ entry }: { entry: JournalEntry }) {
         </div>
       ) : (
         <>
-          <p style={{
-            ...font, fontSize: 13.5, color: 'rgba(255,255,255,0.75)',
-            lineHeight: 1.65,
-          }}>
-            {expanded && !entry.brief ? entry.content : previewText}
+          {/* Summary — always visible, human-readable one-liner */}
+          <p style={{ ...font, fontSize: 13.5, color: 'rgba(255,255,255,0.82)', lineHeight: 1.6, fontWeight: 500 }}>
+            {summary}
           </p>
 
-          {expanded && entry.oracleReply && (
-            <div style={{
-              marginTop: 12,
-              borderLeft: `2px solid ${dimColor}`,
-              paddingLeft: 12,
-            }}>
-              <p style={{ ...font, fontSize: 10, color: dimColor, fontWeight: 700, marginBottom: 4, letterSpacing: '1.2px' }}>
-                ORACLE'S INSIGHT
-              </p>
-              <p style={{ ...font, fontSize: 13, color: 'rgba(255,255,255,0.6)', lineHeight: 1.65 }}>
-                {entry.oracleReply}
-              </p>
-            </div>
+          {/* Collapsed hint */}
+          {!expanded && entry.oracleReply && (
+            <p style={{ ...font, fontSize: 11, color: 'rgba(255,255,255,0.25)', marginTop: 7 }}>
+              tap to see full conversation →
+            </p>
           )}
 
-          {!expanded && entry.oracleReply && (
-            <p style={{ ...font, fontSize: 11, color: 'rgba(255,255,255,0.28)', marginTop: 6 }}>
-              tap to see Oracle's insight
-            </p>
+          {/* ── Expanded: full conversation view ── */}
+          {expanded && (
+            <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+
+              {/* You said */}
+              <div style={{
+                background: 'rgba(255,255,255,0.04)',
+                border: '1px solid rgba(255,255,255,0.08)',
+                borderRadius: 10, padding: '10px 14px',
+              }}>
+                <p style={{ ...font, fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.3)', letterSpacing: '1.3px', marginBottom: 7, textTransform: 'uppercase' as const }}>
+                  You said
+                </p>
+                <p style={{ ...font, fontSize: 13, color: 'rgba(255,255,255,0.72)', lineHeight: 1.7 }}>
+                  {cleanContent}
+                </p>
+              </div>
+
+              {/* Oracle reply */}
+              {oracleParas.length > 0 && (
+                <div style={{
+                  background: `${dimColor}0A`,
+                  border: `1px solid ${dimColor}20`,
+                  borderRadius: 10, padding: '10px 14px',
+                }}>
+                  <p style={{ ...font, fontSize: 9, fontWeight: 700, color: dimColor, letterSpacing: '1.3px', marginBottom: 10, textTransform: 'uppercase' as const }}>
+                    Oracle
+                  </p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+                    {oracleParas.map((para, i) => (
+                      <React.Fragment key={i}>
+                        {i > 0 && <div style={{ height: 1, background: `${dimColor}12` }} />}
+                        <p style={{ ...font, fontSize: 13, color: 'rgba(255,255,255,0.72)', lineHeight: 1.7 }}>
+                          {para}
+                        </p>
+                      </React.Fragment>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
           )}
         </>
       )}
