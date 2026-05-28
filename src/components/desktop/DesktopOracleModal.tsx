@@ -231,12 +231,7 @@ export function DesktopOracleModal() {
     return () => window.removeEventListener('keydown', onKey)
   }, [close])
 
-  // ── Auto-scroll chat ────────────────────────────────────────────────────────
-  useEffect(() => {
-    setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
-  }, [chatMessages])
-
-  // Scroll to bottom whenever the chat view opens (catches existing history)
+  // Scroll to bottom when the chat view opens (catches existing history)
   useEffect(() => {
     if (mode === 'chat') {
       setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'instant' }), 80)
@@ -614,6 +609,24 @@ function ChatView({ messages, input, setInput, onSubmit, loading, inputRef, chat
   const QUICK = ['Plan my day', 'Review my week', 'Add a task', 'Log something I did', 'What should I focus on?']
   const [isRecording, setIsRecording] = React.useState(false)
   const recognitionRef = React.useRef<SpeechRecognition | null>(null)
+  const scrollContainerRef = React.useRef<HTMLDivElement>(null)
+  const isNearBottomRef = React.useRef(true)
+
+  // Track whether user has scrolled away from the bottom
+  const handleScrollContainer = React.useCallback(() => {
+    const el = scrollContainerRef.current
+    if (!el) return
+    isNearBottomRef.current = (el.scrollHeight - el.scrollTop - el.clientHeight) < 80
+  }, [])
+
+  // Sticky-scroll: instant snap when near bottom (no smooth = no bouncing during streaming)
+  React.useEffect(() => {
+    const el = scrollContainerRef.current
+    if (!el) return
+    if (isNearBottomRef.current) {
+      el.scrollTop = el.scrollHeight
+    }
+  }, [messages])
 
   // Auto-grow textarea
   React.useEffect(() => {
@@ -719,7 +732,7 @@ function ChatView({ messages, input, setInput, onSubmit, loading, inputRef, chat
         </div>
 
         {/* Messages */}
-        <div style={{ flex: 1, padding: '18px 20px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12, scrollbarWidth: 'none' }}>
+        <div ref={scrollContainerRef} onScroll={handleScrollContainer} style={{ flex: 1, padding: '18px 20px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12, scrollbarWidth: 'none' }}>
           {messages.length === 0 && (
             <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: 12, fontStyle: 'italic', textAlign: 'center', marginTop: 40 }}>
               Ask Oracle anything — tasks, calendar, reflections, or just a chat.
@@ -736,7 +749,7 @@ function ChatView({ messages, input, setInput, onSubmit, loading, inputRef, chat
               />
             </div>
           ))}
-          {loading && (
+          {loading && messages[messages.length - 1]?.role !== 'oracle' && (
             <div style={{ display: 'flex', gap: 10, alignSelf: 'flex-start' }}>
               <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(255,122,101,0.15)', border: '1px solid rgba(255,122,101,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <OracleRobot size={16} />
