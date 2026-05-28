@@ -139,6 +139,16 @@ export interface ArcInput {
   userId: string
   ouraData?: { sleepScore?: number; readiness?: number; hrv?: number }
   checkInData?: { energyLevel: number; mood: string }
+  /** Plain-text file content (HTML, TXT, MD, CSV, etc.) */
+  fileContent?: string
+  /** Original filename, used in context block */
+  fileName?: string
+  /** Base64-encoded PDF (native Claude document support) */
+  fileBase64?: string
+  fileMimeType?: string
+  /** Base64-encoded image — processed via Haiku vision then stored as memory */
+  imageBase64?: string
+  imageMimeType?: string
 }
 
 export interface ArcOutput {
@@ -315,8 +325,45 @@ function buildPersonContext(profile: UserProfileRow): string {
   return lines.join('\n')
 }
 
+/**
+ * Describe a photo using Haiku vision and store it as an arc memory.
+ * Returns the description string so Arc can reference it in its response.
+ */
+async function processPhotoAndStore(
+  imageBase64: string,
+  imageMimeType: string,
+  userId: string
+): Promise<string> {
+  const response = await anthropic.messages.create({
+    model: SPECIALIST_MODEL,
+    max_tokens: 300,
+    system: `You are a visual memory assistant for a life coaching app. The user has shared a personal photo.
+Describe what you see in 2-4 sentences: the scene, mood, context, time of day if apparent, and any emotional resonance.
+Then on a new line starting with MEMORY:, write a single concise memory sentence in first-person Arc voice (e.g. "Shared a photo of morning coffee in what looks like a café abroad — seems like a slow, content moment").
+Focus on the human experience, not technical image details.`,
+    messages: [{
+      role: 'user',
+      content: [{
+        type: 'image',
+        source: { type: 'base64', media_type: imageMimeType as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp', data: imageBase64 },
+      }],
+    }],
+  })
+  const text = response.content[0].type === 'text' ? response.content[0].text : ''
+  // Extract the MEMORY: line for storage
+  const memoryMatch = text.match(/MEMORY:\s*(.+)/i)
+  const memoryLine = memoryMatch?.[1]?.trim()
+  if (memoryLine) {
+    // Store as arc memory — fire-and-forget, don't block
+    void saveDimensionMemory('arc', memoryLine, 'photo', 7, userId)
+  }
+  // Return just the description part (before MEMORY:)
+  const memoryIdx = text.search(/MEMORY:/i)
+  return (memoryIdx >= 0 ? text.slice(0, memoryIdx) : text).trim()
+}
+
 export async function consultArc(input: ArcInput): Promise<ArcOutput> {
-  const { userMessage, userId, checkInData } = input
+  const { userMessage, userId, checkInData, fileContent, fileName, fileBase64, fileMimeType, imageBase64, imageMimeType } = input
 
   // Load profile, arc relationship memories, and all external context in parallel
   const [loadedOura, { calendarContext, freeBlocks }, profileResult, arcMemories] = await Promise.all([
@@ -395,6 +442,27 @@ export async function consultArc(input: ArcInput): Promise<ArcOutput> {
       ? `EMOTIONAL & RELATIONAL MEMORY (what you know about how this person feels, relates, and patterns):\n${arcMemories.join('\n')}`
       : ''
 
+  // ── Process image attachment (vision pre-processing) ──────────────────────
+  let photoContextBlock = ''
+  if (imageBase64 && imageMimeType) {
+    try {
+      const description = await processPhotoAndStore(imageBase64, imageMimeType, userId)
+      photoContextBlock = description
+        ? `PHOTO SHARED BY USER:\n${description}`
+        : ''
+    } catch {
+      // Continue without photo context if vision fails
+    }
+  }
+
+  // ── Build file context block ───────────────────────────────────────────────
+  let fileContextBlock = ''
+  if (fileContent && fileName) {
+    // Plain text file — truncate if too large (keep first 8000 chars)
+    const truncated = fileContent.length > 8000 ? fileContent.slice(0, 8000) + '\n\n[... file truncated ...]' : fileContent
+    fileContextBlock = `FILE SHARED BY USER (${fileName}):\n${truncated}`
+  }
+
   const contextSection = [
     personContextBlock ? personContextBlock : '',
     arcMemoryBlock,
@@ -404,22 +472,39 @@ export async function consultArc(input: ArcInput): Promise<ArcOutput> {
     calendarContext ? `SCHEDULE FOR TODAY:\n${calendarContext}` : '',
     freeBlocks.length > 0 ? `FREE BLOCKS FOR DEEP WORK:\n${freeBlocks.join('\n')}` : '',
     gmailContext ? `INBOX STATUS:\n${gmailContext}` : '',
+    photoContextBlock,
+    fileContextBlock,
   ]
     .filter(Boolean)
     .join('\n\n')
 
   const contextSectionBlock = contextSection ? `\n\n${contextSection}` : ''
 
+  // Build the user message line — include filename hint if file is attached
+  const fileHint = fileName && (fileContent || fileBase64 || imageBase64)
+    ? ` [Attached: ${fileName}]`
+    : ''
+  const effectiveUserMessage = userMessage || (fileName ? `I've shared a file: ${fileName}` : '')
+
+  // For PDF files, build a native document message
+  const arcUserContent: Parameters<typeof anthropic.messages.create>[0]['messages'][0]['content'] | null =
+    fileBase64 && fileMimeType === 'application/pdf'
+      ? [
+          { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: fileBase64 } } as { type: 'document'; source: { type: 'base64'; media_type: 'application/pdf'; data: string } },
+          { type: 'text', text: effectiveUserMessage || 'Please review this document and help me understand how to use it.' },
+        ]
+      : null
+
   const synthesisPrompt =
     activeResults.length > 0
-      ? `User said: "${userMessage}"${checkInContext}
+      ? `User said: "${effectiveUserMessage}"${fileHint}${checkInContext}
 
 Specialist insights:
 ${specialistContext}
 
 Respond to the user as Arc. One unified response. Draw on what's relevant from the specialists.
 Do not address every dimension — just what actually matters right now.`
-      : `User said: "${userMessage}"${checkInContext}
+      : `User said: "${effectiveUserMessage}"${fileHint}${checkInContext}
 
 No specialist insights were available. Respond as Arc with warmth and specificity based on what they said.`
 
@@ -427,7 +512,7 @@ No specialist insights were available. Respond as Arc with warmth and specificit
     model: ARC_MODEL,
     max_tokens: 700,
     system: `${ARC_SYNTHESIS_PROMPT}${contextSectionBlock}`,
-    messages: [{ role: 'user', content: synthesisPrompt }],
+    messages: [{ role: 'user', content: arcUserContent !== null ? arcUserContent : synthesisPrompt }],
   })
 
   const arcResponse =

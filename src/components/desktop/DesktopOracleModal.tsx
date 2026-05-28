@@ -136,6 +136,14 @@ const metaLabel: CSSProperties = { color: 'rgba(255,255,255,0.5)', fontSize: 9, 
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
+interface Attachment {
+  type: 'file' | 'image'
+  name: string
+  /** For text files: raw UTF-8 text. For images/PDFs: base64-encoded data. */
+  content: string
+  mimeType?: string
+}
+
 export function DesktopOracleModal() {
   const userId = getUserId()
   const [mode, setMode] = useState<ModalMode>('closed')
@@ -144,8 +152,10 @@ export function DesktopOracleModal() {
   const [chatInput, setChatInput] = useState('')
   const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'oracle'; text: string }[]>([])
   const [chatLoading, setChatLoading] = useState(false)
+  const [attachment, setAttachment] = useState<Attachment | null>(null)
   const chatEndRef = useRef<HTMLDivElement>(null)
   const chatInputRef = useRef<HTMLTextAreaElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Check-in state
   const [morningContext, setMorningContext] = useState<MorningContext | null>(null)
@@ -159,6 +169,7 @@ export function DesktopOracleModal() {
     setMode('closed')
     setChatInput('')
     setCheckinInput('')
+    setAttachment(null)
     window.dispatchEvent(new CustomEvent('protagonist:oracle-closed'))
   }, [])
 
@@ -218,14 +229,65 @@ export function DesktopOracleModal() {
     setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
   }, [chatMessages])
 
+  // ── Handle file attach ──────────────────────────────────────────────────────
+  const handleFileAttach = useCallback(async (file: File) => {
+    const isImage = file.type.startsWith('image/')
+    const isPdf   = file.type === 'application/pdf'
+
+    if (isImage || isPdf) {
+      // Read as base64
+      const reader = new FileReader()
+      reader.onload = () => {
+        const dataUrl = reader.result as string
+        // dataUrl is "data:<mimeType>;base64,<data>" — strip the prefix
+        const base64 = dataUrl.split(',')[1] ?? dataUrl
+        setAttachment({ type: isImage ? 'image' : 'file', name: file.name, content: base64, mimeType: file.type })
+      }
+      reader.readAsDataURL(file)
+    } else {
+      // Read as text (HTML, MD, TXT, etc.)
+      const text = await file.text()
+      setAttachment({ type: 'file', name: file.name, content: text, mimeType: file.type })
+    }
+  }, [])
+
   // ── Chat submit ─────────────────────────────────────────────────────────────
   const handleChatSubmit = useCallback(async () => {
     const text = chatInput.trim()
-    if (!text || chatLoading) return
+    const hasAttachment = !!attachment
+    if ((!text && !hasAttachment) || chatLoading) return
+    const displayText = text || (attachment ? `📎 ${attachment.name}` : '')
     setChatInput('')
-    setChatMessages(prev => [...prev, { role: 'user', text }])
+    const currentAttachment = attachment
+    setAttachment(null)
+    setChatMessages(prev => [...prev, { role: 'user', text: displayText }])
     setChatLoading(true)
     try {
+      // If there's an attachment, skip classify and go straight to Arc
+      if (currentAttachment) {
+        const body: Record<string, unknown> = { message: text || `I've shared a file: ${currentAttachment.name}`, userId }
+        if (currentAttachment.type === 'image') {
+          body.imageBase64 = currentAttachment.content
+          body.imageMimeType = currentAttachment.mimeType ?? 'image/jpeg'
+          body.fileName = currentAttachment.name
+        } else {
+          const isPdf = currentAttachment.mimeType === 'application/pdf'
+          if (isPdf) {
+            body.fileBase64 = currentAttachment.content
+            body.fileMimeType = 'application/pdf'
+            body.fileName = currentAttachment.name
+          } else {
+            body.fileContent = currentAttachment.content
+            body.fileName = currentAttachment.name
+          }
+        }
+        const arcRes = await fetch('/api/arc', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+        const arcData = await arcRes.json()
+        const reply = (arcData.response as string) ?? "I'm here with you."
+        setChatMessages(prev => [...prev, { role: 'oracle', text: reply }])
+        return  // finally will still run
+      }
+
       // Classify intent first
       const classRes = await fetch('/api/oracle/classify', {
         method: 'POST',
@@ -330,7 +392,7 @@ export function DesktopOracleModal() {
     } finally {
       setChatLoading(false)
     }
-  }, [chatInput, chatLoading, userId])
+  }, [chatInput, chatLoading, userId, attachment])
 
   // ── Check-in submit ─────────────────────────────────────────────────────────
   const handleCheckinSubmit = useCallback(async () => {
@@ -398,6 +460,10 @@ export function DesktopOracleModal() {
           inputRef={chatInputRef}
           chatEndRef={chatEndRef}
           onClose={close}
+          attachment={attachment}
+          onAttach={handleFileAttach}
+          onClearAttach={() => setAttachment(null)}
+          fileInputRef={fileInputRef}
         />}
         {(mode === 'checkin-loading' || mode === 'checkin-input' || mode === 'checkin-thinking') && <CheckinInputView
           mode={mode}
@@ -424,7 +490,7 @@ export function DesktopOracleModal() {
 
 // ── Chat view ─────────────────────────────────────────────────────────────────
 
-function ChatView({ messages, input, setInput, onSubmit, loading, inputRef, chatEndRef, onClose }: {
+function ChatView({ messages, input, setInput, onSubmit, loading, inputRef, chatEndRef, onClose, attachment, onAttach, onClearAttach, fileInputRef }: {
   messages: { role: 'user' | 'oracle'; text: string }[]
   input: string
   setInput: (v: string) => void
@@ -433,6 +499,10 @@ function ChatView({ messages, input, setInput, onSubmit, loading, inputRef, chat
   inputRef: React.RefObject<HTMLTextAreaElement | null>
   chatEndRef: React.RefObject<HTMLDivElement | null>
   onClose: () => void
+  attachment: { type: 'file' | 'image'; name: string; content: string; mimeType?: string } | null
+  onAttach: (file: File) => void
+  onClearAttach: () => void
+  fileInputRef: React.RefObject<HTMLInputElement | null>
 }) {
   const QUICK = ['Plan my day', 'Review my week', 'Add a task', 'Log something I did', 'What should I focus on?']
   const [isRecording, setIsRecording] = React.useState(false)
@@ -561,56 +631,115 @@ function ChatView({ messages, input, setInput, onSubmit, loading, inputRef, chat
         </div>
 
         {/* Input */}
-        <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', padding: '12px 16px', display: 'flex', gap: 8, alignItems: 'flex-end' }}>
-          {/* Mic button */}
-          <button
-            type="button"
-            onClick={toggleVoice}
-            aria-label={isRecording ? 'Stop recording' : 'Start voice input'}
-            style={{
-              width: 40, height: 40, borderRadius: 10, flexShrink: 0,
-              background: isRecording ? 'rgba(255,107,157,0.2)' : 'rgba(255,255,255,0.06)',
-              border: isRecording ? '1.5px solid rgba(255,107,157,0.6)' : '1px solid rgba(255,255,255,0.1)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer', transition: 'all 0.15s',
-              animation: isRecording ? 'dm-spin 2s linear infinite' : 'none',
-            }}
-          >
-            {isRecording ? (
-              /* Stop icon */
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="rgba(255,107,157,0.9)">
-                <rect x="4" y="4" width="16" height="16" rx="2"/>
-              </svg>
-            ) : (
-              /* Mic icon */
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.55)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-                <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-                <line x1="12" y1="19" x2="12" y2="23"/>
-                <line x1="8" y1="23" x2="16" y2="23"/>
-              </svg>
-            )}
-          </button>
+        <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', padding: '12px 16px' }}>
+          {/* Attachment preview */}
+          {attachment && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+              {attachment.type === 'image' ? (
+                <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={`data:${attachment.mimeType ?? 'image/jpeg'};base64,${attachment.content}`}
+                    alt={attachment.name}
+                    style={{ height: 52, maxWidth: 80, objectFit: 'cover', borderRadius: 8, border: '1px solid rgba(255,255,255,0.15)' }}
+                  />
+                  <button onClick={onClearAttach} style={{ position: 'absolute', top: -6, right: -6, width: 16, height: 16, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', border: 'none', color: 'white', fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}>×</button>
+                </div>
+              ) : (
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(123,63,228,0.15)', border: '1px solid rgba(123,63,228,0.3)', borderRadius: 8, padding: '5px 10px', fontSize: 12, color: 'rgba(255,255,255,0.8)', maxWidth: 260 }}>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="rgba(123,63,228,0.9)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
+                  </svg>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{attachment.name}</span>
+                  <button onClick={onClearAttach} style={{ marginLeft: 2, background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', fontSize: 14, cursor: 'pointer', lineHeight: 1, padding: 0 }}>×</button>
+                </div>
+              )}
+            </div>
+          )}
 
-          <textarea
-            ref={inputRef}
-            value={input}
-            onChange={e => setInput(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSubmit() } }}
-            placeholder={isRecording ? 'Listening…' : 'Ask Arc anything…'}
-            rows={1}
-            style={{ flex: 1, background: isRecording ? 'rgba(255,107,157,0.06)' : 'rgba(255,255,255,0.06)', border: `1px solid ${isRecording ? 'rgba(255,107,157,0.3)' : 'rgba(255,255,255,0.1)'}`, borderRadius: 10, padding: '10px 14px', color: 'white', fontSize: 13, fontFamily: 'inherit', outline: 'none', resize: 'none', lineHeight: 1.5, transition: 'border-color 0.15s, background 0.15s', overflowY: 'auto', minHeight: 40, maxHeight: 160 }}
-          />
-          <button
-            type="button"
-            onClick={handleSubmit}
-            disabled={!input.trim() || loading}
-            style={{ background: input.trim() && !loading ? '#FF7A65' : 'rgba(255,255,255,0.08)', border: 'none', borderRadius: 10, width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: input.trim() && !loading ? 'pointer' : 'default', flexShrink: 0, transition: 'background 0.15s' }}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
-            </svg>
-          </button>
+          {/* Input row */}
+          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+            {/* Hidden file input */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*,.pdf,.html,.htm,.txt,.md,.csv"
+              style={{ display: 'none' }}
+              onChange={e => {
+                const file = e.target.files?.[0]
+                if (file) onAttach(file)
+                e.target.value = ''
+              }}
+            />
+
+            {/* Paperclip button */}
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              aria-label="Attach file or photo"
+              style={{
+                width: 40, height: 40, borderRadius: 10, flexShrink: 0,
+                background: 'rgba(255,255,255,0.06)',
+                border: '1px solid rgba(255,255,255,0.1)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: 'pointer', transition: 'all 0.15s',
+              }}
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.55)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+              </svg>
+            </button>
+
+            {/* Mic button */}
+            <button
+              type="button"
+              onClick={toggleVoice}
+              aria-label={isRecording ? 'Stop recording' : 'Start voice input'}
+              style={{
+                width: 40, height: 40, borderRadius: 10, flexShrink: 0,
+                background: isRecording ? 'rgba(255,107,157,0.2)' : 'rgba(255,255,255,0.06)',
+                border: isRecording ? '1.5px solid rgba(255,107,157,0.6)' : '1px solid rgba(255,255,255,0.1)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: 'pointer', transition: 'all 0.15s',
+                animation: isRecording ? 'dm-spin 2s linear infinite' : 'none',
+              }}
+            >
+              {isRecording ? (
+                /* Stop icon */
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="rgba(255,107,157,0.9)">
+                  <rect x="4" y="4" width="16" height="16" rx="2"/>
+                </svg>
+              ) : (
+                /* Mic icon */
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.55)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                  <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                  <line x1="12" y1="19" x2="12" y2="23"/>
+                  <line x1="8" y1="23" x2="16" y2="23"/>
+                </svg>
+              )}
+            </button>
+
+            <textarea
+              ref={inputRef}
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSubmit() } }}
+              placeholder={isRecording ? 'Listening…' : attachment ? 'Add a message (or just send the file)…' : 'Ask Arc anything…'}
+              rows={1}
+              style={{ flex: 1, background: isRecording ? 'rgba(255,107,157,0.06)' : 'rgba(255,255,255,0.06)', border: `1px solid ${isRecording ? 'rgba(255,107,157,0.3)' : 'rgba(255,255,255,0.1)'}`, borderRadius: 10, padding: '10px 14px', color: 'white', fontSize: 13, fontFamily: 'inherit', outline: 'none', resize: 'none', lineHeight: 1.5, transition: 'border-color 0.15s, background 0.15s', overflowY: 'auto', minHeight: 40, maxHeight: 160 }}
+            />
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={(!input.trim() && !attachment) || loading}
+              style={{ background: (input.trim() || attachment) && !loading ? '#FF7A65' : 'rgba(255,255,255,0.08)', border: 'none', borderRadius: 10, width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: (input.trim() || attachment) && !loading ? 'pointer' : 'default', flexShrink: 0, transition: 'background 0.15s' }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+              </svg>
+            </button>
+          </div>
         </div>
       </div>
     </div>

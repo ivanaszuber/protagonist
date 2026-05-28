@@ -10,17 +10,23 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const { message, userId, ouraData, checkInData } = await req.json()
+    const { message, userId, ouraData, checkInData, fileContent, fileName, fileBase64, fileMimeType, imageBase64, imageMimeType } = await req.json()
 
-    if (!message?.trim()) {
+    if (!message?.trim() && !fileContent && !fileBase64 && !imageBase64) {
       return NextResponse.json({ error: 'No message provided' }, { status: 400 })
     }
 
     const result = await consultArc({
-      userMessage: message,
+      userMessage: message ?? '',
       userId: userId || 'default',
       ouraData,
       checkInData,
+      fileContent,
+      fileName,
+      fileBase64,
+      fileMimeType,
+      imageBase64,
+      imageMimeType,
     })
 
     return NextResponse.json(result)
