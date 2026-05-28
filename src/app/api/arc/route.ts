@@ -10,15 +10,9 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const { message, userId, ouraData, checkInData, fileContent, fileName, fileBase64, fileMimeType, imageBase64, imageMimeType } = await req.json()
-
-    if (!message?.trim() && !fileContent && !fileBase64 && !imageBase64) {
-      return NextResponse.json({ error: 'No message provided' }, { status: 400 })
-    }
-
-    const result = await consultArc({
-      userMessage: message ?? '',
-      userId: userId || 'default',
+    const {
+      message,
+      userId,
       ouraData,
       checkInData,
       fileContent,
@@ -27,9 +21,48 @@ export async function POST(req: NextRequest) {
       fileMimeType,
       imageBase64,
       imageMimeType,
+    } = await req.json()
+
+    if (!message?.trim() && !fileContent && !fileBase64 && !imageBase64) {
+      return NextResponse.json({ error: 'No message provided' }, { status: 400 })
+    }
+
+    const encoder = new TextEncoder()
+
+    const readable = new ReadableStream({
+      async start(controller) {
+        try {
+          await consultArc({
+            userMessage: message ?? '',
+            userId: userId || 'default',
+            ouraData,
+            checkInData,
+            fileContent,
+            fileName,
+            fileBase64,
+            fileMimeType,
+            imageBase64,
+            imageMimeType,
+            onChunk: (chunk) => {
+              controller.enqueue(encoder.encode(chunk))
+            },
+          })
+        } catch (error) {
+          console.error('Arc stream error:', error)
+          controller.enqueue(encoder.encode("The Oracle is having a moment. Try again."))
+        } finally {
+          controller.close()
+        }
+      },
     })
 
-    return NextResponse.json(result)
+    return new Response(readable, {
+      headers: {
+        'Content-Type': 'text/plain; charset=utf-8',
+        'Cache-Control': 'no-cache',
+        'X-Accel-Buffering': 'no',
+      },
+    })
   } catch (error) {
     console.error('Arc route error:', error)
     return NextResponse.json(

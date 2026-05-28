@@ -163,6 +163,8 @@ export interface ArcInput {
   /** Base64-encoded image — processed via Haiku vision then stored as memory */
   imageBase64?: string
   imageMimeType?: string
+  /** If provided, Arc will stream text chunks to this callback instead of returning the full response at once */
+  onChunk?: (chunk: string) => void
 }
 
 export interface ArcOutput {
@@ -380,27 +382,19 @@ export async function consultArc(input: ArcInput): Promise<ArcOutput> {
   const { userMessage, userId, checkInData, fileContent, fileName, fileBase64, fileMimeType, imageBase64, imageMimeType } = input
 
   // Load profile, arc relationship memories, and all external context in parallel
-  const [loadedOura, { calendarContext, freeBlocks }, profileResult, arcMemories] = await Promise.all([
+  const [loadedOura, { calendarContext, freeBlocks }, profileResult, arcMemories, gmailDigestResult] = await Promise.all([
     input.ouraData !== undefined
       ? Promise.resolve({ payload: input.ouraData, contextBlock: '' })
       : loadOuraContextForUser(userId),
     loadCalendarContextForUser(userId),
     getUserProfile(userId).catch(() => null),
     getDimensionMemories('arc', 15, userId).catch(() => [] as string[]),
+    getGmailDigest(userId).catch(() => null),
   ])
 
   const ouraContextBlock = loadedOura.contextBlock
   const personContextBlock = profileResult ? buildPersonContext(profileResult) : ''
-
-  let gmailContext = ''
-  try {
-    const gmailDigest = await getGmailDigest(userId)
-    if (gmailDigest?.arc_summary) {
-      gmailContext = gmailDigest.arc_summary as string
-    }
-  } catch {
-    // Gmail not connected — continue without it
-  }
+  const gmailContext = (gmailDigestResult?.arc_summary as string | undefined) ?? ''
 
   const allDimensions: DimensionId[] = isCheckIn(userMessage)
     ? ['vitality', 'mind', 'create', 'social', 'love', 'family', 'wealth']
@@ -522,17 +516,36 @@ Do not address every dimension — just what actually matters right now.`
 
 No specialist insights were available. Respond as Arc with warmth and specificity based on what they said.`
 
-  const arcMessage = await anthropic.messages.create({
-    model: ARC_MODEL,
-    max_tokens: 700,
-    system: `${ARC_SYNTHESIS_PROMPT}${contextSectionBlock}`,
-    messages: [{ role: 'user', content: arcUserContent !== null ? arcUserContent : synthesisPrompt }],
-  })
+  let arcResponse = ''
+  const { onChunk } = input
 
-  const arcResponse =
-    arcMessage.content[0].type === 'text'
-      ? arcMessage.content[0].text
-      : "I'm here. Tell me more."
+  if (onChunk) {
+    // Streaming path — push text chunks to the caller as they arrive
+    const arcStream = anthropic.messages.stream({
+      model: ARC_MODEL,
+      max_tokens: 700,
+      system: `${ARC_SYNTHESIS_PROMPT}${contextSectionBlock}`,
+      messages: [{ role: 'user', content: arcUserContent !== null ? arcUserContent : synthesisPrompt }],
+    })
+    arcStream.on('text', (text) => {
+      arcResponse += text
+      onChunk(text)
+    })
+    await arcStream.finalMessage()
+    if (!arcResponse) arcResponse = "I'm here. Tell me more."
+  } else {
+    // Non-streaming path (used by morning check-in, witness, etc.)
+    const arcMessage = await anthropic.messages.create({
+      model: ARC_MODEL,
+      max_tokens: 700,
+      system: `${ARC_SYNTHESIS_PROMPT}${contextSectionBlock}`,
+      messages: [{ role: 'user', content: arcUserContent !== null ? arcUserContent : synthesisPrompt }],
+    })
+    arcResponse =
+      arcMessage.content[0].type === 'text'
+        ? arcMessage.content[0].text
+        : "I'm here. Tell me more."
+  }
 
   const memoryPromises = activeResults
     .filter((r) => r.memoryToStore.trim().length > 0)

@@ -290,6 +290,45 @@ export function DesktopOracleModal() {
     }
   }, [])
 
+  // ── Streaming Arc helper ────────────────────────────────────────────────────
+  // Adds a placeholder oracle message and updates it chunk-by-chunk as the
+  // stream arrives, returning the complete reply when done.
+  const streamArcReply = useCallback(async (body: Record<string, unknown>): Promise<string> => {
+    const res = await fetch('/api/arc', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    if (!res.ok || !res.body) throw new Error('Arc request failed')
+
+    // Insert placeholder that will be updated in-place
+    setChatMessages(prev => [...prev, { role: 'oracle' as const, text: '' }])
+
+    const reader = res.body.getReader()
+    const decoder = new TextDecoder()
+    let reply = ''
+
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      reply += decoder.decode(value, { stream: true })
+      const current = reply
+      setChatMessages(prev => {
+        const msgs = [...prev]
+        msgs[msgs.length - 1] = { role: 'oracle' as const, text: current }
+        return msgs
+      })
+    }
+
+    const final = reply || "I'm here with you."
+    setChatMessages(prev => {
+      const msgs = [...prev]
+      msgs[msgs.length - 1] = { role: 'oracle' as const, text: final }
+      return msgs
+    })
+    return final
+  }, [])
+
   // ── Chat submit ─────────────────────────────────────────────────────────────
   const handleChatSubmit = useCallback(async () => {
     const text = chatInput.trim()
@@ -320,10 +359,7 @@ export function DesktopOracleModal() {
             body.fileName = currentAttachment.name
           }
         }
-        const arcRes = await fetch('/api/arc', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-        const arcData = await arcRes.json()
-        const reply = (arcData.response as string) ?? "I'm here with you."
-        setChatMessages(prev => [...prev, { role: 'oracle', text: reply }])
+        await streamArcReply(body)
         return  // finally will still run
       }
 
@@ -442,14 +478,8 @@ export function DesktopOracleModal() {
         const reply = calRes.ok ? `Added to calendar: "${ev.title}" on ${ev.date}${ev.startTime ? ` at ${ev.startTime}` : ''}` : "Couldn't add that to your calendar — try again."
         setChatMessages(prev => [...prev, { role: 'oracle', text: reply }])
       } else {
-        // CHAT / NOTE — send to Arc for a conversational reply
-        const arcRes = await fetch('/api/arc', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: text, userId }),
-        })
-        const arcData = await arcRes.json()
-        const reply = (arcData.response as string) ?? arcData.oracleReply ?? "I'm here with you."
+        // CHAT / NOTE — send to Arc for a conversational reply (streamed)
+        const reply = await streamArcReply({ message: text, userId })
         // Save all chat + note exchanges to voice_notes so they appear in the journal stream
         fetch('/api/notes', {
           method: 'POST',
@@ -458,7 +488,6 @@ export function DesktopOracleModal() {
         }).then(() => {
           window.dispatchEvent(new CustomEvent('protagonist:note-saved'))
         }).catch(() => {})
-        setChatMessages(prev => [...prev, { role: 'oracle', text: reply }])
       }
     } catch {
       setChatMessages(prev => [...prev, { role: 'oracle', text: "Something went wrong — try again." }])
