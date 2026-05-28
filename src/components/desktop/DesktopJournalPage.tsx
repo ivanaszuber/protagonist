@@ -2,8 +2,9 @@
 
 import React, { useCallback, useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { type Dimension } from '@/lib/character'
+import { ALL_DIMENSIONS, type Dimension } from '@/lib/character'
 import { getUserId } from '@/lib/user'
+import { getLevel, getLevelProgress } from '@/lib/xp'
 import { openOracle } from '@/lib/oracle-events'
 import { DesktopLeftSidebar, DIM_COLORS } from './DesktopLeftSidebar'
 import DesktopTopNav from './DesktopTopNav'
@@ -848,6 +849,10 @@ export default function DesktopJournalPage() {
   const [growthMarkers, setGrowthMarkers] = useState<GrowthMarker[]>([])
   const [stats, setStats] = useState({ totalEntries: 0, totalCompleted: 0, activeStreak: 0, mostActiveDay: '—' })
 
+  // Sidebar scores
+  const [dimXpMap, setDimXpMap] = useState<Record<string, number>>({})
+  const [dimBaselineMap, setDimBaselineMap] = useState<Record<string, number>>({})
+
   // UI
   const [activeTab, setActiveTab] = useState<Tab>('stream')
   const [activeDimFilter, setActiveDimFilter] = useState<Dimension | null>(null)
@@ -911,6 +916,35 @@ export default function DesktopJournalPage() {
       .finally(() => setLoadingInsights(false))
   }, [userId])
 
+  // Load sidebar scores
+  useEffect(() => {
+    if (!userId) return
+    Promise.all([
+      fetch(`/api/quests/main?userId=${userId}`).then(r => r.json()).catch(() => ({})),
+      fetch(`/api/dimension-score?userId=${userId}`).then(r => r.json()).catch(() => ({})),
+    ]).then(([questData, scoreData]: [Record<string, unknown>, Record<string, unknown>]) => {
+      const xpMap = (questData.dimXpMap ?? {}) as Record<string, number>
+      const baselines = (scoreData.scores ?? {}) as Record<string, number>
+      setDimXpMap(xpMap)
+      setDimBaselineMap(baselines)
+    })
+  }, [userId])
+
+  function xpScore(xp: number): number {
+    const level = getLevel(xp)
+    const progress = getLevelProgress(xp)
+    return Math.min(10, Math.max(1, Math.round(level * 1.5 + progress)))
+  }
+
+  const sidebarScores = Object.fromEntries(
+    ALL_DIMENSIONS.map(dim => {
+      const xp = dimXpMap[dim] ?? 0
+      const baseline = dimBaselineMap[dim]
+      const score = baseline != null ? baseline : xpScore(xp)
+      return [dim, score] as const
+    })
+  ) as Partial<Record<Dimension, number>>
+
   const generatePortrait = useCallback(async () => {
     if (!userId) return
     setLoadingPortrait(true)
@@ -965,7 +999,7 @@ export default function DesktopJournalPage() {
       {/* Body */}
       <div style={{ display: 'flex', flex: 1, minHeight: 0, overflow: 'hidden' }}>
         {/* Left sidebar */}
-        <DesktopLeftSidebar scores={{}} />
+        <DesktopLeftSidebar scores={sidebarScores} />
 
         {/* Main content */}
         <div style={{
