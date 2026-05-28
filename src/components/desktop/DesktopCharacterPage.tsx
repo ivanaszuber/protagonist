@@ -333,7 +333,7 @@ export function DesktopCharacterPage({ dimension }: DesktopCharacterPageProps) {
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div style={{ ...font, minHeight: '100dvh', background: '#0D0820', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+    <div style={{ ...font, height: '100dvh', background: '#0D0820', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <style>{PAGE_CSS}</style>
 
       {/* ── Top nav (shared component) ───────────────────────────────────── */}
