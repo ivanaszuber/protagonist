@@ -260,7 +260,7 @@ export function DesktopLeftSidebar({
         {/* ── Fixed upper section ── */}
         <div style={{ padding: '18px 16px 0', flexShrink: 0 }}>
 
-          {/* ── Back button ── */}
+          {/* ── Back button (character pages) ── */}
           {showBackButton ? (
             <button
               type="button"
@@ -270,7 +270,7 @@ export function DesktopLeftSidebar({
                 display: 'flex', alignItems: 'center', gap: 6,
                 background: 'transparent', border: 'none',
                 color: 'rgba(255,255,255,0.5)', fontSize: 12, fontWeight: 500,
-                cursor: 'pointer', padding: '4px 0', marginBottom: 22,
+                cursor: 'pointer', padding: '4px 0', marginBottom: 16,
               }}
               onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.85)' }}
               onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.5)' }}
@@ -344,83 +344,81 @@ export function DesktopLeftSidebar({
 
                   </div>
               </div>
+            </>
+          )}
 
-              {/* ── NOW — split into strengths + watch-for ── */}
-              {hasNow && (
-                <>
-                  {/* Strengths showing up */}
-                  {nowStrengths.length > 0 && (
-                    <div style={{ marginBottom: nowWatch.length > 0 ? 10 : 4 }}>
-                      <div style={{
-                        display: 'flex', alignItems: 'center', gap: 5, marginBottom: 5,
-                        fontSize: 9, fontWeight: 700, letterSpacing: '1.2px', textTransform: 'uppercase' as const,
-                        color: 'rgba(110,231,164,0.65)',
-                      }}>
-                        <span style={{ fontSize: 7 }}>●</span>
-                        Strengths showing up
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 0, paddingLeft: 10 }}>
-                        {nowStrengths.map((pill, i) => {
-                          return (
-                            <div key={i} style={{
-                              display: 'flex', alignItems: 'flex-start', gap: 7,
-                              padding: '4px 0',
-                            }}>
-                              <div style={{
-                                width: 5, height: 5, borderRadius: '50%',
-                                background: '#6EE7A4', flexShrink: 0, marginTop: 5,
-                              }} />
-                              <span style={{
-                                ...font,
-                                fontSize: 12, fontWeight: 500, color: 'rgba(255,255,255,0.85)', lineHeight: 1.45,
-                              }}>
-                                {pill.label}
-                              </span>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Watch for */}
-                  {nowWatch.length > 0 && (
-                    <div style={{ marginBottom: 4 }}>
-                      <div style={{
-                        display: 'flex', alignItems: 'center', gap: 5, marginBottom: 5,
-                        fontSize: 9, fontWeight: 700, letterSpacing: '1.2px', textTransform: 'uppercase' as const,
-                        color: 'rgba(255,212,122,0.65)',
-                      }}>
-                        <span style={{ fontSize: 9 }}>△</span>
-                        Watch for
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 0, paddingLeft: 10 }}>
-                        {nowWatch.map((pill, i) => (
-                          <div key={i} style={{
-                            display: 'flex', alignItems: 'flex-start', gap: 7,
-                            padding: '4px 0',
-                          }}>
-                            <div style={{
-                              width: 5, height: 5, borderRadius: '50%',
-                              background: '#FFD47A', flexShrink: 0, marginTop: 5,
-                            }} />
-                            <span style={{
-                              ...font,
-                              fontSize: 12, fontWeight: 500, color: 'rgba(255,212,122,0.88)', lineHeight: 1.45,
-                            }}>
-                              {pill.label}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', marginTop: 8 }}>
-                    from your recent conversations
+          {/* ── NOW — strengths + watch-for (shown on ALL pages) ── */}
+          {hasNow && (
+            <>
+              {/* Strengths showing up */}
+              {nowStrengths.length > 0 && (
+                <div style={{ marginBottom: nowWatch.length > 0 ? 10 : 4 }}>
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: 5, marginBottom: 5,
+                    fontSize: 9, fontWeight: 700, letterSpacing: '1.2px', textTransform: 'uppercase' as const,
+                    color: 'rgba(110,231,164,0.65)',
+                  }}>
+                    <span style={{ fontSize: 7 }}>●</span>
+                    Strengths showing up
                   </div>
-                </>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 0, paddingLeft: 10 }}>
+                    {nowStrengths.map((pill, i) => (
+                      <div key={i} style={{
+                        display: 'flex', alignItems: 'flex-start', gap: 7,
+                        padding: '4px 0',
+                      }}>
+                        <div style={{
+                          width: 5, height: 5, borderRadius: '50%',
+                          background: '#6EE7A4', flexShrink: 0, marginTop: 5,
+                        }} />
+                        <span style={{
+                          ...font,
+                          fontSize: 12, fontWeight: 500, color: 'rgba(255,255,255,0.85)', lineHeight: 1.45,
+                        }}>
+                          {pill.label}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
+
+              {/* Watch for */}
+              {nowWatch.length > 0 && (
+                <div style={{ marginBottom: 4 }}>
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: 5, marginBottom: 5,
+                    fontSize: 9, fontWeight: 700, letterSpacing: '1.2px', textTransform: 'uppercase' as const,
+                    color: 'rgba(255,212,122,0.65)',
+                  }}>
+                    <span style={{ fontSize: 9 }}>△</span>
+                    Watch for
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 0, paddingLeft: 10 }}>
+                    {nowWatch.map((pill, i) => (
+                      <div key={i} style={{
+                        display: 'flex', alignItems: 'flex-start', gap: 7,
+                        padding: '4px 0',
+                      }}>
+                        <div style={{
+                          width: 5, height: 5, borderRadius: '50%',
+                          background: '#FFD47A', flexShrink: 0, marginTop: 5,
+                        }} />
+                        <span style={{
+                          ...font,
+                          fontSize: 12, fontWeight: 500, color: 'rgba(255,212,122,0.88)', lineHeight: 1.45,
+                        }}>
+                          {pill.label}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', marginTop: 8 }}>
+                from your recent conversations
+              </div>
             </>
           )}
 
