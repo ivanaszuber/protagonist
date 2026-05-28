@@ -198,9 +198,9 @@ export default function DesktopDashboardV2(props: DesktopDashboardV2Props) {
   const font: CSSProperties = { fontFamily: "'Space Grotesk', system-ui, sans-serif" }
   const colScroll: CSSProperties = { overflowY: 'auto', overflowX: 'hidden', scrollbarWidth: 'none' }
   const metaLabel: CSSProperties = {
-    color: 'rgba(255,255,255,0.25)',
+    color: 'rgba(255,255,255,0.5)',
     fontSize: 9,
-    fontWeight: 500,
+    fontWeight: 600,
     letterSpacing: '1.6px',
     textTransform: 'uppercase' as const,
     display: 'block',
@@ -343,11 +343,11 @@ export default function DesktopDashboardV2(props: DesktopDashboardV2Props) {
               Dashboard
             </div>
             <button type="button" onClick={() => router.push('/characters')}
-              style={{ color: 'rgba(255,255,255,0.4)', padding: '6px 14px', fontSize: 13, background: 'transparent', border: 'none', cursor: 'pointer', ...font }}>
+              style={{ color: 'rgba(255,255,255,0.6)', padding: '6px 14px', fontSize: 13, background: 'transparent', border: 'none', cursor: 'pointer', ...font }}>
               Characters
             </button>
             <button type="button" onClick={() => router.push('/journal')}
-              style={{ color: 'rgba(255,255,255,0.4)', padding: '6px 14px', fontSize: 13, background: 'transparent', border: 'none', cursor: 'pointer', ...font }}>
+              style={{ color: 'rgba(255,255,255,0.6)', padding: '6px 14px', fontSize: 13, background: 'transparent', border: 'none', cursor: 'pointer', ...font }}>
               Journal
             </button>
           </div>
@@ -426,7 +426,7 @@ export default function DesktopDashboardV2(props: DesktopDashboardV2Props) {
               </svg>
               <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: 10, fontWeight: 500, letterSpacing: '1.8px', marginBottom: 8 }}>LIFE SCORE</div>
               <div style={{ color: 'white', fontSize: 16, fontWeight: 600, letterSpacing: -0.3 }}>Ivana</div>
-              <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, marginTop: 2, letterSpacing: 0.3 }}>The Protagonist</div>
+              <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, marginTop: 2, letterSpacing: 0.3 }}>The Protagonist</div>
             </div>
 
             {/* Life Areas */}
@@ -478,7 +478,7 @@ export default function DesktopDashboardV2(props: DesktopDashboardV2Props) {
 
             {/* Greeting */}
             <div style={{ marginBottom: 22 }}>
-              <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: 26, fontWeight: 300, lineHeight: 1.1 }}>
+              <div style={{ color: 'rgba(255,255,255,0.72)', fontSize: 26, fontWeight: 300, lineHeight: 1.1 }}>
                 {isToday
                   ? 'Good morning,'
                   : selectedDate.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' })
@@ -512,10 +512,10 @@ export default function DesktopDashboardV2(props: DesktopDashboardV2Props) {
                         cursor: 'pointer', ...font,
                       }}
                     >
-                      <span style={{ color: isSelected ? 'rgba(255,255,255,0.75)' : 'rgba(255,255,255,0.28)', fontSize: 8, fontWeight: 500, letterSpacing: 0.6 }}>
+                      <span style={{ color: isSelected ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.5)', fontSize: 8, fontWeight: 500, letterSpacing: 0.6 }}>
                         {d.toLocaleDateString('en-GB', { weekday: 'short' }).toUpperCase().slice(0, 3)}
                       </span>
-                      <span style={{ color: isSelected ? 'white' : isT ? '#E8E0F0' : 'rgba(255,255,255,0.55)', fontSize: 14, fontWeight: isSelected ? 700 : 400 }}>
+                      <span style={{ color: isSelected ? 'white' : isT ? '#E8E0F0' : 'rgba(255,255,255,0.7)', fontSize: 14, fontWeight: isSelected ? 700 : 400 }}>
                         {d.getDate()}
                       </span>
                       <div style={{ width: 4, height: 4, borderRadius: '50%', background: isSelected ? 'white' : isT ? '#A87EF8' : 'transparent' }} />
@@ -530,7 +530,7 @@ export default function DesktopDashboardV2(props: DesktopDashboardV2Props) {
             </div>
 
             {/* Date label */}
-            <div style={{ color: 'rgba(255,255,255,0.28)', fontSize: 10, fontWeight: 500, letterSpacing: '1.4px', marginBottom: 14 }}>
+            <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 10, fontWeight: 500, letterSpacing: '1.4px', marginBottom: 14 }}>
               {selectedDate.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'long' }).toUpperCase()}
             </div>
 
@@ -547,10 +547,10 @@ export default function DesktopDashboardV2(props: DesktopDashboardV2Props) {
                 {calendarEvents.length > 0 && (
                   <div style={{ marginBottom: 16 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 9 }}>
-                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.25)" strokeWidth="2" strokeLinecap="round">
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="2" strokeLinecap="round">
                         <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
                       </svg>
-                      <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: 9, fontWeight: 500, letterSpacing: '1.4px' }}>CALENDAR</span>
+                      <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 9, fontWeight: 600, letterSpacing: '1.4px' }}>CALENDAR</span>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                       {calendarEvents.map(ev => {
@@ -591,10 +591,10 @@ export default function DesktopDashboardV2(props: DesktopDashboardV2Props) {
                 {taskItems.length > 0 && (
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 9 }}>
-                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.25)" strokeWidth="2" strokeLinecap="round">
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="2" strokeLinecap="round">
                         <polyline points="9 11 12 14 22 4" /><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
                       </svg>
-                      <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: 9, fontWeight: 500, letterSpacing: '1.4px' }}>TASKS</span>
+                      <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 9, fontWeight: 600, letterSpacing: '1.4px' }}>TASKS</span>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                       {taskItems.map(item => {
@@ -844,7 +844,7 @@ export default function DesktopDashboardV2(props: DesktopDashboardV2Props) {
                   )
                 })}
               </div>
-              <div style={{ fontSize: 11, textAlign: 'center', color: moodScore != null ? moodColor : 'rgba(255,255,255,0.22)' }}>
+              <div style={{ fontSize: 11, textAlign: 'center', color: moodScore != null ? moodColor : 'rgba(255,255,255,0.4)' }}>
                 {moodScore != null ? moodLabel : 'How are you feeling?'}
               </div>
             </div>
@@ -852,14 +852,14 @@ export default function DesktopDashboardV2(props: DesktopDashboardV2Props) {
             {/* ── Weekly Progress ── */}
             <div>
               <span style={metaLabel}>Weekly Progress</span>
-              <div style={{ color: 'rgba(255,255,255,0.18)', fontSize: 9, marginBottom: 10 }}>tasks done / day</div>
+              <div style={{ color: 'rgba(255,255,255,0.42)', fontSize: 9, marginBottom: 10 }}>tasks done / day</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {weeklyData.map(({ label: dayLabel, count, isToday: isDayToday }) => {
                   const pct      = maxCount > 0 ? Math.round((count / maxCount) * 100) : 0
                   const barColor = count >= 4 ? '#6EE7A4' : count >= 2 ? '#A87EF8' : count === 1 ? '#FF7A65' : 'rgba(255,255,255,0.06)'
                   return (
                     <div key={dayLabel} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ color: isDayToday ? '#FF7A65' : 'rgba(255,255,255,0.35)', fontSize: 10, width: 24, fontWeight: isDayToday ? 600 : 400 }}>
+                      <span style={{ color: isDayToday ? '#FF7A65' : 'rgba(255,255,255,0.55)', fontSize: 10, width: 24, fontWeight: isDayToday ? 600 : 400 }}>
                         {dayLabel}
                       </span>
                       <div style={{ flex: 1, height: 5, background: 'rgba(255,255,255,0.06)', borderRadius: 3, overflow: 'hidden' }}>
