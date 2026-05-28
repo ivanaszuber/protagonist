@@ -16,6 +16,8 @@ import { LegendCard } from '@/components/characters/LegendCard'
 import { DesktopLeftSidebar, DIM_COLORS } from './DesktopLeftSidebar'
 import DesktopTopNav from './DesktopTopNav'
 import { DesktopOracleModal } from './DesktopOracleModal'
+import { openOracle } from '@/lib/oracle-events'
+import { VaultNetWorthCard } from '@/components/vault/VaultNetWorthCard'
 import {
   ForgeCharacterLarge,
   EchoCharacterLarge,
@@ -521,6 +523,62 @@ export function DesktopCharacterPage({ dimension }: DesktopCharacterPageProps) {
         borderLeft: '1px solid rgba(255,255,255,0.06)',
         overflowY: 'auto', padding: '28px 20px 60px',
       }}>
+
+        {/* ── Oracle card ─────────────────────────────────────────────── */}
+        <div style={{
+          background: `rgba(255,122,101,0.07)`,
+          border: '1px solid rgba(255,122,101,0.18)',
+          borderRadius: 12, padding: '16px 14px', marginBottom: 20,
+        }}>
+          <span style={{ ...font, color: 'rgba(255,255,255,0.35)', fontSize: 9, fontWeight: 600, letterSpacing: '1.7px', textTransform: 'uppercase' as const, display: 'block', marginBottom: 14 }}>The Oracle</span>
+
+          {/* Robot */}
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}>
+            <div style={{ position: 'relative', width: 80, height: 80, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ position: 'absolute', top: '50%', left: '50%', margin: -3, width: 6, height: 6, borderRadius: '50%', background: accentColor, animation: 'dcp-float 3.5s linear infinite' }} />
+              <div style={{ position: 'absolute', top: '50%', left: '50%', margin: -2.5, width: 5, height: 5, borderRadius: '50%', background: '#00D4B8', opacity: 0.7, animation: 'dcp-float 4s linear infinite' }} />
+              <svg width="52" height="60" viewBox="0 0 58 66" style={{ animation: 'dcp-float 3s ease-in-out infinite', position: 'relative', zIndex: 1 }}>
+                <polygon points="16,16 22,6 29,13 36,6 42,16" fill="#FFB347"/>
+                <rect x="14" y="14" width="30" height="3" rx="1.5" fill="#FFB347" opacity="0.7"/>
+                <rect x="1" y="25" width="4" height="8" rx="2" fill="#FF7A65" opacity="0.7"/>
+                <rect x="53" y="25" width="4" height="8" rx="2" fill="#FF7A65" opacity="0.7"/>
+                <rect x="5" y="17" width="48" height="32" rx="9" fill="#FF7A65"/>
+                <rect x="11" y="24" width="14" height="14" rx="4" fill="#130E2A"/>
+                <rect x="33" y="24" width="14" height="14" rx="4" fill="#130E2A"/>
+                <circle cx="15" cy="28" r="3" fill="white" opacity="0.9"/>
+                <circle cx="37" cy="28" r="3" fill="white" opacity="0.9"/>
+                <circle cx="17" cy="30" r="2" fill="#130E2A"/>
+                <circle cx="39" cy="30" r="2" fill="#130E2A"/>
+                <path d="M20 39 Q29 44 38 39" stroke="#130E2A" strokeWidth="1.8" fill="none" strokeLinecap="round"/>
+                <rect x="12" y="50" width="12" height="14" rx="5" fill="#FF7A65" opacity="0.85"/>
+                <rect x="34" y="50" width="12" height="14" rx="5" fill="#FF7A65" opacity="0.85"/>
+              </svg>
+            </div>
+          </div>
+
+          {/* Insight or prompt */}
+          <div style={{ ...font, color: 'rgba(255,255,255,0.6)', fontSize: 11.5, fontStyle: 'italic', lineHeight: 1.55, textAlign: 'center', marginBottom: 14 }}>
+            {dimensionInsight
+              ? `"${dimensionInsight.length > 100 ? dimensionInsight.slice(0, 100) + '…' : dimensionInsight}"`
+              : `"Ask me anything about your ${char.categoryLabel.toLowerCase()} journey."`
+            }
+          </div>
+
+          <button
+            type="button"
+            onClick={() => openOracle()}
+            style={{ ...font, width: '100%', background: 'transparent', color: 'rgba(255,255,255,0.75)', padding: 9, borderRadius: 8, fontSize: 12, fontWeight: 500, border: '1.5px solid rgba(255,255,255,0.2)', cursor: 'pointer', transition: 'border-color 0.15s, color 0.15s' }}
+          >
+            Chat with Oracle →
+          </button>
+        </div>
+
+        {/* ── Vault Net Worth (wealth dimension only) ──────────────────── */}
+        {dimension === 'wealth' && (
+          <div style={{ marginBottom: 20 }}>
+            <VaultNetWorthCard userId={userId} accentColor={accentColor} />
+          </div>
+        )}
 
         {/* Active challenge */}
         <BossCard

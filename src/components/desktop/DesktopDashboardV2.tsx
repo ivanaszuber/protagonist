@@ -518,9 +518,9 @@ export default function DesktopDashboardV2(props: DesktopDashboardV2Props) {
             <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 18 }}>
               <button type="button" onClick={onWeekBack}
                 style={{
-                  width: 28, height: 36, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  width: 26, height: 30, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
                   background: 'rgba(255,255,255,0.06)', border: '0.5px solid rgba(255,255,255,0.12)',
-                  borderRadius: 8, color: 'rgba(255,255,255,0.65)', fontSize: 16, cursor: 'pointer', ...font,
+                  borderRadius: 7, color: 'rgba(255,255,255,0.65)', fontSize: 15, cursor: 'pointer', ...font,
                 }}>
                 ‹
               </button>
@@ -532,29 +532,29 @@ export default function DesktopDashboardV2(props: DesktopDashboardV2Props) {
                   return (
                     <button key={ds} type="button" onClick={() => onDateSelect(d)}
                       style={{
-                        flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
-                        padding: '5px 2px', borderRadius: 8,
+                        flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
+                        padding: '3px 2px', borderRadius: 7,
                         background: isSelected ? '#7B3FE4' : 'rgba(255,255,255,0.04)',
                         border: `1px solid ${isSelected ? 'rgba(123,63,228,0.8)' : 'rgba(255,255,255,0.07)'}`,
                         cursor: 'pointer', ...font,
                       }}
                     >
-                      <span style={{ color: isSelected ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.5)', fontSize: 8, fontWeight: 500, letterSpacing: 0.6 }}>
+                      <span style={{ color: isSelected ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.4)', fontSize: 7, fontWeight: 500, letterSpacing: 0.5 }}>
                         {d.toLocaleDateString('en-GB', { weekday: 'short' }).toUpperCase().slice(0, 3)}
                       </span>
-                      <span style={{ color: isSelected ? 'white' : isT ? '#E8E0F0' : 'rgba(255,255,255,0.7)', fontSize: 13, fontWeight: isSelected ? 700 : 400 }}>
+                      <span style={{ color: isSelected ? 'white' : isT ? '#E8E0F0' : 'rgba(255,255,255,0.65)', fontSize: 11, fontWeight: isSelected ? 700 : 400 }}>
                         {d.getDate()}
                       </span>
-                      <div style={{ width: 3, height: 3, borderRadius: '50%', background: isSelected ? 'white' : isT ? '#A87EF8' : 'transparent' }} />
+                      <div style={{ width: 2.5, height: 2.5, borderRadius: '50%', background: isSelected ? 'white' : isT ? '#A87EF8' : 'transparent' }} />
                     </button>
                   )
                 })}
               </div>
               <button type="button" onClick={onWeekForward}
                 style={{
-                  width: 28, height: 36, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  width: 26, height: 30, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
                   background: 'rgba(255,255,255,0.06)', border: '0.5px solid rgba(255,255,255,0.12)',
-                  borderRadius: 8, color: 'rgba(255,255,255,0.65)', fontSize: 16, cursor: 'pointer', ...font,
+                  borderRadius: 7, color: 'rgba(255,255,255,0.65)', fontSize: 15, cursor: 'pointer', ...font,
                 }}>
                 ›
               </button>
