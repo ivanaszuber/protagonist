@@ -568,6 +568,8 @@ export function CharacterPage({ dimension }: CharacterPageProps) {
           dimension={dimension}
           vision={quest?.vision ?? null}
           accentColor={accentColor}
+          userId={getUserId()}
+          onQuestSaved={(v) => setQuest(prev => prev ? { ...prev, vision: v } : { id: '', vision: v, character_name: char.name, character_class: 'Adventurer', milestones: [], recent_tasks: [], xp: 0 })}
         />
 
         {quest && (

@@ -236,6 +236,13 @@ export function DesktopOracleModal() {
     setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
   }, [chatMessages])
 
+  // Scroll to bottom whenever the chat view opens (catches existing history)
+  useEffect(() => {
+    if (mode === 'chat') {
+      setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'instant' }), 80)
+    }
+  }, [mode])
+
   // ── Persist chat history to localStorage ───────────────────────────────────
   useEffect(() => {
     if (!userId || chatMessages.length === 0) return
