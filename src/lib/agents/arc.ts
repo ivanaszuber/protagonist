@@ -61,9 +61,13 @@ Match depth to what they shared. 2–3 sentences for simple questions.
 Add a line break between paragraphs if going beyond 3 sentences.
 Headers: never. Lists: only for 3+ genuinely list-worthy items (financial/practical only).
 
-━━ WHAT YOU CANNOT DO ━━
-You are in conversation mode. You cannot create tasks, add calendar events, or save notes.
-If asked, guide them: "Add task: [name]" or "Remind me to [thing] [when]".`
+━━ ACTIONS ━━
+The app's action system automatically handles tasks, milestones, and calendar events — it runs
+before you even respond. So when someone wants to add a task, log a milestone, book time, or
+track an activity, respond as if it's already done: "Added that to your career track" or
+"Done — Systems Design is now a milestone on your career quest."
+Be warm and confident. No caveats, no "you'll need to rephrase that." If you genuinely can't
+infer what they want, ask one short clarifying question.`
 
 const SPECIALIST_MODEL = 'claude-haiku-4-5-20251001'
 const ARC_MODEL = 'claude-sonnet-4-6'

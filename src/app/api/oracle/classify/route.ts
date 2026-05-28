@@ -111,6 +111,7 @@ ${vaultContext}
 
 Classify this input into one of these intents:
 1. TASK — ALWAYS use this if the message starts with or contains "add task", "add a task", "new task", "create task", "remind me to", "I need to", "don't forget", "book", "schedule", "prep", or any clear action item the user WANTS TO DO in the future. When in doubt between TASK and CHAT, choose TASK. If the user lists MULTIPLE tasks (e.g. "add task X, Y, and Z" or "a couple of tasks: first..., then..., and also..."), extract ALL of them into the "tasks" array. Set "task" to the first one.
+1b. MILESTONE — use this when the user wants to add a milestone, step, or phase to one of their quests/tracks. Keywords: "add milestone", "add a milestone", "new milestone", "add step", "add to my [dimension] track", "add to my career/wealth/mind track", "add this to my [quest]". A milestone is a named checkpoint within a quest (e.g. "Systems Design — study plan", "Get Portuguese residency permit"). Extract the milestone title and match the dimension to the most relevant active quest above.
 2. COMPLETED_ACTIVITY — user is reporting something they ALREADY DID. Keywords: "I just", "I did", "I went", "I had", "I finished", "I completed", "I got", "just done", "just had", "already did", "did my", "went for", "went to", "trained", "ran", "walked", "ate", "cooked", "read", "meditated", "worked on". The activity has ALREADY HAPPENED — use this instead of TASK. Do NOT use COMPLETED_ACTIVITY if the user says "remind me" or "I need to" (those are future tasks).
 3. NOTE — user is journaling, reflecting, or sharing feelings (emotional, reflective, no clear action item and no concrete activity completed)
 4. LEGEND — user is defining or confirming their long-term Legend (one-sentence life vision) for a character dimension. Use when they confirm a final legend sentence or say "save this as my legend".
@@ -120,6 +121,13 @@ Classify this input into one of these intents:
 8. CALENDAR_DELETE — user wants to cancel or delete an existing calendar event. Keywords: "cancel", "delete", "remove", "drop", "skip". Only use when clearly referring to an existing event that appears in the calendar context above.
 9. VAULT_UPDATE — user is reporting a change to their net worth or savings balance. Triggers: "my revolut is now", "my savings is now", "cash is now", "just transferred", "invested another", "net worth update", "my ISA is now", "my portfolio is", "topped up", "withdrew from savings". Extract field and amount. If user gives a delta ("I added £2k to savings"), use cash_delta or invested_delta with the delta amount; convert to absolute only if prior balance is clear from vault context.
 10. CHAT — questions, advice, open conversation. Never use CHAT if there's a clear action item. Use CHAT if the user wants to update/delete an event but no matching event exists in the calendar context.
+
+For MILESTONE, extract:
+- title: clean milestone title (e.g. "Systems Design study plan", "Get residency permit")
+- dimension: one of "career", "social", "wealth", "vitality", "mind", "love", "family" — infer from context
+- questId: match to the most relevant active quest id from the list above, or null if no match
+- targetDate: ISO date if mentioned, otherwise null
+The oracleReply should confirm enthusiastically in 1 sentence (e.g. "Done — added Systems Design as a milestone on your career quest.")
 
 For COMPLETED_ACTIVITY, extract the same fields as TASK but put them in "completed_task":
 - title: clean activity title (e.g. "20 minute walk", "Gym session", "Read 30 minutes")
@@ -184,7 +192,7 @@ The oracleReply should be warm and brief — acknowledge the update and mention 
 
 Respond ONLY with valid JSON, no explanation:
 {
-  "intent": "TASK" | "COMPLETED_ACTIVITY" | "NOTE" | "LEGEND" | "BOSS" | "CALENDAR_CREATE" | "CALENDAR_UPDATE" | "CALENDAR_DELETE" | "VAULT_UPDATE" | "CHAT",
+  "intent": "TASK" | "COMPLETED_ACTIVITY" | "NOTE" | "LEGEND" | "BOSS" | "MILESTONE" | "CALENDAR_CREATE" | "CALENDAR_UPDATE" | "CALENDAR_DELETE" | "VAULT_UPDATE" | "CHAT",
   "completed_task": {
     "title": "...",
     "dimension": "career" | "social" | "wealth" | "vitality" | "mind" | "love" | "family",
@@ -246,6 +254,12 @@ Respond ONLY with valid JSON, no explanation:
     "field": "invested" | "cash" | "cash_delta" | "invested_delta" | "both",
     "amount": 56000,
     "notes": "Revolut savings pot" | null
+  } | null,
+  "milestone": {
+    "title": "...",
+    "dimension": "career" | "social" | "wealth" | "vitality" | "mind" | "love" | "family",
+    "questId": "..." | null,
+    "targetDate": "YYYY-MM-DD" | null
   } | null,
   "oracleReply": "..."
 }`

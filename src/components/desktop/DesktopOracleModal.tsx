@@ -32,13 +32,14 @@ interface ParsedTask {
 
 interface ClassifyResult {
   intent: 'TASK' | 'COMPLETED_ACTIVITY' | 'NOTE' | 'LEGEND' | 'BOSS'
-    | 'CALENDAR_CREATE' | 'CALENDAR_UPDATE' | 'CALENDAR_DELETE' | 'VAULT_UPDATE' | 'CHAT'
+    | 'MILESTONE' | 'CALENDAR_CREATE' | 'CALENDAR_UPDATE' | 'CALENDAR_DELETE' | 'VAULT_UPDATE' | 'CHAT'
   task: ParsedTask | null
   tasks?: ParsedTask[]
   completed_task?: { title: string; dimension: string | null; date: string | null; xpReward: number } | null
   note: { text: string } | null
   legend?: { dimension: string; vision: string | null } | null
   boss?: { dimension: string } | null
+  milestone?: { title: string; dimension: string | null; questId: string | null; targetDate?: string | null } | null
   calendar_event?: { title: string; date: string; startTime: string | null; durationMinutes: number; description?: string | null; location?: string | null } | null
   calendar_update?: { event_id: string; event_title: string; current_date: string; current_time: string | null; new_date: string; new_start_time: string | null; new_duration_minutes: number } | null
   calendar_delete?: { event_id: string; event_title: string; event_date: string; event_time: string | null } | null
@@ -388,6 +389,41 @@ export function DesktopOracleModal() {
         window.dispatchEvent(new CustomEvent('protagonist:task-added'))
         const reply = data.oracleReply ?? `Logged +${ct.xpReward ?? 50} XP for "${ct.title}"`
         setChatMessages(prev => [...prev, { role: 'oracle', text: reply }])
+      } else if (data.intent === 'MILESTONE' && data.milestone) {
+        const ms = data.milestone
+        if (!ms.questId) {
+          // No quest matched — fall back to a loose task so it's still captured
+          await fetch('/api/quests/tasks', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              userId,
+              dimension: ms.dimension ?? 'career',
+              title: ms.title,
+              xpReward: 75,
+              taskDate: ms.targetDate ?? null,
+            }),
+          })
+          window.dispatchEvent(new CustomEvent('protagonist:task-added'))
+          const reply = data.oracleReply ?? `Added "${ms.title}" as a task — attach it to a quest on your ${ms.dimension ?? 'career'} page when ready.`
+          setChatMessages(prev => [...prev, { role: 'oracle', text: reply }])
+        } else {
+          const msRes = await fetch('/api/quests/milestones', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              userId,
+              questId: ms.questId,
+              title: ms.title,
+              targetDate: ms.targetDate ?? null,
+            }),
+          })
+          window.dispatchEvent(new CustomEvent('protagonist:task-added'))
+          const reply = msRes.ok
+            ? (data.oracleReply ?? `Done — "${ms.title}" added as a milestone.`)
+            : `Couldn't save that milestone — try again.`
+          setChatMessages(prev => [...prev, { role: 'oracle', text: reply }])
+        }
       } else if (data.intent === 'CALENDAR_CREATE' && data.calendar_event) {
         const ev = data.calendar_event
         const calRes = await fetch('/api/calendar/create', {
@@ -399,9 +435,7 @@ export function DesktopOracleModal() {
         const reply = calRes.ok ? `Added to calendar: "${ev.title}" on ${ev.date}${ev.startTime ? ` at ${ev.startTime}` : ''}` : "Couldn't add that to your calendar — try again."
         setChatMessages(prev => [...prev, { role: 'oracle', text: reply }])
       } else {
-        // Genuine CHAT / NOTE — send to Arc for a conversational reply
-        // Important: Arc cannot create tasks or calendar events directly.
-        // It will only provide conversational responses.
+        // CHAT / NOTE — send to Arc for a conversational reply
         const arcRes = await fetch('/api/arc', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
