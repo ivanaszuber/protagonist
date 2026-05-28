@@ -21,11 +21,10 @@ function xpScore(xp: number): number {
   return Math.min(10, Math.max(1, Math.round(level * 1.5 + progress)))
 }
 
-/** Blend baseline (user-set) with XP-derived score */
+/** Returns user-set baseline if available, otherwise XP-derived score */
 export function blendScore(baseline: number | null, xp: number): number {
-  const xs = xpScore(xp)
-  if (baseline == null) return xs
-  return Math.round((baseline + xs) / 2)
+  if (baseline != null) return baseline
+  return xpScore(xp)
 }
 
 interface ScoreBlockProps {
@@ -121,8 +120,8 @@ export function ScoreBlock({ dimension, xp, userId, accentColor }: ScoreBlockPro
           </div>
           <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>
             {baseline != null
-              ? `You: ${baseline} · XP: ${xs} · Blended: ${displayed}`
-              : `Set your baseline below`}
+              ? `Your score · XP rank: ${xs}`
+              : `Set your score below`}
           </div>
         </div>
       </div>
@@ -159,7 +158,7 @@ export function ScoreBlock({ dimension, xp, userId, accentColor }: ScoreBlockPro
 
       {/* Hint */}
       <div style={{ marginTop: 8, fontSize: 11, color: 'rgba(255,255,255,0.28)' }}>
-        Your score blends with XP progress and rises automatically as you complete quests.
+        How would you honestly rate this area of your life right now?
       </div>
     </div>
   )

@@ -76,9 +76,8 @@ function xpScore(xp: number): number {
 }
 
 function getDimScore(xp: number, baseline?: number): number {
-  const xs = xpScore(xp)
-  if (baseline == null) return xs
-  return Math.round((baseline + xs) / 2)
+  if (baseline != null) return baseline
+  return xpScore(xp)
 }
 
 function toDateStr(d: Date): string {
