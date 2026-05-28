@@ -261,6 +261,19 @@ function MoodDot({ signal }: { signal: string | null }) {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+/** Convert third-person she/her language from API to second-person you/your */
+function toSecondPerson(text: string): string {
+  return text
+    .replace(/\bShe\b/g, 'You')
+    .replace(/\bshe\b/g, 'you')
+    .replace(/\bHer\b/g, 'Your')
+    .replace(/\bher\b/g, 'your')
+    .replace(/\bHers\b/g, 'Yours')
+    .replace(/\bhers\b/g, 'yours')
+    .replace(/\bHerself\b/g, 'Yourself')
+    .replace(/\bherself\b/g, 'yourself')
+}
+
 function formatRelTime(iso: string): string {
   const d = new Date(iso)
   const now = new Date()
@@ -370,7 +383,7 @@ function EntryCard({ entry }: { entry: JournalEntry }) {
               paddingLeft: 12,
             }}>
               <p style={{ ...font, fontSize: 10, color: dimColor, fontWeight: 700, marginBottom: 4, letterSpacing: '1.2px' }}>
-                ARC'S INSIGHT
+                ORACLE'S INSIGHT
               </p>
               <p style={{ ...font, fontSize: 13, color: 'rgba(255,255,255,0.6)', lineHeight: 1.65 }}>
                 {entry.oracleReply}
@@ -380,7 +393,7 @@ function EntryCard({ entry }: { entry: JournalEntry }) {
 
           {!expanded && entry.oracleReply && (
             <p style={{ ...font, fontSize: 11, color: 'rgba(255,255,255,0.28)', marginTop: 6 }}>
-              tap to see Arc's insight
+              tap to see Oracle's insight
             </p>
           )}
         </>
@@ -568,7 +581,7 @@ function PortraitView({ portrait, identity, identityLoading, loading, profile, i
           <Icon name="arc" size={28} color="white" />
         </div>
         <p style={{ ...font, color: 'rgba(255,255,255,0.5)', fontSize: 14 }}>
-          Arc is synthesizing your story…
+          Oracle is synthesizing your story…
         </p>
       </div>
     )
@@ -585,9 +598,9 @@ function PortraitView({ portrait, identity, identityLoading, loading, profile, i
         }}>
           <Icon name="portrait" size={32} color="#C4A8FF" />
         </div>
-        <h3 style={{ ...font, color: '#fff', fontSize: 18, fontWeight: 700 }}>Arc's Portrait awaits</h3>
+        <h3 style={{ ...font, color: '#fff', fontSize: 18, fontWeight: 700 }}>Oracle's Portrait awaits</h3>
         <p style={{ ...font, color: 'rgba(255,255,255,0.45)', fontSize: 13.5, textAlign: 'center', maxWidth: 340, lineHeight: 1.7 }}>
-          Arc synthesizes your memories, reflections, and growth into a living psychological portrait — a mirror of who you're becoming.
+          Oracle synthesizes your memories, reflections, and growth into a living psychological portrait — a mirror of who you're becoming.
         </p>
         <button
           onClick={onGenerate}
@@ -635,7 +648,7 @@ function PortraitView({ portrait, identity, identityLoading, loading, profile, i
               fontSize: 9, fontWeight: 700, letterSpacing: '1.6px',
               padding: '3px 10px', borderRadius: 100, textTransform: 'uppercase' as const, flexShrink: 0,
             }}>
-              Arc's Portrait
+              Oracle's Portrait
             </div>
             {profile?.displayName && (
               <span style={{ ...font, color: 'rgba(255,255,255,0.45)', fontSize: 12 }}>· {profile.displayName}</span>
@@ -656,7 +669,7 @@ function PortraitView({ portrait, identity, identityLoading, loading, profile, i
               paddingLeft: 14, marginBottom: 16,
             }}>
               <p style={{ ...font, fontSize: 15, fontStyle: 'italic', color: 'rgba(255,255,255,0.78)', lineHeight: 1.75 }}>
-                "{identity.essenceQuote}"
+                "{toSecondPerson(identity.essenceQuote)}"
               </p>
             </div>
           )}
@@ -707,7 +720,7 @@ function PortraitView({ portrait, identity, identityLoading, loading, profile, i
           borderRadius: 18, padding: '20px 22px', border: '1px solid rgba(196,168,255,0.18)',
         }}>
           <p style={{ ...font, fontSize: 10, fontWeight: 700, color: '#C4A8FF', letterSpacing: '1.5px', marginBottom: 12, textTransform: 'uppercase' as const }}>Your Essence</p>
-          <p style={{ ...font, fontSize: 16, color: '#fff', lineHeight: 1.85, fontWeight: 500, fontStyle: 'italic' }}>"{portrait.essence}"</p>
+          <p style={{ ...font, fontSize: 16, color: '#fff', lineHeight: 1.85, fontWeight: 500, fontStyle: 'italic' }}>"{toSecondPerson(portrait.essence)}"</p>
         </div>
       )}
 
@@ -718,7 +731,7 @@ function PortraitView({ portrait, identity, identityLoading, loading, profile, i
           border: '1px solid rgba(123,63,228,0.15)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
-          <span style={{ ...font, color: 'rgba(255,255,255,0.3)', fontSize: 12 }}>Arc is reading your memories…</span>
+          <span style={{ ...font, color: 'rgba(255,255,255,0.3)', fontSize: 12 }}>Oracle is reading your memories…</span>
         </div>
       )}
 
@@ -776,7 +789,7 @@ function PortraitView({ portrait, identity, identityLoading, loading, profile, i
           border: '1px solid rgba(110,231,164,0.14)',
         }}>
           <p style={{ ...font, fontSize: 9, fontWeight: 700, color: '#6EE7A4', letterSpacing: '1.5px', textTransform: 'uppercase' as const, marginBottom: 10 }}>Your Growth</p>
-          <p style={{ ...font, fontSize: 14, color: 'rgba(255,255,255,0.82)', lineHeight: 1.8 }}>{portrait.growth}</p>
+          <p style={{ ...font, fontSize: 14, color: 'rgba(255,255,255,0.82)', lineHeight: 1.8 }}>{toSecondPerson(portrait.growth)}</p>
         </div>
       )}
 
@@ -848,7 +861,7 @@ function PortraitView({ portrait, identity, identityLoading, loading, profile, i
       {identity?.dimensionInsights && identity.dimensionInsights.length > 0 && (
         <div className="jrn-portrait-section">
           <p style={{ ...font, fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.3)', letterSpacing: '1.6px', textTransform: 'uppercase' as const, marginBottom: 10 }}>
-            Arc's Lens
+            Oracle's Lens
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
             {identity.dimensionInsights.map((d, i) => (
@@ -863,7 +876,7 @@ function PortraitView({ portrait, identity, identityLoading, loading, profile, i
                     {d.dimension}
                   </p>
                   <p style={{ ...font, fontSize: 12.5, color: 'rgba(255,255,255,0.68)', lineHeight: 1.6 }}>
-                    {d.insight}
+                    {toSecondPerson(d.insight)}
                   </p>
                 </div>
               </div>
@@ -1354,7 +1367,7 @@ export default function DesktopJournalPage() {
   const tabs: { id: Tab; icon: string; label: string }[] = [
     { id: 'stream', icon: 'stream', label: 'Stream' },
     { id: 'pulse', icon: 'pulse', label: 'Pulse' },
-    { id: 'portrait', icon: 'portrait', label: "Arc's Portrait" },
+    { id: 'portrait', icon: 'portrait', label: "Oracle's Portrait" },
     { id: 'growth', icon: 'growth', label: 'Growth Map' },
   ]
 
@@ -1536,33 +1549,6 @@ export default function DesktopJournalPage() {
 
               {activeTab === 'portrait' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                  {/* Import banner — shown when no portrait yet or always accessible */}
-                  <div style={{
-                    background: 'linear-gradient(135deg, rgba(123,63,228,0.12), rgba(196,168,255,0.06))',
-                    borderRadius: 14, padding: '14px 18px',
-                    border: '1px solid rgba(196,168,255,0.15)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap',
-                  }}>
-                    <div>
-                      <p style={{ ...font, fontSize: 13, fontWeight: 700, color: '#C4A8FF', marginBottom: 2 }}>
-                        Coming from ChatGPT?
-                      </p>
-                      <p style={{ ...font, fontSize: 12, color: 'rgba(255,255,255,0.4)', lineHeight: 1.5 }}>
-                        Import your conversation history so Arc already knows you from day one.
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => setShowImport(true)}
-                      style={{
-                        ...font, cursor: 'pointer', fontWeight: 700, fontSize: 12,
-                        background: 'rgba(196,168,255,0.15)', color: '#C4A8FF',
-                        border: '1px solid rgba(196,168,255,0.25)', borderRadius: 9,
-                        padding: '8px 16px', whiteSpace: 'nowrap', flexShrink: 0,
-                      }}
-                    >
-                      Import context →
-                    </button>
-                  </div>
                   <PortraitView
                     portrait={portrait}
                     identity={identity}

@@ -684,7 +684,7 @@ function ChatView({ messages, input, setInput, onSubmit, loading, inputRef, chat
         <div style={{ background: '#1A1335', borderBottom: '1px solid rgba(255,255,255,0.08)', padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 10 }}>
           <OracleRobot size={26} />
           <div>
-            <div style={{ color: 'white', fontSize: 14, fontWeight: 600 }}>The Oracle · Arc</div>
+            <div style={{ color: 'white', fontSize: 14, fontWeight: 600 }}>The Oracle</div>
             <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11 }}>Your AI life companion</div>
           </div>
         </div>
@@ -693,7 +693,7 @@ function ChatView({ messages, input, setInput, onSubmit, loading, inputRef, chat
         <div style={{ flex: 1, padding: '18px 20px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12, scrollbarWidth: 'none' }}>
           {messages.length === 0 && (
             <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: 12, fontStyle: 'italic', textAlign: 'center', marginTop: 40 }}>
-              Ask Arc anything — tasks, calendar, reflections, or just a chat.
+              Ask Oracle anything — tasks, calendar, reflections, or just a chat.
             </div>
           )}
           {messages.map((m, i) => (
@@ -817,7 +817,7 @@ function ChatView({ messages, input, setInput, onSubmit, loading, inputRef, chat
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSubmit() } }}
-              placeholder={isRecording ? 'Listening…' : attachment ? 'Add a message (or just send the file)…' : 'Ask Arc anything…'}
+              placeholder={isRecording ? 'Listening…' : attachment ? 'Add a message (or just send the file)…' : 'Ask Oracle anything…'}
               rows={1}
               style={{ flex: 1, background: isRecording ? 'rgba(255,107,157,0.06)' : 'rgba(255,255,255,0.06)', border: `1px solid ${isRecording ? 'rgba(255,107,157,0.3)' : 'rgba(255,255,255,0.1)'}`, borderRadius: 10, padding: '10px 14px', color: 'white', fontSize: 13, fontFamily: 'inherit', outline: 'none', resize: 'none', lineHeight: 1.5, transition: 'border-color 0.15s, background 0.15s', overflowY: 'auto', minHeight: 40, maxHeight: 160 }}
             />
@@ -908,7 +908,7 @@ function CheckinInputView({ mode, context, input, setInput, onSubmit, onClose }:
         )}
 
         <div style={{ background: 'rgba(255,122,101,0.08)', border: '1px solid rgba(255,122,101,0.18)', borderRadius: 10, padding: 12, flex: 1 }}>
-          <span style={{ ...metaLabel, marginBottom: 6 }}>Arc says</span>
+          <span style={{ ...metaLabel, marginBottom: 6 }}>Oracle says</span>
           <div style={{ color: 'rgba(255,255,255,0.72)', fontSize: 12, fontStyle: 'italic', lineHeight: 1.6 }}>
             {isLoading ? 'Loading your morning...' : 'Tell me about how you\'re feeling and what\'s on your mind today.'}
           </div>
@@ -926,13 +926,13 @@ function CheckinInputView({ mode, context, input, setInput, onSubmit, onClose }:
               <OracleRobot size={56} />
             </div>
             <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13, fontStyle: 'italic' }}>
-              {mode === 'checkin-loading' ? 'Loading your morning...' : 'Arc is processing your check-in...'}
+              {mode === 'checkin-loading' ? 'Loading your morning...' : 'Oracle is processing your check-in...'}
             </div>
           </div>
         ) : (
           <>
             <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, marginBottom: 12, lineHeight: 1.6 }}>
-              Share anything — how you slept, how you feel, what's on your mind, what you're planning. Arc will pull out tasks, surface insights, and set you up for the day.
+              Share anything — how you slept, how you feel, what's on your mind, what you're planning. Oracle will pull out tasks, surface insights, and set you up for the day.
             </div>
             <textarea
               autoFocus
@@ -1034,7 +1034,7 @@ function CheckinDoneView({ result, context, onClose, onAskArc }: {
         </div>
 
         <div style={{ background: 'rgba(255,122,101,0.08)', border: '1px solid rgba(255,122,101,0.18)', borderRadius: 10, padding: 12, flex: 1 }}>
-          <span style={{ ...metaLabel, marginBottom: 6 }}>Arc says</span>
+          <span style={{ ...metaLabel, marginBottom: 6 }}>Oracle says</span>
           <div style={{ color: 'rgba(255,255,255,0.75)', fontSize: 12, fontStyle: 'italic', lineHeight: 1.6 }}>
             &ldquo;{result.oracle_message || 'Your morning has been set. Make today count.'}&rdquo;
           </div>
@@ -1097,7 +1097,7 @@ function CheckinDoneView({ result, context, onClose, onAskArc }: {
         {/* Actions */}
         <div style={{ display: 'flex', gap: 10, marginTop: 'auto', paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.07)' }}>
           <button onClick={onAskArc} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '11px 16px', color: 'rgba(255,255,255,0.6)', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>
-            Ask Arc to adjust
+            Ask Oracle to adjust
           </button>
           <button onClick={onClose} style={{ flex: 1, background: '#FF7A65', border: 'none', borderRadius: 10, padding: '11px', color: 'white', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
             Start my day →

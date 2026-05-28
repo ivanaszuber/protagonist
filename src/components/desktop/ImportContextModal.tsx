@@ -261,7 +261,7 @@ export default function ImportContextModal({ userId, onClose }: Props) {
               Import Context from ChatGPT
             </h2>
             <p style={{ ...font, fontSize: 12, color: 'rgba(255,255,255,0.4)', margin: 0, marginTop: 1 }}>
-              Arc reads your history and builds a head-start on knowing you
+              Oracle reads your history and builds a head-start on knowing you
             </p>
           </div>
           <button
@@ -404,7 +404,7 @@ export default function ImportContextModal({ userId, onClose }: Props) {
                     ? <><SpinnerIcon size={15} /> Analysing…</>
                     : <>
                         <BrainIcon size={14} color="white" />
-                        Analyse with Arc
+                        Analyse with Oracle
                       </>
                   }
                 </button>
@@ -426,7 +426,7 @@ export default function ImportContextModal({ userId, onClose }: Props) {
               }}>
                 <div>
                   <p style={{ fontSize: 14, fontWeight: 700, color: '#fff', margin: 0 }}>
-                    Arc found {memories.length} memories
+                    Oracle found {memories.length} memories
                   </p>
                   <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', margin: 0, marginTop: 2 }}>
                     Deselect anything you don't want saved. {selectedCount} selected.
@@ -535,10 +535,10 @@ export default function ImportContextModal({ userId, onClose }: Props) {
               </div>
               <div>
                 <h3 style={{ ...font, fontSize: 20, fontWeight: 800, color: '#fff', marginBottom: 8 }}>
-                  Arc now knows you better
+                  Oracle now knows you better
                 </h3>
                 <p style={{ ...font, fontSize: 14, color: 'rgba(255,255,255,0.55)', lineHeight: 1.7, maxWidth: 360 }}>
-                  {savedCount} memories saved across your life areas. Arc will use these to give you more personal, contextual coaching from day one.
+                  {savedCount} memories saved across your life areas. Oracle will use these to give you more personal, contextual coaching from day one.
                 </p>
               </div>
               <div style={{ display: 'flex', gap: 10 }}>
@@ -608,7 +608,7 @@ export default function ImportContextModal({ userId, onClose }: Props) {
             >
               {step === 'saving'
                 ? <><SpinnerIcon size={15} /> Saving…</>
-                : <>Save {selectedCount} memories to Arc</>
+                : <>Save {selectedCount} memories to Oracle</>
               }
             </button>
           </div>

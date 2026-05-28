@@ -304,7 +304,7 @@ export function DesktopLeftSidebar({
 
                 {/* Name + life facts + archetype tags */}
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ color: 'white', fontSize: 15, fontWeight: 600, letterSpacing: -0.3, marginBottom: 4 }}>
+                  <div style={{ color: 'white', fontSize: 24, fontWeight: 700, letterSpacing: -0.5, marginBottom: 4, lineHeight: 1.1 }}>
                     {profile?.displayName || 'Ivana'}
                   </div>
 
@@ -336,32 +336,12 @@ export function DesktopLeftSidebar({
                     </div>
                   )}
 
-                  {/* Archetype tags — tiny muted chips */}
-                  {archTags.length > 0 && (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
-                      {archTags.map((tag, i) => (
-                        <span key={i} style={{
-                          fontSize: 9, color: tag.color,
-                          background: `${tag.color.replace('0.65', '0.07')}`,
-                          border: `1px solid ${tag.border}`,
-                          padding: '2px 5px', borderRadius: 4,
-                        }}>
-                          {tag.label}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                  </div>
               </div>
-
-              {divider}
 
               {/* ── NOW — split into strengths + watch-for ── */}
               {hasNow && (
                 <>
-                  {divider}
-                  <span style={metaLabel}>Now</span>
-
                   {/* Strengths showing up */}
                   {nowStrengths.length > 0 && (
                     <div style={{ marginBottom: nowWatch.length > 0 ? 10 : 4 }}>
@@ -373,7 +353,7 @@ export function DesktopLeftSidebar({
                         <span style={{ fontSize: 7 }}>●</span>
                         Strengths showing up
                       </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 0, paddingLeft: 10 }}>
                         {nowStrengths.map((pill, i) => {
                           return (
                             <div key={i} style={{
@@ -408,7 +388,7 @@ export function DesktopLeftSidebar({
                         <span style={{ fontSize: 9 }}>△</span>
                         Watch for
                       </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 0, paddingLeft: 10 }}>
                         {nowWatch.map((pill, i) => (
                           <div key={i} style={{
                             display: 'flex', alignItems: 'flex-start', gap: 7,
@@ -430,7 +410,7 @@ export function DesktopLeftSidebar({
                     </div>
                   )}
 
-                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.18)', marginTop: 6 }}>
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', marginTop: 8 }}>
                     from your recent conversations
                   </div>
                 </>

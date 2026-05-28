@@ -836,7 +836,7 @@ export default function DesktopDashboardV2(props: DesktopDashboardV2Props) {
               border: '1px solid rgba(255,122,101,0.18)',
               borderRadius: 12, padding: '16px 14px',
             }}>
-              <span style={{ ...metaLabel, marginBottom: 14 }}>The Oracle · Arc</span>
+              <span style={{ ...metaLabel, marginBottom: 14 }}>The Oracle</span>
 
               {/* Oracle Robot */}
               <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}>
