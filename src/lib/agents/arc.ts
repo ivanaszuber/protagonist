@@ -68,6 +68,72 @@ If asked, guide them: "Add task: [name]" or "Remind me to [thing] [when]".`
 const SPECIALIST_MODEL = 'claude-haiku-4-5-20251001'
 const ARC_MODEL = 'claude-sonnet-4-6'
 
+// ── Relationship memory writer ─────────────────────────────────────────────────
+// Runs silently after every conversation. Captures emotional and relational
+// patterns that help Arc feel like it truly *knows* the person over time.
+
+const RELATIONSHIP_MEMORY_PROMPT = `You are the emotional memory system for Arc, an AI life coach.
+
+After each conversation exchange, your job is to record 0–2 emotional or relational
+insights about the user — permanent internal notes that will make Arc more emotionally
+intelligent in every future conversation.
+
+WHAT TO CAPTURE (only if genuinely revealed in this exchange):
+- Emotional patterns: how they react under stress, what they deflect, what opens them up
+- Relationship dynamics: patterns with key people (Leo, Zara, family, colleagues)
+- Emotional triggers: topics that create unusual anxiety, resistance, or energy
+- Self-relationship: where they're harsh vs generous with themselves
+- Growth loops: where they're genuinely stretching vs repeating old patterns
+- What they need but don't always ask for (challenge, validation, space, directness)
+
+WHAT NOT TO CAPTURE:
+- Tasks, goals, plans (those go in dimension memories)
+- Facts already in their profile (age, location, family info)
+- Neutral or purely practical exchanges with no emotional content
+- Anything already obvious or generic
+
+FORMAT: Return JSON only — no other text.
+{ "memories": ["sentence one", "sentence two"] }
+
+Each memory: one sentence, present-tense, Arc's internal observation voice.
+Good examples:
+  "Deflects with humour when the Leo situation surfaces — the joke is the tell"
+  "Pride and exhaustion live together around Zara; she rarely separates them"
+  "Big ideas energise her immediately; the gap between idea and action is where fear lives"
+  "Needs to feel competent before she can ask for help — vulnerability feels like weakness"
+
+If no genuine emotional insight emerged from this exchange, return: { "memories": [] }
+Maximum 2 memories. Quality over quantity.`
+
+async function writeRelationshipMemory(
+  userMessage: string,
+  arcResponse: string,
+  userId: string
+): Promise<void> {
+  try {
+    const response = await anthropic.messages.create({
+      model: SPECIALIST_MODEL,
+      max_tokens: 220,
+      system: RELATIONSHIP_MEMORY_PROMPT,
+      messages: [{
+        role: 'user',
+        content: `User said: "${userMessage}"\n\nArc responded: "${arcResponse}"\n\nWhat emotional/relational memories should Arc store from this exchange?`,
+      }],
+    })
+    const text = response.content[0].type === 'text' ? response.content[0].text : ''
+    const parsed = parseJsonFromClaude<{ memories: string[] }>(text)
+    if (parsed.memories?.length > 0) {
+      await Promise.allSettled(
+        parsed.memories.map((mem) =>
+          saveDimensionMemory('arc', mem, 'conversation', 8, userId)
+        )
+      )
+    }
+  } catch {
+    // Silent fail — background operation, never blocks the response
+  }
+}
+
 export interface ArcInput {
   userMessage: string
   userId: string
@@ -252,13 +318,14 @@ function buildPersonContext(profile: UserProfileRow): string {
 export async function consultArc(input: ArcInput): Promise<ArcOutput> {
   const { userMessage, userId, checkInData } = input
 
-  // Load profile and all external context in parallel
-  const [loadedOura, { calendarContext, freeBlocks }, profileResult] = await Promise.all([
+  // Load profile, arc relationship memories, and all external context in parallel
+  const [loadedOura, { calendarContext, freeBlocks }, profileResult, arcMemories] = await Promise.all([
     input.ouraData !== undefined
       ? Promise.resolve({ payload: input.ouraData, contextBlock: '' })
       : loadOuraContextForUser(userId),
     loadCalendarContextForUser(userId),
     getUserProfile(userId).catch(() => null),
+    getDimensionMemories('arc', 15, userId).catch(() => [] as string[]),
   ])
 
   const ouraContextBlock = loadedOura.contextBlock
@@ -323,8 +390,14 @@ export async function consultArc(input: ArcInput): Promise<ArcOutput> {
     ? `\nUser's current state: energy ${checkInData.energyLevel}/10, mood: ${checkInData.mood}`
     : ''
 
+  const arcMemoryBlock =
+    arcMemories.length > 0
+      ? `EMOTIONAL & RELATIONAL MEMORY (what you know about how this person feels, relates, and patterns):\n${arcMemories.join('\n')}`
+      : ''
+
   const contextSection = [
     personContextBlock ? personContextBlock : '',
+    arcMemoryBlock,
     ouraContextBlock
       ? `BIODATA FOR TODAY (from Oura Ring — use for energy/recovery calibration):\n${ouraContextBlock}`
       : '',
@@ -368,6 +441,10 @@ No specialist insights were available. Respond as Arc with warmth and specificit
       saveDimensionMemory(toPersistenceId(r.dimensionId), r.memoryToStore, 'conversation', 6, userId)
     )
   await Promise.allSettled(memoryPromises)
+
+  // Fire-and-forget: extract emotional/relational patterns into arc memory.
+  // Runs after response is returned — never delays the user.
+  void writeRelationshipMemory(userMessage, arcResponse, userId)
 
   const questSuggestions = activeResults
     .filter((r) => r.questSuggestion)
