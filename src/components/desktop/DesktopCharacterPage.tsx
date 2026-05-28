@@ -16,6 +16,7 @@ import { MedalsRow } from '@/components/characters/MedalsRow'
 import { LegendCard } from '@/components/characters/LegendCard'
 import { DesktopLeftSidebar, DIM_COLORS } from './DesktopLeftSidebar'
 import { openOracle } from '@/lib/oracle-events'
+import { isCheckinDoneToday } from './DesktopOracleModal'
 import {
   ForgeCharacterLarge,
   EchoCharacterLarge,
@@ -155,6 +156,13 @@ export function DesktopCharacterPage({ dimension }: DesktopCharacterPageProps) {
   const [killStats, setKillStats] = useState({ slain: 0, escaped: 0 })
   const [earnedMedals, setEarnedMedals] = useState<string[]>([])
   const [dimScores, setDimScores] = useState<Record<string, number>>({})
+  const [checkinDone, setCheckinDone] = useState(() => isCheckinDoneToday())
+
+  useEffect(() => {
+    const handler = () => setCheckinDone(true)
+    window.addEventListener('protagonist:checkin-done', handler)
+    return () => window.removeEventListener('protagonist:checkin-done', handler)
+  }, [])
 
   // ── Data loading ──────────────────────────────────────────────────────────
 
@@ -326,19 +334,22 @@ export function DesktopCharacterPage({ dimension }: DesktopCharacterPageProps) {
 
         <div style={{ flex: 1 }} />
 
-        {/* Morning Check-In */}
+        {/* Morning Check-In / Daily Brief */}
         <button
           type="button"
-          onClick={() => openOracle('', 'morning_checkin')}
+          onClick={() => openOracle('', checkinDone ? 'checkin-summary' : 'morning_checkin')}
           style={{
-            background: '#FF7A65', color: 'white', padding: '9px 22px',
+            background: checkinDone ? 'rgba(110,231,164,0.12)' : '#FF7A65',
+            color: checkinDone ? '#6EE7A4' : 'white',
+            padding: '9px 22px',
             borderRadius: 100, fontSize: 13, fontWeight: 600, cursor: 'pointer',
-            marginRight: 12, border: 'none',
-            animation: 'dcp-pulse-btn 3s ease-in-out infinite',
+            marginRight: 12,
+            border: checkinDone ? '1px solid rgba(110,231,164,0.35)' : 'none',
+            animation: checkinDone ? 'none' : 'dcp-pulse-btn 3s ease-in-out infinite',
             letterSpacing: 0.1, ...font,
           }}
         >
-          Morning Check-In
+          {checkinDone ? '✓ Daily Brief' : 'Morning Check-In'}
         </button>
 
         {/* Settings */}

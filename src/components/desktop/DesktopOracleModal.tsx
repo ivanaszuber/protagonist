@@ -52,6 +52,25 @@ type ModalMode = 'closed' | 'chat' | 'checkin-loading' | 'checkin-input' | 'chec
 
 function dimColor(d: string): string { return CHARACTERS[d as Dimension]?.color ?? '#A87EF8' }
 
+// ── Check-in localStorage cache ───────────────────────────────────────────────
+
+function getCheckinKey() {
+  return 'protagonist-checkin-' + new Date().toISOString().split('T')[0]
+}
+export function saveCheckinToCache(result: MorningCheckinResult) {
+  try { localStorage.setItem(getCheckinKey(), JSON.stringify(result)) } catch {}
+  window.dispatchEvent(new CustomEvent('protagonist:checkin-done'))
+}
+export function loadCheckinFromCache(): MorningCheckinResult | null {
+  try {
+    const raw = localStorage.getItem(getCheckinKey())
+    return raw ? (JSON.parse(raw) as MorningCheckinResult) : null
+  } catch { return null }
+}
+export function isCheckinDoneToday(): boolean {
+  try { return !!localStorage.getItem(getCheckinKey()) } catch { return false }
+}
+
 function renderMarkdown(text: string): string {
   return text
     .replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>')
@@ -146,7 +165,23 @@ export function DesktopOracleModal() {
   useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent<{ prefill?: string; context?: string }>).detail
-      if (detail?.context === 'morning_checkin') {
+      if (detail?.context === 'checkin-summary') {
+        // Reopen today's completed check-in summary
+        const cached = loadCheckinFromCache()
+        if (cached) {
+          setCheckinResult(cached)
+          setMode('checkin-done')
+        } else {
+          // Fallback: start a new check-in
+          setCheckinResult(null)
+          setCheckinInput('')
+          setMode('checkin-loading')
+          fetch(`/api/oracle/morning-context?userId=${encodeURIComponent(userId)}`)
+            .then(r => r.json())
+            .then((data: MorningContext) => { setMorningContext(data); setMode('checkin-input') })
+            .catch(() => setMode('checkin-input'))
+        }
+      } else if (detail?.context === 'morning_checkin') {
         setCheckinResult(null)
         setCheckinInput('')
         setMode('checkin-loading')
@@ -313,6 +348,7 @@ export function DesktopOracleModal() {
       const data = (await res.json()) as MorningCheckinResult
       setCheckinResult(data)
       setMode('checkin-done')
+      saveCheckinToCache(data)
       window.dispatchEvent(new CustomEvent('protagonist:task-added'))
     } catch {
       setMode('checkin-input')
@@ -410,13 +446,15 @@ function ChatView({ messages, input, setInput, onSubmit, loading, inputRef, chat
     el.style.height = Math.min(el.scrollHeight, 160) + 'px'
   }, [input, inputRef])
 
+  function stopVoice() {
+    if (!isRecording) return
+    recognitionRef.current?.stop()
+    recognitionRef.current = null
+    setIsRecording(false)
+  }
+
   function toggleVoice() {
-    if (isRecording) {
-      recognitionRef.current?.stop()
-      recognitionRef.current = null
-      setIsRecording(false)
-      return
-    }
+    if (isRecording) { stopVoice(); return }
     const SR = (window as typeof window & { webkitSpeechRecognition?: typeof SpeechRecognition }).SpeechRecognition
       || (window as typeof window & { webkitSpeechRecognition?: typeof SpeechRecognition }).webkitSpeechRecognition
     if (!SR) return
@@ -439,6 +477,11 @@ function ChatView({ messages, input, setInput, onSubmit, loading, inputRef, chat
       })
     }
     rec.start()
+  }
+
+  function handleSubmit() {
+    stopVoice()
+    void onSubmit()
   }
 
   return (
@@ -553,14 +596,14 @@ function ChatView({ messages, input, setInput, onSubmit, loading, inputRef, chat
             ref={inputRef}
             value={input}
             onChange={e => setInput(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void onSubmit() } }}
+            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSubmit() } }}
             placeholder={isRecording ? 'Listening…' : 'Ask Arc anything…'}
             rows={1}
             style={{ flex: 1, background: isRecording ? 'rgba(255,107,157,0.06)' : 'rgba(255,255,255,0.06)', border: `1px solid ${isRecording ? 'rgba(255,107,157,0.3)' : 'rgba(255,255,255,0.1)'}`, borderRadius: 10, padding: '10px 14px', color: 'white', fontSize: 13, fontFamily: 'inherit', outline: 'none', resize: 'none', lineHeight: 1.5, transition: 'border-color 0.15s, background 0.15s', overflowY: 'auto', minHeight: 40, maxHeight: 160 }}
           />
           <button
             type="button"
-            onClick={() => void onSubmit()}
+            onClick={handleSubmit}
             disabled={!input.trim() || loading}
             style={{ background: input.trim() && !loading ? '#FF7A65' : 'rgba(255,255,255,0.08)', border: 'none', borderRadius: 10, width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: input.trim() && !loading ? 'pointer' : 'default', flexShrink: 0, transition: 'background 0.15s' }}
           >
@@ -588,13 +631,15 @@ function CheckinInputView({ mode, context, input, setInput, onSubmit, onClose }:
   const [isRecording, setIsRecording] = React.useState(false)
   const recognitionRef = React.useRef<SpeechRecognition | null>(null)
 
+  function stopVoice() {
+    if (!isRecording) return
+    recognitionRef.current?.stop()
+    recognitionRef.current = null
+    setIsRecording(false)
+  }
+
   function toggleVoice() {
-    if (isRecording) {
-      recognitionRef.current?.stop()
-      recognitionRef.current = null
-      setIsRecording(false)
-      return
-    }
+    if (isRecording) { stopVoice(); return }
     const SR = (window as typeof window & { webkitSpeechRecognition?: typeof SpeechRecognition }).SpeechRecognition
       || (window as typeof window & { webkitSpeechRecognition?: typeof SpeechRecognition }).webkitSpeechRecognition
     if (!SR) return
@@ -617,6 +662,11 @@ function CheckinInputView({ mode, context, input, setInput, onSubmit, onClose }:
       })
     }
     rec.start()
+  }
+
+  function handleSubmit() {
+    stopVoice()
+    void onSubmit()
   }
 
   return (
@@ -667,7 +717,7 @@ function CheckinInputView({ mode, context, input, setInput, onSubmit, onClose }:
               autoFocus
               value={input}
               onChange={e => setInput(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) void onSubmit() }}
+              onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleSubmit() }}
               placeholder={isRecording ? 'Listening…' : 'e.g. Slept okay, feeling a bit tired but motivated. Big interview at 11, then I need to work on the app. Also need to plan Croatia trip...'}
               style={{ flex: 1, background: isRecording ? 'rgba(255,107,157,0.06)' : 'rgba(255,255,255,0.05)', border: `1px solid ${isRecording ? 'rgba(255,107,157,0.3)' : 'rgba(255,255,255,0.1)'}`, borderRadius: 12, padding: '14px 16px', color: 'white', fontSize: 13, fontFamily: 'inherit', outline: 'none', resize: 'none', lineHeight: 1.7, marginBottom: 14, transition: 'border-color 0.15s, background 0.15s' }}
             />
@@ -702,7 +752,7 @@ function CheckinInputView({ mode, context, input, setInput, onSubmit, onClose }:
                 Skip for now
               </button>
               <button
-                onClick={() => void onSubmit()}
+                onClick={handleSubmit}
                 disabled={!input.trim()}
                 style={{ flex: 1, background: input.trim() ? '#FF7A65' : 'rgba(255,122,101,0.25)', border: 'none', borderRadius: 10, padding: '11px', color: 'white', fontSize: 13, fontWeight: 600, cursor: input.trim() ? 'pointer' : 'default', fontFamily: 'inherit', transition: 'background 0.15s' }}
               >

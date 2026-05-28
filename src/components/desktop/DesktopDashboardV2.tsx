@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useRef } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { CSSProperties } from 'react'
 import { ALL_DIMENSIONS, type Dimension } from '@/lib/character'
@@ -9,6 +9,7 @@ import { getLevel, getLevelProgress } from '@/lib/xp'
 import { openOracle } from '@/lib/oracle-events'
 import type { DesktopDashboardProps } from './DesktopDashboard'
 import { DesktopLeftSidebar, DIM_COLORS } from './DesktopLeftSidebar'
+import { isCheckinDoneToday } from './DesktopOracleModal'
 
 // ── Extended props ────────────────────────────────────────────────────────────
 
@@ -124,6 +125,14 @@ export default function DesktopDashboardV2(props: DesktopDashboardV2Props) {
   const router = useRouter()
   const starsRef    = useRef<HTMLDivElement>(null)
   const sparklesRef = useRef<HTMLDivElement>(null)
+
+  // ── Check-in done state ───────────────────────────────────────────────────
+  const [checkinDone, setCheckinDone] = useState(() => isCheckinDoneToday())
+  useEffect(() => {
+    const handler = () => setCheckinDone(true)
+    window.addEventListener('protagonist:checkin-done', handler)
+    return () => window.removeEventListener('protagonist:checkin-done', handler)
+  }, [])
 
   const font: CSSProperties = { fontFamily: "'Space Grotesk', system-ui, sans-serif" }
   const colScroll: CSSProperties = { overflowY: 'auto', overflowX: 'hidden', scrollbarWidth: 'none' }
@@ -279,19 +288,22 @@ export default function DesktopDashboardV2(props: DesktopDashboardV2Props) {
 
           <div style={{ flex: 1 }} />
 
-          {/* Morning Check-In */}
+          {/* Morning Check-In / Daily Brief */}
           <button
             type="button"
-            onClick={() => openOracle('', 'morning_checkin')}
+            onClick={() => openOracle('', checkinDone ? 'checkin-summary' : 'morning_checkin')}
             style={{
-              background: '#FF7A65', color: 'white', padding: '9px 22px',
+              background: checkinDone ? 'rgba(110,231,164,0.12)' : '#FF7A65',
+              color: checkinDone ? '#6EE7A4' : 'white',
+              padding: '9px 22px',
               borderRadius: 100, fontSize: 13, fontWeight: 600, cursor: 'pointer',
-              marginRight: 12, border: 'none',
-              animation: 'v2-pulse-btn 3s ease-in-out infinite',
+              marginRight: 12,
+              border: checkinDone ? '1px solid rgba(110,231,164,0.35)' : 'none',
+              animation: checkinDone ? 'none' : 'v2-pulse-btn 3s ease-in-out infinite',
               letterSpacing: 0.1, ...font,
             }}
           >
-            Morning Check-In
+            {checkinDone ? '✓ Daily Brief' : 'Morning Check-In'}
           </button>
 
           {/* Settings */}
