@@ -290,29 +290,32 @@ export function DesktopOracleModal() {
   return (
     <>
       <style>{MODAL_CSS}</style>
-      {/* Backdrop */}
+      {/* Full-viewport flex overlay — avoids transform-centering issues with overflow:hidden ancestors */}
       <div
-        role="button" tabIndex={0} aria-label="Close"
-        onClick={close}
-        onKeyDown={e => e.key === 'Enter' && close()}
-        style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 100, cursor: 'default' }}
-      />
+        style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+      >
+        {/* Backdrop */}
+        <div
+          role="button" tabIndex={0} aria-label="Close"
+          onClick={close}
+          onKeyDown={e => e.key === 'Enter' && close()}
+          style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.65)', cursor: 'default' }}
+        />
 
-      {/* Modal */}
-      <div style={{
-        ...font,
-        position: 'fixed', top: '50%', left: '50%',
-        transform: 'translate(-50%, -50%)',
-        zIndex: 101,
-        width: 'min(900px, calc(100vw - 40px))',
-        maxHeight: 'calc(100vh - 60px)',
-        background: '#130E2A',
-        border: '1px solid rgba(255,255,255,0.1)',
-        borderRadius: 16,
-        overflow: 'hidden',
-        display: 'flex', flexDirection: 'column',
-        animation: 'dm-fade-in 0.2s ease-out both',
-      }}>
+        {/* Modal */}
+        <div style={{
+          ...font,
+          position: 'relative',
+          zIndex: 1,
+          width: 'min(860px, calc(100vw - 40px))',
+          maxHeight: 'calc(100vh - 60px)',
+          background: '#130E2A',
+          border: '1px solid rgba(255,255,255,0.1)',
+          borderRadius: 16,
+          overflow: 'hidden',
+          display: 'flex', flexDirection: 'column',
+          animation: 'dm-fade-in 0.2s ease-out both',
+        }}>
         {mode === 'chat' && <ChatView
           messages={chatMessages}
           input={chatInput}
@@ -340,6 +343,7 @@ export function DesktopOracleModal() {
             setChatMessages([])
           }}
         />}
+        </div>
       </div>
     </>
   )

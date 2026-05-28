@@ -34,13 +34,13 @@ const CATEGORY_LABELS: Record<Dimension, string> = {
 }
 
 const DIM_COLORS: Record<Dimension, string> = {
-  family:   '#C4A8FF',
-  career:   '#FFD47A',
-  wealth:   '#6EE7A4',
-  vitality: '#FF9A5C',
-  mind:     '#A87EF8',
-  love:     '#FFB0A3',
-  social:   '#6EE7A4',
+  family:   '#C4A8FF',  // lavender
+  career:   '#FFD47A',  // gold
+  wealth:   '#4DC4FF',  // sky blue
+  vitality: '#FF9A5C',  // orange
+  mind:     '#7B3FE4',  // deep purple
+  love:     '#FF6B9D',  // hot pink
+  social:   '#1EEFB8',  // teal
 }
 
 /** Fixed display order for life areas */
@@ -68,6 +68,16 @@ const CSS_ANIMATIONS = `
 `
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+function formatMoodTimestamp(iso: string): string {
+  const d = new Date(iso)
+  const now = new Date()
+  const isToday = d.toDateString() === now.toDateString()
+  const time = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+  if (isToday) return `logged today at ${time}`
+  const dayStr = d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
+  return `logged ${dayStr} at ${time}`
+}
 
 function xpScore(xp: number): number {
   const level = getLevel(xp)
@@ -178,6 +188,7 @@ export default function DesktopDashboardV2(props: DesktopDashboardV2Props) {
   const {
     vitality, vitalityLoading,
     moodScore,
+    moodLoggedAt,
     verdict,
     quests, dimXpMap, dimBaselineMap,
     todayItems, todayLoading, selectedDate, todayDate, weekStart,
@@ -428,64 +439,74 @@ export default function DesktopDashboardV2(props: DesktopDashboardV2Props) {
               <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, marginTop: 2, letterSpacing: 0.3 }}>The Protagonist</div>
             </div>
 
-            {/* Life Areas */}
+            {/* Life Areas — sorted by score descending */}
             <span style={metaLabel}>Life Areas</span>
             <div>
-              {AREA_ORDER.map((dim, i) => {
-                const xp    = Math.max(dimXpMap[dim] ?? 0, quests.find(q => q.dimension === dim)?.xp ?? 0)
-                const score = getDimScore(xp, dimBaselineMap[dim])
-                const color = DIM_COLORS[dim]
-                const isLast = i === AREA_ORDER.length - 1
-
-                return (
-                  <div
-                    key={dim}
-                    role="button" tabIndex={0}
-                    onClick={() => router.push(`/${DIMENSION_TO_SLUG[dim]}`)}
-                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') router.push(`/${DIMENSION_TO_SLUG[dim]}`) }}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 8,
-                      padding: '6px 4px',
-                      borderBottom: isLast ? 'none' : '1px solid rgba(255,255,255,0.05)',
-                      cursor: 'pointer',
-                      transition: 'opacity 0.15s',
-                    }}
-                  >
-                    <RobotChar dim={dim} color={color} />
-                    <span style={{ color, fontSize: 12, fontWeight: 500, flex: 1 }}>{CATEGORY_LABELS[dim]}</span>
-                    <span
-                      key={score}
+              {(() => {
+                const scored = AREA_ORDER.map(dim => {
+                  const xp    = Math.max(dimXpMap[dim] ?? 0, quests.find(q => q.dimension === dim)?.xp ?? 0)
+                  const score = getDimScore(xp, dimBaselineMap[dim])
+                  return { dim, score }
+                }).sort((a, b) => b.score - a.score)
+                const maxScore = scored[0]?.score ?? -1
+                const minScore = scored[scored.length - 1]?.score ?? -1
+                return scored.map(({ dim, score }, i) => {
+                  const color  = DIM_COLORS[dim]
+                  const isLast = i === scored.length - 1
+                  const isTop  = score === maxScore
+                  const isBot  = score === minScore && score !== maxScore
+                  return (
+                    <div
+                      key={dim}
+                      role="button" tabIndex={0}
+                      onClick={() => router.push(`/${DIMENSION_TO_SLUG[dim]}`)}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') router.push(`/${DIMENSION_TO_SLUG[dim]}`) }}
                       style={{
-                        color, fontSize: 15, fontWeight: 700,
-                        background: 'rgba(255,255,255,0.06)',
-                        padding: '2px 8px', borderRadius: 6,
-                        minWidth: 30, textAlign: 'center',
-                        display: 'inline-block',
-                        animation: 'v2-score-pop 0.35s cubic-bezier(0.34,1.56,0.64,1) both',
+                        display: 'flex', alignItems: 'center', gap: 8,
+                        padding: '6px 4px',
+                        borderBottom: isLast ? 'none' : '1px solid rgba(255,255,255,0.05)',
+                        cursor: 'pointer',
+                        transition: 'opacity 0.15s',
                       }}
                     >
-                      {score}
-                    </span>
-                  </div>
-                )
-              })}
+                      <RobotChar dim={dim} color={color} />
+                      <span style={{ color, fontSize: 12, fontWeight: 500, flex: 1 }}>{CATEGORY_LABELS[dim]}</span>
+                      {isTop && <span style={{ fontSize: 10, color: '#4DC4FF', fontWeight: 700, lineHeight: 1 }}>↑</span>}
+                      {isBot && <span style={{ fontSize: 10, color: '#FF6B9D', fontWeight: 700, lineHeight: 1 }}>↓</span>}
+                      <span
+                        key={score}
+                        style={{
+                          color, fontSize: 15, fontWeight: 700,
+                          background: 'rgba(255,255,255,0.06)',
+                          padding: '2px 8px', borderRadius: 6,
+                          minWidth: 30, textAlign: 'center',
+                          display: 'inline-block',
+                          animation: 'v2-score-pop 0.35s cubic-bezier(0.34,1.56,0.64,1) both',
+                        }}
+                      >
+                        {score}
+                      </span>
+                    </div>
+                  )
+                })
+              })()}
             </div>
           </div>
 
           {/* ═══════ CENTER PANEL ═══════ */}
           <div style={{ ...colScroll, flex: 1, padding: '26px 28px 20px', minWidth: 0 }}>
 
-            {/* Greeting */}
+            {/* Greeting — always visible */}
             <div style={{ marginBottom: 22 }}>
               <div style={{ color: 'rgba(255,255,255,0.72)', fontSize: 26, fontWeight: 300, lineHeight: 1.1 }}>
-                {isToday
-                  ? 'Good morning,'
-                  : selectedDate.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' })
-                }
+                Good morning,
               </div>
-              {isToday && (
-                <div style={{ color: '#FF7A65', fontSize: 40, fontStyle: 'italic', fontWeight: 700, lineHeight: 1.05 }}>
-                  Ivana.
+              <div style={{ color: '#FF7A65', fontSize: 40, fontStyle: 'italic', fontWeight: 700, lineHeight: 1.05 }}>
+                Ivana.
+              </div>
+              {!isToday && (
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 4 }}>
+                  Viewing {selectedDate.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' })}
                 </div>
               )}
             </div>
@@ -782,11 +803,11 @@ export default function DesktopDashboardV2(props: DesktopDashboardV2Props) {
                 &ldquo;{oracleInsight}&rdquo;
               </div>
 
-              {/* Chat button */}
+              {/* Chat button — outline style */}
               <button
                 type="button"
                 onClick={() => openOracle()}
-                style={{ width: '100%', background: '#FF7A65', color: 'white', padding: 9, borderRadius: 8, fontSize: 12, fontWeight: 600, border: 'none', cursor: 'pointer', ...font }}
+                style={{ width: '100%', background: 'transparent', color: 'rgba(255,255,255,0.75)', padding: 9, borderRadius: 8, fontSize: 12, fontWeight: 500, border: '1.5px solid rgba(255,255,255,0.2)', cursor: 'pointer', ...font, transition: 'border-color 0.15s, color 0.15s' }}
               >
                 Chat with Oracle →
               </button>
@@ -846,6 +867,11 @@ export default function DesktopDashboardV2(props: DesktopDashboardV2Props) {
               <div style={{ fontSize: 11, textAlign: 'center', color: moodScore != null ? moodColor : 'rgba(255,255,255,0.4)' }}>
                 {moodScore != null ? moodLabel : 'How are you feeling?'}
               </div>
+              {moodLoggedAt && (
+                <div style={{ fontSize: 10, textAlign: 'center', color: 'rgba(255,255,255,0.28)', marginTop: 3 }}>
+                  {formatMoodTimestamp(moodLoggedAt)}
+                </div>
+              )}
             </div>
 
             {/* ── Weekly Progress ── */}
