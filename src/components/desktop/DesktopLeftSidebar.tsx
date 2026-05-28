@@ -373,22 +373,20 @@ export function DesktopLeftSidebar({
                         <span style={{ fontSize: 7 }}>●</span>
                         Strengths showing up
                       </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
                         {nowStrengths.map((pill, i) => {
-                          const c = PILL_HEX[pill.color] ?? '#6EE7A4'
                           return (
                             <div key={i} style={{
                               display: 'flex', alignItems: 'flex-start', gap: 7,
                               padding: '4px 0',
-                              borderBottom: i < nowStrengths.length - 1 ? '0.5px solid rgba(255,255,255,0.05)' : 'none',
                             }}>
                               <div style={{
                                 width: 5, height: 5, borderRadius: '50%',
-                                background: c, flexShrink: 0, marginTop: 5,
+                                background: '#6EE7A4', flexShrink: 0, marginTop: 5,
                               }} />
                               <span style={{
                                 ...font,
-                                fontSize: 12, color: 'rgba(255,255,255,0.72)', lineHeight: 1.45,
+                                fontSize: 12, fontWeight: 500, color: 'rgba(255,255,255,0.85)', lineHeight: 1.45,
                               }}>
                                 {pill.label}
                               </span>
@@ -410,12 +408,11 @@ export function DesktopLeftSidebar({
                         <span style={{ fontSize: 9 }}>△</span>
                         Watch for
                       </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
                         {nowWatch.map((pill, i) => (
                           <div key={i} style={{
                             display: 'flex', alignItems: 'flex-start', gap: 7,
                             padding: '4px 0',
-                            borderBottom: i < nowWatch.length - 1 ? '0.5px solid rgba(255,255,255,0.05)' : 'none',
                           }}>
                             <div style={{
                               width: 5, height: 5, borderRadius: '50%',
@@ -423,7 +420,7 @@ export function DesktopLeftSidebar({
                             }} />
                             <span style={{
                               ...font,
-                              fontSize: 12, color: 'rgba(255,212,122,0.72)', lineHeight: 1.45,
+                              fontSize: 12, fontWeight: 500, color: 'rgba(255,212,122,0.88)', lineHeight: 1.45,
                             }}>
                               {pill.label}
                             </span>

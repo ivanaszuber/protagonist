@@ -1,5 +1,6 @@
 'use client'
 
+import React from 'react'
 import { useRouter } from 'next/navigation'
 import type { CSSProperties } from 'react'
 import {
@@ -513,10 +514,16 @@ export default function DesktopDashboard(props: DesktopDashboardProps) {
             </div>
 
             {/* Week strip */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 18 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 18 }}>
               <button type="button" onClick={onWeekBack}
-                style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.3)', fontSize: 20, cursor: 'pointer', padding: '0 6px', lineHeight: 1, ...font }}>‹</button>
-              <div style={{ display: 'flex', flex: 1, gap: 3 }}>
+                style={{
+                  background: 'rgba(255,255,255,0.06)', border: '0.5px solid rgba(255,255,255,0.1)',
+                  borderRadius: 8, color: 'rgba(255,255,255,0.65)', fontSize: 16,
+                  cursor: 'pointer', padding: '0 7px', lineHeight: 1,
+                  width: 28, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  flexShrink: 0, ...font,
+                }}>‹</button>
+              <div style={{ display: 'flex', flex: 1, gap: 2 }}>
                 {weekDays.map((d) => {
                   const ds = toDateStr(d)
                   const isSelected = ds === selectedDateStr
@@ -524,26 +531,32 @@ export default function DesktopDashboard(props: DesktopDashboardProps) {
                   return (
                     <button key={ds} type="button" onClick={() => onDateSelect(d)}
                       style={{
-                        flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
-                        padding: '7px 4px', borderRadius: 10,
+                        flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
+                        padding: '5px 2px', borderRadius: 8,
                         background: isSelected ? 'rgba(147,51,234,0.18)' : 'transparent',
-                        border: isSelected ? '0.5px solid rgba(147,51,234,0.4)' : 'none',
+                        border: isSelected ? '0.5px solid rgba(147,51,234,0.4)' : '0.5px solid transparent',
                         cursor: 'pointer', ...font,
                       }}
                     >
-                      <span style={{ fontSize: 10, fontWeight: 500, color: isSelected ? '#C084FC' : 'rgba(255,255,255,0.35)' }}>
+                      <span style={{ fontSize: 9, fontWeight: 500, color: isSelected ? '#C084FC' : 'rgba(255,255,255,0.35)' }}>
                         {d.toLocaleDateString('en-GB', { weekday: 'short' }).slice(0, 2)}
                       </span>
-                      <span style={{ fontSize: 14, fontWeight: 500, color: isSelected ? '#C084FC' : isT ? '#E8E0F0' : 'rgba(255,255,255,0.45)' }}>
+                      <span style={{ fontSize: 13, fontWeight: 500, color: isSelected ? '#C084FC' : isT ? '#E8E0F0' : 'rgba(255,255,255,0.45)' }}>
                         {d.getDate()}
                       </span>
-                      <div style={{ width: 4, height: 4, borderRadius: '50%', background: isSelected ? '#9333EA' : isT ? 'rgba(147,51,234,0.5)' : 'transparent' }} />
+                      <div style={{ width: 3, height: 3, borderRadius: '50%', background: isSelected ? '#9333EA' : isT ? 'rgba(147,51,234,0.5)' : 'transparent' }} />
                     </button>
                   )
                 })}
               </div>
               <button type="button" onClick={onWeekForward}
-                style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.3)', fontSize: 20, cursor: 'pointer', padding: '0 6px', lineHeight: 1, ...font }}>›</button>
+                style={{
+                  background: 'rgba(255,255,255,0.06)', border: '0.5px solid rgba(255,255,255,0.1)',
+                  borderRadius: 8, color: 'rgba(255,255,255,0.65)', fontSize: 16,
+                  cursor: 'pointer', padding: '0 7px', lineHeight: 1,
+                  width: 28, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  flexShrink: 0, ...font,
+                }}>›</button>
             </div>
 
             {/* Items list */}
@@ -567,15 +580,35 @@ export default function DesktopDashboard(props: DesktopDashboardProps) {
               </div>
             ) : (
               <div>
-                {todayItems.map((item) => {
+                {(() => {
+                  const sorted = [...todayItems].sort((a, b) => {
+                    const ac = (a.completed || justCompletedIds.has(a.id)) ? 1 : 0
+                    const bc = (b.completed || justCompletedIds.has(b.id)) ? 1 : 0
+                    return ac - bc
+                  })
+                  const completedCount = sorted.filter(i => i.completed || justCompletedIds.has(i.id)).length
+                  let dividerInserted = false
+                  return sorted.map((item, idx) => {
                   const now = new Date()
                   const isPast = item.type === 'event' && item.endIso ? new Date(item.endIso) < now : false
                   const isCompleted = item.completed || justCompletedIds.has(item.id)
+                  const showDivider = !dividerInserted && isCompleted && completedCount > 0 && idx > 0
+                  if (showDivider) dividerInserted = true
                   const isExpanded = expandedTaskId === item.id
                   const isEditing = editingTaskId === item.id
 
                   return (
-                    <div key={item.id} style={{ borderBottom: '0.5px solid rgba(255,255,255,0.05)' }}>
+                    <React.Fragment key={item.id}>
+                      {showDivider && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0 4px' }}>
+                          <div style={{ flex: 1, height: '0.5px', background: 'rgba(255,255,255,0.07)' }} />
+                          <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.25)', letterSpacing: '1.2px', textTransform: 'uppercase' as const, fontWeight: 600 }}>
+                            {completedCount} done
+                          </span>
+                          <div style={{ flex: 1, height: '0.5px', background: 'rgba(255,255,255,0.07)' }} />
+                        </div>
+                      )}
+                    <div style={{ borderBottom: '0.5px solid rgba(255,255,255,0.05)' }}>
                       <div
                         style={{
                           display: 'flex', gap: 12, alignItems: 'flex-start',
@@ -668,8 +701,10 @@ export default function DesktopDashboard(props: DesktopDashboardProps) {
                         </div>
                       )}
                     </div>
+                    </React.Fragment>
                   )
-                })}
+                  })
+                })()}
               </div>
             )}
           </div>

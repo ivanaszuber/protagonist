@@ -390,6 +390,7 @@ export default function DashboardPage() {
   const [quickAddDuration, setQuickAddDuration] = useState(60)
   const [quickAddError, setQuickAddError] = useState('')
   const [quickAddLoading, setQuickAddLoading] = useState(false)
+  const [weeklyTaskCounts, setWeeklyTaskCounts] = useState<Record<string, number>>({})
 
   const refreshCalendarEvents = useCallback(async (dateStr?: string) => {
     const uid = userIdRef.current
@@ -571,6 +572,32 @@ export default function DashboardPage() {
       })
       .catch(() => {})
   }, [])
+
+  // Fetch completed task counts for each day of the displayed week
+  useEffect(() => {
+    const uid = userIdRef.current
+    if (!uid) return
+    const days = Array.from({ length: 5 }, (_, i) => {
+      const d = new Date(weekStart)
+      d.setDate(d.getDate() + i)
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    })
+    Promise.all(
+      days.map(ds =>
+        fetch(`/api/quests/tasks?userId=${encodeURIComponent(uid)}&date=${encodeURIComponent(ds)}`)
+          .then(r => r.json())
+          .then((d: { tasks?: { completed: boolean }[] }) => ({
+            ds,
+            count: (d.tasks ?? []).filter(t => t.completed).length,
+          }))
+          .catch(() => ({ ds, count: 0 }))
+      )
+    ).then(results => {
+      const counts: Record<string, number> = {}
+      results.forEach(({ ds, count }) => { counts[ds] = count })
+      setWeeklyTaskCounts(counts)
+    }).catch(() => {})
+  }, [weekStart])
 
   const handleResetCheckin = useCallback(async () => {
     await fetch('/api/dev/reset-checkin', {
@@ -764,6 +791,9 @@ export default function DashboardPage() {
             return next
           })
         }, 700)
+        // Bump weekly count for the selected day
+        const ds = toDateStr(selectedDateRef.current)
+        setWeeklyTaskCounts((prev) => ({ ...prev, [ds]: (prev[ds] ?? 0) + 1 }))
         void loadDashboard()
       }
     } catch {
@@ -864,6 +894,7 @@ export default function DashboardPage() {
           dimXpMap={dimXpMap}
           dimBaselineMap={dimBaselineMap}
           dimMedalsMap={dimMedalsMap}
+          weeklyTaskCounts={weeklyTaskCounts}
           todayItems={todayItems}
           todayLoading={todayLoading}
           selectedDate={selectedDate}
