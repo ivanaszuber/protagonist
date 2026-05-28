@@ -373,9 +373,9 @@ export function DesktopCharacterPage({ dimension }: DesktopCharacterPageProps) {
           {/* Info */}
           <div style={{ flex: 1, paddingTop: 8 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-              <span style={{ fontSize: 28, fontWeight: 600, color: '#E8E0F0' }}>{char.name}</span>
+              <span style={{ fontSize: 28, fontWeight: 600, color: '#E8E0F0' }}>{char.categoryLabel}</span>
               <span style={{ background: `${accentColor}18`, border: `0.5px solid ${accentColor}40`, borderRadius: 20, padding: '3px 10px', fontSize: 10, color: accentColor }}>
-                {char.categoryLabel}
+                {char.name}
               </span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
