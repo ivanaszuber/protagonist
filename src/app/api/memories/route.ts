@@ -2,6 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin as supabase } from '@/lib/supabase'
 import { anthropic } from '@/lib/anthropic'
 
+// Allow up to 20 MB body — base64-encoded photos can be large
+export const config = {
+  api: { bodyParser: { sizeLimit: '20mb' } },
+}
+
+// Next.js App Router body size override
+export const maxDuration = 60
+
 const BUCKET = 'memory-photos'
 
 // ── Oracle vision processing ──────────────────────────────────────────────────

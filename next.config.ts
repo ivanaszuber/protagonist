@@ -8,6 +8,13 @@ const withPWA = require('next-pwa')({
   disable: process.env.NODE_ENV === 'development',
 })
 
-const nextConfig: NextConfig = {}
+const nextConfig: NextConfig = {
+  experimental: {
+    // Allow up to 20 MB request bodies for the memories photo upload route
+    serverActions: {
+      bodySizeLimit: '20mb',
+    },
+  },
+}
 
 export default withPWA(nextConfig)

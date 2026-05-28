@@ -91,6 +91,35 @@ function formatMonth(iso: string): string {
   return new Date(iso).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
 }
 
+/**
+ * Resize + compress a File to max 1400px on longest side, JPEG 85%.
+ * Returns { base64, mimeType } ready to send to the API.
+ */
+function compressImage(file: File): Promise<{ base64: string; mimeType: string }> {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    const url = URL.createObjectURL(file)
+    img.onload = () => {
+      URL.revokeObjectURL(url)
+      const MAX = 1400
+      let { width, height } = img
+      if (width > MAX || height > MAX) {
+        if (width > height) { height = Math.round(height * MAX / width); width = MAX }
+        else { width = Math.round(width * MAX / height); height = MAX }
+      }
+      const canvas = document.createElement('canvas')
+      canvas.width = width; canvas.height = height
+      const ctx = canvas.getContext('2d')
+      if (!ctx) { reject(new Error('canvas not supported')); return }
+      ctx.drawImage(img, 0, 0, width, height)
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.85)
+      resolve({ base64: dataUrl.split(',')[1], mimeType: 'image/jpeg' })
+    }
+    img.onerror = reject
+    img.src = url
+  })
+}
+
 // ── Upload Modal ──────────────────────────────────────────────────────────────
 
 function UploadModal({
@@ -124,16 +153,21 @@ function UploadModal({
   }
 
   const handleSubmit = async () => {
-    if (!file || !preview) return
+    if (!file) return
     setProcessing(true); setError(null)
     try {
-      const base64 = preview.split(',')[1]
+      // Compress client-side to keep payload under the body limit
+      const { base64, mimeType } = await compressImage(file)
       const res = await fetch('/api/memories', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, imageBase64: base64, imageMimeType: file.type, location: location.trim() || undefined }),
+        body: JSON.stringify({ userId, imageBase64: base64, imageMimeType: mimeType, location: location.trim() || undefined }),
       })
-      const json = await res.json() as { memory?: Memory; error?: string }
+      // Guard against non-JSON responses (e.g. 413 from proxy)
+      const text = await res.text()
+      let json: { memory?: Memory; error?: string }
+      try { json = JSON.parse(text) as { memory?: Memory; error?: string } }
+      catch { throw new Error(`Server error: ${text.slice(0, 80)}`) }
       if (!res.ok || !json.memory) throw new Error(json.error ?? 'Upload failed')
       onUploaded(json.memory)
       onClose()
