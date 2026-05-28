@@ -10,6 +10,8 @@ import { DesktopLeftSidebar, DIM_COLORS } from './DesktopLeftSidebar'
 import DesktopTopNav from './DesktopTopNav'
 import { DesktopOracleModal } from './DesktopOracleModal'
 import ImportContextModal from './ImportContextModal'
+import type { UserProfile } from '@/app/api/user-profile/route'
+import type { ArchetypeInsights } from '@/app/api/user-profile/archetype-insights/route'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -458,13 +460,99 @@ function PulseChart({ pulse }: { pulse: PulseDay[] }) {
   )
 }
 
+// ── Blueprint archetype lookup ────────────────────────────────────────────────
+
+const SUN_SIGN_DATA: Record<string, { symbol: string; color: string; tagline: string; interpretation: string }> = {
+  aries:       { symbol: '♈', color: '#FF6B5E', tagline: 'The Initiator', interpretation: 'You move before others finish thinking. That fire-first instinct is your superpower — just pair it with reflection before the momentum becomes friction.' },
+  taurus:      { symbol: '♉', color: '#6EE7A4', tagline: 'The Builder',   interpretation: 'You create lasting things. Slow, deliberate, and deeply reliable — your challenge is letting go of comfort when growth requires it.' },
+  gemini:      { symbol: '♊', color: '#4DC4FF', tagline: 'The Connector',  interpretation: 'Your mind moves fast across ideas and people. The gift is curiosity; the trap is scattering before anything roots.' },
+  cancer:      { symbol: '♋', color: '#C4A8FF', tagline: 'The Nurturer',   interpretation: 'You feel everything deeply and protect what you love fiercely. The work is turning that inward radar into self-protection too.' },
+  leo:         { symbol: '♌', color: '#FFD47A', tagline: 'The Performer',  interpretation: 'You shine brightest when seen — and you earn it. Watch for needing validation to fuel what only you can do.' },
+  virgo:       { symbol: '♍', color: '#6EE7A4', tagline: 'The Analyst',    interpretation: 'Precision is your love language. The details you catch change outcomes — your edge is knowing when good enough is actually enough.' },
+  libra:       { symbol: '♎', color: '#FF9A5C', tagline: 'The Diplomat',   interpretation: 'You read rooms and build bridges intuitively. Your challenge is making the call when consensus stays out of reach.' },
+  scorpio:     { symbol: '♏', color: '#C4A8FF', tagline: 'The Transformer', interpretation: 'You go deep where others stay surface. That intensity forges real things — and demands you trust the people you let in.' },
+  sagittarius: { symbol: '♐', color: '#FF9A5C', tagline: 'The Seeker',     interpretation: 'Freedom, truth, and the next horizon pull you forward. The anchor you resist is actually what makes the exploration sustainable.' },
+  capricorn:   { symbol: '♑', color: '#4DC4FF', tagline: 'The Architect',  interpretation: 'Long-game thinking is your default. You build structures others rely on — just make sure you\'re also in what you build.' },
+  aquarius:    { symbol: '♒', color: '#4DC4FF', tagline: 'The Visionary',  interpretation: 'You see systems before others notice them. The challenge is staying connected to the humans inside the system you\'re redesigning.' },
+  pisces:      { symbol: '♓', color: '#C4A8FF', tagline: 'The Dreamer',    interpretation: 'Your empathy and imagination access what logic alone can\'t. Boundaries are the structure that makes your sensitivity a gift, not a wound.' },
+}
+
+const RISING_SIGN_DATA: Record<string, { symbol: string; color: string; tagline: string; interpretation: string }> = {
+  aries:       { symbol: '↑♈', color: '#FF6B5E', tagline: 'Leads with action',    interpretation: 'First impressions: direct, bold, already moving. People feel your energy before you\'ve said a word.' },
+  taurus:      { symbol: '↑♉', color: '#6EE7A4', tagline: 'Leads with presence',  interpretation: 'You arrive and the room settles. Your steadiness signals safety — a magnetic, grounding energy.' },
+  gemini:      { symbol: '↑♊', color: '#4DC4FF', tagline: 'Leads with wit',       interpretation: 'You\'re immediately curious, adaptable, alive. People sense your mind and want to match your pace.' },
+  cancer:      { symbol: '↑♋', color: '#C4A8FF', tagline: 'Leads with warmth',    interpretation: 'You read the room emotionally before you read it logically. That softness draws people in — and sometimes hides your real fire.' },
+  leo:         { symbol: '↑♌', color: '#FFD47A', tagline: 'Leads with presence',  interpretation: 'You walk in and take up space naturally. The challenge is letting your private self match who shows up in the room.' },
+  virgo:       { symbol: '↑♍', color: '#6EE7A4', tagline: 'Leads with precision', interpretation: 'You notice what\'s off before others settle in. That discernment builds trust — over time.' },
+  libra:       { symbol: '↑♎', color: '#FF9A5C', tagline: 'Leads with grace',     interpretation: 'Effortlessly diplomatic on entry. You make people feel considered, which opens doors your sun sign can then walk through.' },
+  scorpio:     { symbol: '↑♏', color: '#C4A8FF', tagline: 'Leads with intensity', interpretation: 'Still waters, deep current. People sense there\'s more to you — and they\'re right. That mystery is a social asset.' },
+  sagittarius: { symbol: '↑♐', color: '#FF9A5C', tagline: 'Leads with enthusiasm', interpretation: 'Your optimism is contagious on contact. You expand the room\'s sense of what\'s possible.' },
+  capricorn:   { symbol: '↑♑', color: '#4DC4FF', tagline: 'Leads with authority', interpretation: 'You project competence before you speak. That quiet authority earns trust — sometimes before you want responsibility.' },
+  aquarius:    { symbol: '↑♒', color: '#4DC4FF', tagline: 'Leads with ideas',     interpretation: 'You enter already on a different wavelength. That distinctiveness is a signal, not a flaw.' },
+  pisces:      { symbol: '↑♓', color: '#C4A8FF', tagline: 'Leads with feeling',   interpretation: 'You absorb the room\'s emotional weather instantly. Knowing that keeps you from owning others\' states as your own.' },
+}
+
+const ENNEAGRAM_DATA: Record<string, { symbol: string; color: string; tagline: string; interpretation: string }> = {
+  '1':    { symbol: '①', color: '#6EE7A4', tagline: 'The Reformer',   interpretation: 'A drive for integrity and improvement that can tip into perfectionism. Your standards lift everyone — when you extend them inward with compassion.' },
+  '1w2':  { symbol: '①', color: '#6EE7A4', tagline: 'The Advocate',   interpretation: 'Principled and people-focused. Your reforms come from care, not criticism — though you still feel both.' },
+  '1w9':  { symbol: '①', color: '#6EE7A4', tagline: 'The Idealist',   interpretation: 'Quiet integrity. You hold your standards without the public fight — until something really matters.' },
+  '2':    { symbol: '②', color: '#FF9A5C', tagline: 'The Helper',     interpretation: 'Generous to a fault. Your love shows up as action — and the work is letting yourself receive as well as give.' },
+  '2w1':  { symbol: '②', color: '#FF9A5C', tagline: 'The Servant',    interpretation: 'Service with standards. You give from a place of genuine care — and occasionally martyr.' },
+  '2w3':  { symbol: '②', color: '#FF9A5C', tagline: 'The Host',       interpretation: 'Warmth and ambition woven together. You charm and care simultaneously — and fear being needed for how you look, not who you are.' },
+  '3':    { symbol: '③', color: '#FFD47A', tagline: 'The Achiever',   interpretation: 'Success is your language. You adapt, excel, and deliver — the depth work is knowing which wins are yours vs. the role you\'re playing.' },
+  '3w2':  { symbol: '③', color: '#FFD47A', tagline: 'The Charmer',    interpretation: 'Achievement fueled by connection. You\'re magnetic and productive — and need the people around you to be real, not an audience.' },
+  '3w4':  { symbol: '③', color: '#FFD47A', tagline: 'The Professional', interpretation: 'Driven to succeed AND to mean it. The 4 wing demands authenticity even inside your ambition — this is where your depth lives. The tension between "performing" and "being" is your central story.' },
+  '4':    { symbol: '④', color: '#C4A8FF', tagline: 'The Individualist', interpretation: 'Depth, beauty, and the authentic self — your native territory. The challenge is not mistaking the longing for the arrival.' },
+  '4w3':  { symbol: '④', color: '#C4A8FF', tagline: 'The Aristocrat',  interpretation: 'Uniqueness with ambition. You want to be seen as extraordinary — and you likely are.' },
+  '4w5':  { symbol: '④', color: '#C4A8FF', tagline: 'The Bohemian',    interpretation: 'Deep, private, intensely original. Your inner world is rich; the world benefits when you share it.' },
+  '5':    { symbol: '⑤', color: '#4DC4FF', tagline: 'The Investigator', interpretation: 'Knowledge as safety. You master before you move — the growth edge is engaging while still learning.' },
+  '5w4':  { symbol: '⑤', color: '#4DC4FF', tagline: 'The Iconoclast',  interpretation: 'Intellectual depth with artistic soul. Your insights are rare; the barrier is letting others in to receive them.' },
+  '5w6':  { symbol: '⑤', color: '#4DC4FF', tagline: 'The Problem Solver', interpretation: 'Analytical and loyal. You build systems others rely on — and need to trust that asking for help is smart, not weak.' },
+  '6':    { symbol: '⑥', color: '#4DC4FF', tagline: 'The Loyalist',    interpretation: 'Trustworthy, prepared, and attuned to risk. Your anxiety is intelligence — the work is not letting preparation become paralysis.' },
+  '6w5':  { symbol: '⑥', color: '#4DC4FF', tagline: 'The Defender',    interpretation: 'Cautious and analytical. You think before trusting — and when you do trust, it\'s real.' },
+  '6w7':  { symbol: '⑥', color: '#4DC4FF', tagline: 'The Buddy',       interpretation: 'Warm and wary in equal measure. You want connection AND safety — and can have both.' },
+  '7':    { symbol: '⑦', color: '#FF9A5C', tagline: 'The Enthusiast',  interpretation: 'Joy, possibility, and the next adventure. The depth work is sitting with what\'s already here long enough to actually have it.' },
+  '7w6':  { symbol: '⑦', color: '#FF9A5C', tagline: 'The Entertainer', interpretation: 'Fun and faithful. You bring people along for the ride — and actually care about who makes it.' },
+  '7w8':  { symbol: '⑦', color: '#FF9A5C', tagline: 'The Realist',     interpretation: 'Bold appetite, practical edge. You want the good life and you\'ll build it yourself if needed.' },
+  '8':    { symbol: '⑧', color: '#FF6B5E', tagline: 'The Challenger',  interpretation: 'Strength, protection, and unfiltered directness. Vulnerability isn\'t weakness — it\'s the move that builds what force alone can\'t.' },
+  '8w7':  { symbol: '⑧', color: '#FF6B5E', tagline: 'The Maverick',    interpretation: 'Fierce and expansive. You chase impact and freedom simultaneously — and usually get both.' },
+  '8w9':  { symbol: '⑧', color: '#FF6B5E', tagline: 'The Bear',        interpretation: 'Power with patience. You move when it matters — and when you do, things shift.' },
+  '9':    { symbol: '⑨', color: '#6EE7A4', tagline: 'The Peacemaker',  interpretation: 'Harmony-seeking and deeply perceptive. Your challenge is not mistaking peace for your own absence.' },
+  '9w8':  { symbol: '⑨', color: '#6EE7A4', tagline: 'The Referee',     interpretation: 'Steady power. You hold the room together — and occasionally need to let yourself take up the space you make for others.' },
+  '9w1':  { symbol: '⑨', color: '#6EE7A4', tagline: 'The Dreamer',     interpretation: 'Principled peace-seeker. Your quiet idealism shapes things slowly and surely.' },
+}
+
+const NEURODIVERGENT_DATA: Record<string, { symbol: string; color: string; tagline: string; interpretation: string }> = {
+  'audhd':        { symbol: '∞', color: '#4DC4FF', tagline: 'AuDHD Wiring',    interpretation: 'Autism + ADHD creates a mind that hyperfocuses with incredible depth AND needs novelty to stay alive. The pattern-recognition is extraordinary; the cost is that context-switching and uncertainty can overload an otherwise high-functioning system. Structure isn\'t a cage — it\'s the rails that let you go full speed.' },
+  'adhd':         { symbol: '⚡', color: '#FFD47A', tagline: 'ADHD Wiring',     interpretation: 'A dopamine-driven brain that thrives on urgency, interest, and challenge. Your spikes of focus are world-class — the work is building systems that survive the valleys in between.' },
+  'autism':       { symbol: '◈',  color: '#C4A8FF', tagline: 'Autistic Wiring', interpretation: 'Deep pattern recognition, intense focus, and a commitment to authenticity. Social masking costs energy — the more you can architect environments that fit you, the more that focus becomes pure output.' },
+  'dyslexia':     { symbol: '◇',  color: '#FF9A5C', tagline: 'Dyslexic Wiring', interpretation: 'Spatial, big-picture, and creative in ways linear thinkers can\'t access. The processing difference that once looked like a limitation is often the source of your most original thinking.' },
+  'dyscalculia':  { symbol: '◆',  color: '#FF9A5C', tagline: 'Dyscalculia',    interpretation: 'Numbers aren\'t your native language — but ideas, patterns, and stories often are. Working with that instead of against it is how you build systems that actually stick.' },
+  'sensory':      { symbol: '〜', color: '#6EE7A4', tagline: 'Sensory Processing', interpretation: 'High-fidelity inputs that most people filter out. The key is designing your environment, not battling your baseline.' },
+  'hsp':          { symbol: '✦',  color: '#C4A8FF', tagline: 'Highly Sensitive', interpretation: 'You process depth — emotional, sensory, aesthetic — at a level that requires deliberate recovery alongside deliberate output.' },
+}
+
+function getNeurodivergentKey(notes: string): string {
+  const n = notes.toLowerCase()
+  if (n.includes('audhd') || (n.includes('autism') && n.includes('adhd'))) return 'audhd'
+  if (n.includes('adhd')) return 'adhd'
+  if (n.includes('autism') || n.includes('autistic') || n.includes('asd')) return 'autism'
+  if (n.includes('dyslexia') || n.includes('dyslexic')) return 'dyslexia'
+  if (n.includes('dyscalculia')) return 'dyscalculia'
+  if (n.includes('sensory')) return 'sensory'
+  if (n.includes('hsp') || n.includes('highly sensitive')) return 'hsp'
+  return 'adhd'
+}
+
 // ── Arc Portrait Tab ──────────────────────────────────────────────────────────
 
-function PortraitView({ portrait, identity, identityLoading, loading, onGenerate, onRefreshIdentity }: {
+function PortraitView({ portrait, identity, identityLoading, loading, profile, insights, onGenerate, onRefreshIdentity }: {
   portrait: Portrait | null
   identity: IdentityData | null
   identityLoading: boolean
   loading: boolean
+  profile: UserProfile | null
+  insights: import('@/app/api/user-profile/archetype-insights/route').ArchetypeInsights | null
   onGenerate: () => void
   onRefreshIdentity: () => void
 }) {
@@ -487,7 +575,7 @@ function PortraitView({ portrait, identity, identityLoading, loading, onGenerate
   }
 
   // No data at all — show empty state
-  if (!portrait && !identity) {
+  if (!portrait && !identity && !profile) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 300, gap: 16 }}>
         <div style={{
@@ -517,148 +605,116 @@ function PortraitView({ portrait, identity, identityLoading, loading, onGenerate
     )
   }
 
+  // Derive archetype tile data from profile
+  const sunKey = profile?.sunSign?.toLowerCase().trim() ?? ''
+  const risingKey = profile?.risingSign?.toLowerCase().trim() ?? ''
+  const enneagramKey = profile?.enneagram?.toLowerCase().trim() ?? ''
+  const neurodivKey = profile?.neurodivergentNotes ? getNeurodivergentKey(profile.neurodivergentNotes) : null
+
+  const sunData = SUN_SIGN_DATA[sunKey]
+  const risingData = RISING_SIGN_DATA[risingKey]
+  const enneagramData = ENNEAGRAM_DATA[enneagramKey] ?? ENNEAGRAM_DATA[enneagramKey.charAt(0)]
+  const neurodivData = neurodivKey ? NEURODIVERGENT_DATA[neurodivKey] : null
+
+  const hasBlueprint = sunData || risingData || enneagramData || neurodivData
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-      {/* ── Identity pills block (from /api/identity/synthesize) ── */}
+      {/* ══ HERO SECTION ══ */}
       {identity && (
-        <>
-          {/* Chapter header */}
-          <div className="jrn-portrait-section" style={{
-            background: 'linear-gradient(135deg, rgba(123,63,228,0.18) 0%, rgba(77,196,255,0.07) 100%)',
-            border: '1px solid rgba(123,63,228,0.3)',
-            borderRadius: 16, padding: '16px 18px',
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-              <div style={{
-                background: 'rgba(123,63,228,0.35)', color: '#C4A8FF',
-                fontSize: 9, fontWeight: 700, letterSpacing: '1.4px',
-                padding: '3px 10px', borderRadius: 100, textTransform: 'uppercase' as const,
-              }}>
-                Arc's Portrait
-              </div>
-              <span style={{ color: 'white', fontSize: 14, fontWeight: 600 }}>{identity.chapterTitle}</span>
+        <div className="jrn-portrait-section" style={{
+          background: 'linear-gradient(135deg, rgba(123,63,228,0.2) 0%, rgba(77,196,255,0.07) 60%, rgba(196,168,255,0.05) 100%)',
+          border: '1px solid rgba(123,63,228,0.32)',
+          borderRadius: 18, padding: '20px 22px',
+        }}>
+          {/* Chapter badge + title */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 14 }}>
+            <div style={{
+              background: 'rgba(123,63,228,0.4)', color: '#C4A8FF',
+              fontSize: 9, fontWeight: 700, letterSpacing: '1.6px',
+              padding: '3px 10px', borderRadius: 100, textTransform: 'uppercase' as const, flexShrink: 0,
+            }}>
+              Arc's Portrait
             </div>
-
-            {/* Essence from identity synthesis */}
-            <p style={{ ...font, fontSize: 13, fontStyle: 'italic', color: 'rgba(255,255,255,0.65)', lineHeight: 1.6, marginBottom: 14 }}>
-              "{identity.essenceQuote}"
-            </p>
-
-            {/* YOU ARE pills */}
-            {identity.strengths?.length > 0 && (
-              <div style={{ marginBottom: 10 }}>
-                <span style={{ ...font, fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.32)', letterSpacing: '1.3px', textTransform: 'uppercase' as const, display: 'block', marginBottom: 7 }}>You Are</span>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-                  {identity.strengths.map((pill, i) => {
-                    const c = PILL_COLORS[pill.color] ?? '#C4A8FF'
-                    return (
-                      <span key={i} style={{
-                        ...font, background: `${c}15`, color: c,
-                        border: `1px solid ${c}30`,
-                        fontSize: 11, fontWeight: 600,
-                        padding: '4px 11px', borderRadius: 100,
-                      }}>{pill.label}</span>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* STILL GROWING pills */}
-            {identity.growthEdges?.length > 0 && (
-              <div>
-                <span style={{ ...font, fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.32)', letterSpacing: '1.3px', textTransform: 'uppercase' as const, display: 'block', marginBottom: 7 }}>Still Growing</span>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-                  {identity.growthEdges.map((pill, i) => (
-                    <span key={i} style={{
-                      ...font, background: 'rgba(255,212,122,0.1)', color: '#FFD47A',
-                      border: '1px solid rgba(255,212,122,0.25)',
-                      fontSize: 11, fontWeight: 600,
-                      padding: '4px 11px', borderRadius: 100,
-                    }}>△ {pill.label}</span>
-                  ))}
-                </div>
-              </div>
+            {profile?.displayName && (
+              <span style={{ ...font, color: 'rgba(255,255,255,0.45)', fontSize: 12 }}>· {profile.displayName}</span>
             )}
           </div>
 
-          {/* 2-col: Your Growth + What to Watch */}
-          {(portrait?.growth || identity.growthEdges?.length > 0) && (
-            <div className="jrn-portrait-section" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              {portrait?.growth && (
-                <div style={{
-                  background: 'rgba(110,231,164,0.07)', borderRadius: 14, padding: '14px 16px',
-                  border: '1px solid rgba(110,231,164,0.14)',
-                }}>
-                  <p style={{ ...font, fontSize: 9, fontWeight: 700, color: '#6EE7A4', letterSpacing: '1.3px', textTransform: 'uppercase' as const, marginBottom: 8 }}>Your Growth</p>
-                  <p style={{ ...font, fontSize: 13, color: 'rgba(255,255,255,0.78)', lineHeight: 1.7 }}>{portrait.growth}</p>
-                </div>
-              )}
-              {identity.growthEdges?.length > 0 && (
-                <div style={{
-                  background: 'rgba(255,212,122,0.06)', borderRadius: 14, padding: '14px 16px',
-                  border: '1px solid rgba(255,212,122,0.14)',
-                }}>
-                  <p style={{ ...font, fontSize: 9, fontWeight: 700, color: '#FFD47A', letterSpacing: '1.3px', textTransform: 'uppercase' as const, marginBottom: 8 }}>What to Watch</p>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                    {identity.growthEdges.map((edge, i) => (
-                      <p key={i} style={{ ...font, fontSize: 12.5, color: 'rgba(255,255,255,0.65)', lineHeight: 1.55 }}>△ {edge.label}</p>
-                    ))}
-                  </div>
-                </div>
-              )}
+          {/* Chapter title — large */}
+          {identity.chapterTitle && (
+            <h2 style={{ ...font, fontSize: 22, fontWeight: 800, color: '#fff', lineHeight: 1.2, marginBottom: 14, letterSpacing: '-0.3px' }}>
+              {identity.chapterTitle}
+            </h2>
+          )}
+
+          {/* Essence quote — prominent */}
+          {identity.essenceQuote && (
+            <div style={{
+              borderLeft: '3px solid rgba(196,168,255,0.4)',
+              paddingLeft: 14, marginBottom: 16,
+            }}>
+              <p style={{ ...font, fontSize: 15, fontStyle: 'italic', color: 'rgba(255,255,255,0.78)', lineHeight: 1.75 }}>
+                "{identity.essenceQuote}"
+              </p>
             </div>
           )}
 
-          {/* Arc's Lens by Dimension */}
-          {identity.dimensionInsights?.length > 0 && (
-            <div className="jrn-portrait-section">
-              <p style={{ ...font, fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.3)', letterSpacing: '1.4px', textTransform: 'uppercase' as const, marginBottom: 10 }}>
-                Arc's Lens
-              </p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-                {identity.dimensionInsights.map((d, i) => (
-                  <div key={i} style={{
-                    background: 'rgba(255,255,255,0.022)', borderRadius: 11, padding: '10px 14px',
-                    display: 'flex', gap: 10, alignItems: 'flex-start',
-                    border: `1px solid ${d.color}15`,
-                  }}>
-                    <div style={{
-                      width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
-                      background: d.color, marginTop: 5,
-                    }} />
-                    <div>
-                      <p style={{ ...font, fontSize: 9, fontWeight: 700, color: d.color, marginBottom: 3, letterSpacing: '1px', textTransform: 'uppercase' as const }}>
-                        {d.dimension}
-                      </p>
-                      <p style={{ ...font, fontSize: 12.5, color: 'rgba(255,255,255,0.68)', lineHeight: 1.6 }}>
-                        {d.insight}
-                      </p>
-                    </div>
-                  </div>
+          {/* YOU ARE pills */}
+          {identity.strengths?.length > 0 && (
+            <div style={{ marginBottom: 12 }}>
+              <span style={{ ...font, fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.32)', letterSpacing: '1.5px', textTransform: 'uppercase' as const, display: 'block', marginBottom: 7 }}>You Are</span>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {identity.strengths.map((pill, i) => {
+                  const c = PILL_COLORS[pill.color] ?? '#C4A8FF'
+                  return (
+                    <span key={i} style={{
+                      ...font, background: `${c}18`, color: c,
+                      border: `1px solid ${c}35`,
+                      fontSize: 12, fontWeight: 600,
+                      padding: '5px 13px', borderRadius: 100,
+                    }}>{pill.label}</span>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* STILL GROWING pills */}
+          {identity.growthEdges?.length > 0 && (
+            <div>
+              <span style={{ ...font, fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.32)', letterSpacing: '1.5px', textTransform: 'uppercase' as const, display: 'block', marginBottom: 7 }}>Still Growing</span>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {identity.growthEdges.map((pill, i) => (
+                  <span key={i} style={{
+                    ...font, background: 'rgba(255,212,122,0.1)', color: '#FFD47A',
+                    border: '1px solid rgba(255,212,122,0.28)',
+                    fontSize: 12, fontWeight: 600,
+                    padding: '5px 13px', borderRadius: 100,
+                  }}>△ {pill.label}</span>
                 ))}
               </div>
             </div>
           )}
-        </>
-      )}
-
-      {/* Fallback: portrait essence only (no identity yet) */}
-      {!identity && portrait?.essence && (
-        <div className="jrn-portrait-section" style={{
-          background: 'linear-gradient(135deg, rgba(123,63,228,0.15), rgba(196,168,255,0.06))',
-          borderRadius: 16, padding: 22, border: '1px solid rgba(196,168,255,0.18)',
-        }}>
-          <p style={{ ...font, fontSize: 10, fontWeight: 700, color: '#C4A8FF', letterSpacing: '1.5px', marginBottom: 10 }}>YOUR ESSENCE</p>
-          <p style={{ ...font, fontSize: 16, color: '#fff', lineHeight: 1.8, fontWeight: 500 }}>"{portrait.essence}"</p>
         </div>
       )}
 
-      {/* Identity loading state */}
+      {/* Fallback hero — portrait essence only (no identity yet) */}
+      {!identity && portrait?.essence && (
+        <div className="jrn-portrait-section" style={{
+          background: 'linear-gradient(135deg, rgba(123,63,228,0.15), rgba(196,168,255,0.06))',
+          borderRadius: 18, padding: '20px 22px', border: '1px solid rgba(196,168,255,0.18)',
+        }}>
+          <p style={{ ...font, fontSize: 10, fontWeight: 700, color: '#C4A8FF', letterSpacing: '1.5px', marginBottom: 12, textTransform: 'uppercase' as const }}>Your Essence</p>
+          <p style={{ ...font, fontSize: 16, color: '#fff', lineHeight: 1.85, fontWeight: 500, fontStyle: 'italic' }}>"{portrait.essence}"</p>
+        </div>
+      )}
+
+      {/* Identity loading placeholder */}
       {!identity && identityLoading && (
         <div style={{
-          height: 80, borderRadius: 14, background: 'rgba(123,63,228,0.07)',
+          height: 90, borderRadius: 16, background: 'rgba(123,63,228,0.07)',
           border: '1px solid rgba(123,63,228,0.15)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
@@ -666,7 +722,157 @@ function PortraitView({ portrait, identity, identityLoading, loading, onGenerate
         </div>
       )}
 
-      {/* Footer: generate portrait / refresh */}
+      {/* ══ BLUEPRINT ══ */}
+      {hasBlueprint && (
+        <div className="jrn-portrait-section">
+          <p style={{ ...font, fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.3)', letterSpacing: '1.6px', textTransform: 'uppercase' as const, marginBottom: 10 }}>
+            Your Blueprint
+          </p>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            {[
+              sunData    ? { ...sunData,      type: 'Sun',     label: profile?.sunSign ?? '' }            : null,
+              risingData ? { ...risingData,   type: 'Rising',  label: (profile?.risingSign ?? '') + ' Rising' } : null,
+              enneagramData ? { ...enneagramData, type: 'Enneagram', label: profile?.enneagram ?? '' }    : null,
+              neurodivData  ? { ...neurodivData,  type: 'Wiring',    label: profile?.neurodivergentNotes ?? '' } : null,
+            ].filter(Boolean).map((tile, i) => {
+              if (!tile) return null
+              const t = tile as { symbol: string; color: string; tagline: string; interpretation: string; type: string; label: string }
+              return (
+                <div key={i} style={{
+                  background: `${t.color}0A`,
+                  border: `1px solid ${t.color}22`,
+                  borderRadius: 14, padding: '14px 15px',
+                  display: 'flex', flexDirection: 'column', gap: 7,
+                }}>
+                  {/* Top row: symbol + type badge */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: 20, lineHeight: 1 }}>{t.symbol}</span>
+                    <span style={{
+                      ...font, fontSize: 9, fontWeight: 700, letterSpacing: '1.2px',
+                      color: t.color, textTransform: 'uppercase' as const,
+                      background: `${t.color}15`, padding: '2px 8px', borderRadius: 100,
+                    }}>{t.type}</span>
+                  </div>
+                  {/* Label + tagline */}
+                  <div>
+                    <p style={{ ...font, fontSize: 14, fontWeight: 700, color: '#fff', marginBottom: 1 }}>{t.label}</p>
+                    <p style={{ ...font, fontSize: 11, color: t.color, fontWeight: 600 }}>{t.tagline}</p>
+                  </div>
+                  {/* Interpretation */}
+                  <p style={{ ...font, fontSize: 11.5, color: 'rgba(255,255,255,0.58)', lineHeight: 1.6 }}>
+                    {t.interpretation}
+                  </p>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ══ YOUR GROWTH — full-width narrative ══ */}
+      {portrait?.growth && (
+        <div className="jrn-portrait-section" style={{
+          background: 'rgba(110,231,164,0.06)', borderRadius: 14, padding: '16px 18px',
+          border: '1px solid rgba(110,231,164,0.14)',
+        }}>
+          <p style={{ ...font, fontSize: 9, fontWeight: 700, color: '#6EE7A4', letterSpacing: '1.5px', textTransform: 'uppercase' as const, marginBottom: 10 }}>Your Growth</p>
+          <p style={{ ...font, fontSize: 14, color: 'rgba(255,255,255,0.82)', lineHeight: 1.8 }}>{portrait.growth}</p>
+        </div>
+      )}
+
+      {/* ══ WHAT TO WATCH ══ */}
+      {insights?.watch && insights.watch.length > 0 && (
+        <div className="jrn-portrait-section" style={{
+          background: 'rgba(255,212,122,0.05)', borderRadius: 14, padding: '16px 18px',
+          border: '1px solid rgba(255,212,122,0.12)',
+        }}>
+          <p style={{ ...font, fontSize: 9, fontWeight: 700, color: '#FFD47A', letterSpacing: '1.5px', textTransform: 'uppercase' as const, marginBottom: 12 }}>What to Watch</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {insights.watch.map((w, i) => (
+              <div key={i} style={{ display: 'flex', gap: 11, alignItems: 'flex-start' }}>
+                <span style={{
+                  ...font, fontSize: 10, fontWeight: 700, color: '#FFD47A',
+                  background: 'rgba(255,212,122,0.15)', border: '1px solid rgba(255,212,122,0.25)',
+                  padding: '4px 9px', borderRadius: 100, flexShrink: 0, whiteSpace: 'nowrap' as const,
+                  marginTop: 1,
+                }}>△ {w.label}</span>
+                <p style={{ ...font, fontSize: 12.5, color: 'rgba(255,255,255,0.6)', lineHeight: 1.6 }}>
+                  {w.tooltip}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Fallback What to Watch from identity growthEdges (if no insights) */}
+      {!insights?.watch?.length && identity?.growthEdges && identity.growthEdges.length > 0 && (
+        <div className="jrn-portrait-section" style={{
+          background: 'rgba(255,212,122,0.05)', borderRadius: 14, padding: '16px 18px',
+          border: '1px solid rgba(255,212,122,0.12)',
+        }}>
+          <p style={{ ...font, fontSize: 9, fontWeight: 700, color: '#FFD47A', letterSpacing: '1.5px', textTransform: 'uppercase' as const, marginBottom: 10 }}>What to Watch</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {identity.growthEdges.map((edge, i) => (
+              <p key={i} style={{ ...font, fontSize: 13, color: 'rgba(255,255,255,0.62)', lineHeight: 1.6 }}>△ {edge.label}</p>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ══ YOUR WIRING (from archetype insights) ══ */}
+      {insights?.wiring && insights.wiring.length > 0 && (
+        <div className="jrn-portrait-section">
+          <p style={{ ...font, fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.3)', letterSpacing: '1.6px', textTransform: 'uppercase' as const, marginBottom: 10 }}>
+            Your Wiring
+          </p>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
+            {insights.wiring.map((w, i) => {
+              const c = PILL_COLORS[w.color] ?? '#C4A8FF'
+              return (
+                <div key={i} title={w.tooltip} style={{
+                  background: `${c}12`, border: `1px solid ${c}28`,
+                  borderRadius: 100, padding: '6px 14px',
+                  display: 'flex', alignItems: 'center', gap: 6, cursor: 'default',
+                }}>
+                  <div style={{ width: 5, height: 5, borderRadius: '50%', background: c, flexShrink: 0 }} />
+                  <span style={{ ...font, fontSize: 12, fontWeight: 600, color: c }}>{w.label}</span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ══ ARC'S LENS by dimension ══ */}
+      {identity?.dimensionInsights && identity.dimensionInsights.length > 0 && (
+        <div className="jrn-portrait-section">
+          <p style={{ ...font, fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.3)', letterSpacing: '1.6px', textTransform: 'uppercase' as const, marginBottom: 10 }}>
+            Arc's Lens
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+            {identity.dimensionInsights.map((d, i) => (
+              <div key={i} style={{
+                background: 'rgba(255,255,255,0.022)', borderRadius: 11, padding: '10px 14px',
+                display: 'flex', gap: 10, alignItems: 'flex-start',
+                border: `1px solid ${d.color}18`,
+              }}>
+                <div style={{ width: 6, height: 6, borderRadius: '50%', flexShrink: 0, background: d.color, marginTop: 5 }} />
+                <div>
+                  <p style={{ ...font, fontSize: 9, fontWeight: 700, color: d.color, marginBottom: 3, letterSpacing: '1px', textTransform: 'uppercase' as const }}>
+                    {d.dimension}
+                  </p>
+                  <p style={{ ...font, fontSize: 12.5, color: 'rgba(255,255,255,0.68)', lineHeight: 1.6 }}>
+                    {d.insight}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Footer */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 4, flexWrap: 'wrap', gap: 8 }}>
         <p style={{ ...font, fontSize: 11, color: 'rgba(255,255,255,0.2)' }}>
           {portrait?.memoryCount ? `${portrait.memoryCount} memories` : ''}
@@ -948,6 +1154,10 @@ export default function DesktopJournalPage() {
   const [identity, setIdentity] = useState<IdentityData | null>(null)
   const [identityLoading, setIdentityLoading] = useState(false)
 
+  // User profile + archetype insights (for Portrait page)
+  const [profile, setProfile] = useState<UserProfile | null>(null)
+  const [insights, setInsights] = useState<import('@/app/api/user-profile/archetype-insights/route').ArchetypeInsights | null>(null)
+
   // UI
   const [activeTab, setActiveTab] = useState<Tab>('stream')
   const [activeDimFilter, setActiveDimFilter] = useState<Dimension | null>(null)
@@ -1076,6 +1286,34 @@ export default function DesktopJournalPage() {
   useEffect(() => {
     if (userId) fetchIdentity(userId)
   }, [userId, fetchIdentity])
+
+  // Load user profile + archetype insights (cached 1h, same key as sidebar)
+  useEffect(() => {
+    if (!userId) return
+    const CACHE_KEY = `protagonist-profile-${userId}`
+    const CACHE_TTL = 60 * 60 * 1000
+    try {
+      const cached = localStorage.getItem(CACHE_KEY)
+      if (cached) {
+        const parsed = JSON.parse(cached) as UserProfile & { cachedAt?: number }
+        if (Date.now() - (parsed.cachedAt ?? 0) < CACHE_TTL) {
+          setProfile(parsed)
+          if (parsed.archetypeInsights) setInsights(parsed.archetypeInsights)
+          return
+        }
+      }
+    } catch { /* ignore */ }
+    fetch(`/api/user-profile?userId=${userId}`)
+      .then(r => r.json())
+      .then((d: { profile?: UserProfile }) => {
+        if (d.profile) {
+          setProfile(d.profile)
+          if (d.profile.archetypeInsights) setInsights(d.profile.archetypeInsights)
+          try { localStorage.setItem(CACHE_KEY, JSON.stringify({ ...d.profile, cachedAt: Date.now() })) } catch { /* ignore */ }
+        }
+      })
+      .catch(() => {})
+  }, [userId])
 
   function xpScore(xp: number): number {
     const level = getLevel(xp)
@@ -1330,6 +1568,8 @@ export default function DesktopJournalPage() {
                     identity={identity}
                     identityLoading={identityLoading}
                     loading={loadingPortrait}
+                    profile={profile}
+                    insights={insights}
                     onGenerate={() => void generatePortrait()}
                     onRefreshIdentity={() => fetchIdentity(userId, true)}
                   />
