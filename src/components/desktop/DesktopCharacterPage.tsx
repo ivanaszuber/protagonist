@@ -143,6 +143,8 @@ export function DesktopCharacterPage({ dimension }: DesktopCharacterPageProps) {
   const [killStats, setKillStats] = useState({ slain: 0, escaped: 0 })
   const [earnedMedals, setEarnedMedals] = useState<string[]>([])
   const [dimScores, setDimScores] = useState<Record<string, number>>({})
+  const [dimensionInsight, setDimensionInsight] = useState<string | null>(null)
+  const [recentNotes, setRecentNotes] = useState<Array<{ id: string; content: string; brief: string | null; createdAt: string }>>([])
 
   // ── Data loading ──────────────────────────────────────────────────────────
 
@@ -199,6 +201,40 @@ export function DesktopCharacterPage({ dimension }: DesktopCharacterPageProps) {
     return () => window.removeEventListener('protagonist:quest-updated', onUpdate)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dimension])
+
+  // ── Oracle insights for this dimension ────────────────────────────────────
+  useEffect(() => {
+    if (!userId) return
+    const cacheKey = `protagonist-identity-${userId}`
+
+    // Try cache first
+    try {
+      const cached = localStorage.getItem(cacheKey)
+      if (cached) {
+        const data = JSON.parse(cached) as { dimensionInsights?: Array<{ dimension: string; insight: string }> }
+        const match = data.dimensionInsights?.find(d => d.dimension === dimension)
+        if (match) setDimensionInsight(match.insight)
+      }
+    } catch { /* ignore */ }
+
+    // Fetch fresh
+    fetch(`/api/identity/synthesize?userId=${encodeURIComponent(userId)}`)
+      .then(r => r.ok ? r.json() : null)
+      .then((data: { dimensionInsights?: Array<{ dimension: string; insight: string }> } | null) => {
+        const match = data?.dimensionInsights?.find(d => d.dimension === dimension)
+        if (match) setDimensionInsight(match.insight)
+      })
+      .catch(() => {})
+
+    // Fetch recent conversation notes for this dimension
+    fetch(`/api/journal/entries?userId=${encodeURIComponent(userId)}&dimension=${encodeURIComponent(dimension)}&limit=4`)
+      .then(r => r.json())
+      .then((d: { entries?: Array<{ id: string; content: string; brief: string | null; createdAt: string }> }) => {
+        setRecentNotes(d.entries?.slice(0, 3) ?? [])
+      })
+      .catch(() => {})
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId, dimension])
 
   // ── Handlers ──────────────────────────────────────────────────────────────
 
@@ -264,6 +300,19 @@ export function DesktopCharacterPage({ dimension }: DesktopCharacterPageProps) {
     quest?.milestones.find(m => !m.completed && m.is_focused) ??
     quest?.milestones.find(m => !m.completed) ??
     null
+
+  function fmtRelTime(iso: string): string {
+    const diff = Date.now() - new Date(iso).getTime()
+    const mins = Math.floor(diff / 60000)
+    const hrs = Math.floor(mins / 60)
+    const days = Math.floor(hrs / 24)
+    if (mins < 2)  return 'just now'
+    if (mins < 60) return `${mins}m ago`
+    if (hrs < 24)  return `${hrs}h ago`
+    if (days === 1) return 'yesterday'
+    if (days < 7)  return `${days}d ago`
+    return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+  }
 
   // ── Loading state ─────────────────────────────────────────────────────────
 
@@ -375,6 +424,61 @@ export function DesktopCharacterPage({ dimension }: DesktopCharacterPageProps) {
           userId={userId}
           onQuestSaved={(v) => setQuest(prev => prev ? { ...prev, vision: v } : { id: '', vision: v, character_name: char.name, character_class: 'Adventurer', milestones: [], recent_tasks: [], xp: 0 })}
         />
+
+        {/* ── Oracle's Read — dimension insight + conversation notes ── */}
+        {(dimensionInsight || recentNotes.length > 0) && (
+          <div style={{ marginBottom: 20 }}>
+
+            {/* Oracle's Read card */}
+            {dimensionInsight && (
+              <div style={{
+                background: 'linear-gradient(135deg, rgba(123,63,228,0.13) 0%, rgba(77,196,255,0.05) 100%)',
+                border: '1px solid rgba(123,63,228,0.28)',
+                borderRadius: 14, padding: '16px 18px', marginBottom: 12,
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 10 }}>
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="#C4A8FF">
+                    <path d="M12 2l2.4 7.6H22l-6.4 4.6 2.4 7.6L12 17.2l-6 4.6 2.4-7.6L2 9.6h7.6L12 2z"/>
+                  </svg>
+                  <span style={{ ...font, fontSize: 9, fontWeight: 700, color: '#C4A8FF', letterSpacing: '1.4px', textTransform: 'uppercase' as const }}>
+                    Oracle&apos;s Read · {char.categoryLabel}
+                  </span>
+                </div>
+                <p style={{ ...font, fontSize: 13.5, color: 'rgba(255,255,255,0.78)', lineHeight: 1.72, margin: 0 }}>
+                  {dimensionInsight}
+                </p>
+              </div>
+            )}
+
+            {/* From your conversations */}
+            {recentNotes.length > 0 && (
+              <div style={{
+                background: 'rgba(255,255,255,0.022)',
+                border: '0.5px solid rgba(255,255,255,0.07)',
+                borderRadius: 12, padding: '14px 16px',
+              }}>
+                <span style={{ ...font, fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.3)', letterSpacing: '1.4px', textTransform: 'uppercase' as const, display: 'block', marginBottom: 11 }}>
+                  From your conversations
+                </span>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
+                  {recentNotes.map(note => {
+                    const excerpt = note.brief ?? (note.content.length > 130 ? note.content.slice(0, 130) + '…' : note.content)
+                    return (
+                      <div key={note.id} style={{ borderLeft: `2px solid ${accentColor}35`, paddingLeft: 11 }}>
+                        <p style={{ ...font, fontSize: 12, color: 'rgba(255,255,255,0.55)', lineHeight: 1.65, fontStyle: 'italic', margin: '0 0 3px' }}>
+                          &ldquo;{excerpt}&rdquo;
+                        </p>
+                        <span style={{ ...font, fontSize: 9, color: 'rgba(255,255,255,0.22)' }}>
+                          {fmtRelTime(note.createdAt)}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Main Quests / Milestones */}
         {quest && (
