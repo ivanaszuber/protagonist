@@ -199,14 +199,21 @@ export function DesktopOracleModal() {
       const data = (await classRes.json()) as ClassifyResult
 
       if (data.intent === 'TASK' && data.task) {
-        await fetch('/api/quests/tasks', {
+        const taskRes = await fetch('/api/quests/tasks', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ userId, dimension: data.task.dimension ?? 'career', title: data.task.title, xpReward: data.task.xpReward, taskDate: data.task.date }),
         })
-        window.dispatchEvent(new CustomEvent('protagonist:task-added'))
-        const reply = data.oracleReply ?? `Task added: "${data.task.title}"`
-        setChatMessages(prev => [...prev, { role: 'oracle', text: reply }])
+        if (taskRes.ok) {
+          window.dispatchEvent(new CustomEvent('protagonist:task-added'))
+          const reply = data.oracleReply ?? `Task added: "${data.task.title}"`
+          setChatMessages(prev => [...prev, { role: 'oracle', text: reply }])
+        } else {
+          setChatMessages(prev => [...prev, { role: 'oracle', text: "Couldn't save that task — try again." }])
+        }
+      } else if (data.intent === 'TASK' && !data.task) {
+        // Classifier recognised a task intent but couldn't extract task details
+        setChatMessages(prev => [...prev, { role: 'oracle', text: "I caught that you want to add a task, but couldn't quite extract the details. Try something like: **\"Add task: book flights to Croatia\"** or **\"Remind me to call the dentist tomorrow\"**" }])
       } else if (data.intent === 'COMPLETED_ACTIVITY' && data.completed_task) {
         const ct = data.completed_task
         const createRes = await fetch('/api/quests/tasks', {
@@ -236,7 +243,9 @@ export function DesktopOracleModal() {
         const reply = calRes.ok ? `Added to calendar: "${ev.title}" on ${ev.date}${ev.startTime ? ` at ${ev.startTime}` : ''}` : "Couldn't add that to your calendar — try again."
         setChatMessages(prev => [...prev, { role: 'oracle', text: reply }])
       } else {
-        // CHAT / NOTE / anything else — send to Arc
+        // Genuine CHAT / NOTE — send to Arc for a conversational reply
+        // Important: Arc cannot create tasks or calendar events directly.
+        // It will only provide conversational responses.
         const arcRes = await fetch('/api/arc', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
