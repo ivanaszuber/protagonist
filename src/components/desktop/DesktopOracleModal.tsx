@@ -353,8 +353,8 @@ function ChatView({ messages, input, setInput, onSubmit, loading, inputRef, chat
   setInput: (v: string) => void
   onSubmit: () => void
   loading: boolean
-  inputRef: React.RefObject<HTMLTextAreaElement>
-  chatEndRef: React.RefObject<HTMLDivElement>
+  inputRef: React.RefObject<HTMLTextAreaElement | null>
+  chatEndRef: React.RefObject<HTMLDivElement | null>
   onClose: () => void
 }) {
   const QUICK = ['Plan my day', 'Review my week', 'Add a task', 'Log something I did', 'What should I focus on?']

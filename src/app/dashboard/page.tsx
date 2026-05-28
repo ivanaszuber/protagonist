@@ -31,6 +31,7 @@ import { openOracle } from '@/lib/oracle-events'
 import { TopNav } from '@/components/TopNav'
 import { useIsDesktop } from '@/lib/useIsDesktop'
 import DesktopDashboard from '@/components/desktop/DesktopDashboardV2'
+import { DesktopOracleModal } from '@/components/desktop/DesktopOracleModal'
 
 interface VitalityData {
   hp: number
@@ -903,6 +904,7 @@ export default function DashboardPage() {
           onToggleQuickAdd={() => setShowQuickAdd((v) => !v)}
         />
         <XpToastOverlay xpToast={xpToast} levelUpToast={levelUpToast} />
+        <DesktopOracleModal />
       </>
     )
   }
