@@ -356,7 +356,7 @@ export function DesktopCharacterPage({ dimension }: DesktopCharacterPageProps) {
       <div style={{
         flex: 1, display: 'flex', flexDirection: 'column',
         overflowY: 'auto', background: '#0D0820',
-        padding: '28px 28px 60px',
+        padding: '28px 28px 100px',
         minWidth: 0,
       }}>
 

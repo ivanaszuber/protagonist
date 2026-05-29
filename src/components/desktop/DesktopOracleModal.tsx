@@ -458,10 +458,62 @@ export function DesktopOracleModal() {
             }),
           })
           window.dispatchEvent(new CustomEvent('protagonist:task-added'))
-          const reply = msRes.ok
-            ? (data.oracleReply ?? `Done — "${ms.title}" added as a milestone.`)
-            : `Couldn't save that milestone — try again.`
-          setChatMessages(prev => [...prev, { role: 'oracle', text: reply }])
+          if (!msRes.ok) {
+            setChatMessages(prev => [...prev, { role: 'oracle', text: `Couldn't save that milestone — try again.` }])
+          } else {
+            const msData = (await msRes.json()) as { milestone?: { id: string } }
+            const milestoneId = msData.milestone?.id
+
+            // Confirm milestone created first
+            const confirmMsg = data.oracleReply ?? `Done — "${ms.title}" added as a milestone.`
+            setChatMessages(prev => [...prev, { role: 'oracle', text: confirmMsg + ' Generating tasks…' }])
+
+            // Auto-generate tasks linked to this milestone in the background
+            if (milestoneId) {
+              try {
+                // Fetch quest vision to give Oracle context for task generation
+                const questRes = await fetch(`/api/quests/character/${ms.dimension ?? 'career'}?userId=${encodeURIComponent(userId)}`)
+                const questData = (await questRes.json()) as { quest?: { vision?: string } }
+                const questVision = questData.quest?.vision ?? ''
+
+                const genRes = await fetch('/api/quests/milestones/generate-tasks', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    userId,
+                    milestoneId,
+                    milestoneTitle: ms.title,
+                    questVision,
+                    dimension: ms.dimension ?? 'career',
+                    targetDate: ms.targetDate ?? null,
+                  }),
+                })
+                const genData = (await genRes.json()) as { tasks?: Array<{ title: string }> }
+                const taskCount = genData.tasks?.length ?? 0
+                if (taskCount > 0) {
+                  setChatMessages(prev => {
+                    const msgs = [...prev]
+                    msgs[msgs.length - 1] = { role: 'oracle', text: confirmMsg + ` I've also broken it down into ${taskCount} tasks — open the milestone on your ${ms.dimension ?? 'career'} page to see them.` }
+                    return msgs
+                  })
+                  window.dispatchEvent(new CustomEvent('protagonist:task-added'))
+                } else {
+                  setChatMessages(prev => {
+                    const msgs = [...prev]
+                    msgs[msgs.length - 1] = { role: 'oracle', text: confirmMsg }
+                    return msgs
+                  })
+                }
+              } catch {
+                // Task generation failed silently — milestone is still saved
+                setChatMessages(prev => {
+                  const msgs = [...prev]
+                  msgs[msgs.length - 1] = { role: 'oracle', text: confirmMsg }
+                  return msgs
+                })
+              }
+            }
+          }
         }
       } else if (data.intent === 'CALENDAR_CREATE' && data.calendar_event) {
         const ev = data.calendar_event
