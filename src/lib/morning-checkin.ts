@@ -308,7 +308,8 @@ function parseClaudeJson(raw: string): MorningCheckinClaudeResult {
 
 export async function runMorningCheckin(
   userId: string,
-  transcript: string
+  transcript: string,
+  attachments?: Array<{ type: 'file' | 'image'; name: string; content: string; mimeType?: string }>
 ): Promise<{
   calendar_matches: string[]
   new_tasks: CreatedMorningTask[]
@@ -354,10 +355,39 @@ export async function runMorningCheckin(
   }
 
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+
+  // Build content blocks — prepend any images/PDFs, text files get appended to prompt
+  type ContentBlock =
+    | { type: 'image'; source: { type: 'base64'; media_type: string; data: string } }
+    | { type: 'document'; source: { type: 'base64'; media_type: 'application/pdf'; data: string } }
+    | { type: 'text'; text: string }
+
+  let fullPrompt = prompt
+  const contentBlocks: ContentBlock[] = []
+
+  if (attachments && attachments.length > 0) {
+    for (const att of attachments) {
+      const isImage = att.type === 'image'
+      const isPdf = att.mimeType === 'application/pdf'
+      if (isImage) {
+        contentBlocks.push({ type: 'image', source: { type: 'base64', media_type: att.mimeType ?? 'image/jpeg', data: att.content } })
+      } else if (isPdf) {
+        contentBlocks.push({ type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: att.content } })
+      } else {
+        // Plain text — append inline
+        const truncated = att.content.length > 4000 ? att.content.slice(0, 4000) + '...' : att.content
+        fullPrompt += `\n\nATTACHED FILE (${att.name}):\n${truncated}`
+      }
+    }
+    contentBlocks.push({ type: 'text', text: fullPrompt })
+  }
+
+  const messageContent = contentBlocks.length > 0 ? contentBlocks : fullPrompt
+
   const message = await anthropic.messages.create({
     model: 'claude-sonnet-4-6',
     max_tokens: 2048,
-    messages: [{ role: 'user', content: prompt }],
+    messages: [{ role: 'user', content: messageContent as Parameters<typeof anthropic.messages.create>[0]['messages'][0]['content'] }],
   })
 
   const raw = message.content[0].type === 'text' ? message.content[0].text : '{}'

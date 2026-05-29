@@ -54,6 +54,33 @@ type ModalMode = 'closed' | 'chat' | 'checkin-loading' | 'checkin-input' | 'chec
 
 function dimColor(d: string): string { return CHARACTERS[d as Dimension]?.color ?? '#A87EF8' }
 
+// ── Image compression (client-side, before base64 upload) ─────────────────────
+// Resizes to max 1280px on the longest side and re-encodes as JPEG 80%.
+// Typical phone photo (4–8 MB) → ~150–300 KB after compression.
+async function compressImage(base64: string, mimeType: string): Promise<{ base64: string; mimeType: string }> {
+  return new Promise((resolve) => {
+    const img = new window.Image()
+    img.onload = () => {
+      const MAX = 1280
+      let { width, height } = img
+      if (width > MAX || height > MAX) {
+        if (width > height) { height = Math.round(height * MAX / width); width = MAX }
+        else { width = Math.round(width * MAX / height); height = MAX }
+      }
+      const canvas = document.createElement('canvas')
+      canvas.width = width
+      canvas.height = height
+      const ctx = canvas.getContext('2d')
+      if (!ctx) { resolve({ base64, mimeType }); return }
+      ctx.drawImage(img, 0, 0, width, height)
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.8)
+      resolve({ base64: dataUrl.split(',')[1] ?? base64, mimeType: 'image/jpeg' })
+    }
+    img.onerror = () => resolve({ base64, mimeType })
+    img.src = `data:${mimeType};base64,${base64}`
+  })
+}
+
 // ── Check-in localStorage cache ───────────────────────────────────────────────
 
 function getCheckinKey() {
@@ -272,11 +299,17 @@ export function DesktopOracleModal() {
     if (isImage || isPdf) {
       // Read as base64
       const reader = new FileReader()
-      reader.onload = () => {
+      reader.onload = async () => {
         const dataUrl = reader.result as string
-        // dataUrl is "data:<mimeType>;base64,<data>" — strip the prefix
-        const base64 = dataUrl.split(',')[1] ?? dataUrl
-        setAttachments(prev => [...prev, { type: isImage ? 'image' : 'file', name: file.name, content: base64, mimeType: file.type }])
+        let base64 = dataUrl.split(',')[1] ?? dataUrl
+        let finalMimeType = file.type
+        // Compress images before storing — keeps payload small enough to send
+        if (isImage) {
+          const compressed = await compressImage(base64, file.type)
+          base64 = compressed.base64
+          finalMimeType = compressed.mimeType
+        }
+        setAttachments(prev => [...prev, { type: isImage ? 'image' : 'file', name: file.name, content: base64, mimeType: finalMimeType }])
       }
       reader.readAsDataURL(file)
     } else {
@@ -533,23 +566,23 @@ export function DesktopOracleModal() {
         }).catch(() => {})
       }
     } catch {
-      setChatMessages(prev => [...prev, { role: 'oracle', text: "Something went wrong — try again." }])
+      setChatMessages(prev => [...prev, { role: 'oracle', text: "⚠️ Something went wrong — tap **Retry** or try again with fewer/smaller files." }])
     } finally {
       setChatLoading(false)
     }
   }, [chatInput, chatLoading, userId, attachments, chatMessages, streamArcReply])
 
   // ── Check-in submit ─────────────────────────────────────────────────────────
-  const handleCheckinSubmit = useCallback(async () => {
+  const handleCheckinSubmit = useCallback(async (attachments?: Array<{ type: 'file' | 'image'; name: string; content: string; mimeType?: string }>) => {
     const text = checkinInput.trim()
-    if (!text || checkinLoading) return
+    if (!text && (!attachments || attachments.length === 0) || checkinLoading) return
     setCheckinLoading(true)
     setMode('checkin-thinking')
     try {
       const res = await fetch('/api/oracle/morning-checkin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, transcript: text }),
+        body: JSON.stringify({ userId, transcript: text || 'I shared some files for context.', attachments }),
       })
       if (!res.ok) { setMode('checkin-input'); return }
       const data = (await res.json()) as MorningCheckinResult
@@ -619,7 +652,7 @@ export function DesktopOracleModal() {
           context={morningContext}
           input={checkinInput}
           setInput={setCheckinInput}
-          onSubmit={handleCheckinSubmit}
+          onSubmit={(atts) => void handleCheckinSubmit(atts)}
           onClose={close}
         />}
         {mode === 'checkin-done' && checkinResult && <CheckinDoneView
@@ -703,9 +736,23 @@ function ChatView({ messages, input, setInput, onSubmit, loading, inputRef, chat
     recognitionRef.current = rec
     setIsRecording(true)
     rec.onresult = (e: SpeechRecognitionEvent) => {
-      let t = ''
-      for (let i = 0; i < e.results.length; i++) t += e.results[i][0].transcript
-      setInput(t)
+      let finalText = ''
+      let interimText = ''
+      for (let i = 0; i < e.results.length; i++) {
+        const chunk = e.results[i][0].transcript
+        if (e.results[i].isFinal) {
+          const trimmed = chunk.trim()
+          if (trimmed) {
+            // Capitalise first letter, ensure sentence ends with punctuation
+            const capped = trimmed.charAt(0).toUpperCase() + trimmed.slice(1)
+            const punctuated = /[.!?,]$/.test(capped) ? capped : capped + '.'
+            finalText += punctuated + ' '
+          }
+        } else {
+          interimText += chunk
+        }
+      }
+      setInput((finalText + interimText).trimEnd())
     }
     rec.onerror = () => { setIsRecording(false) }
     rec.onend = () => {
@@ -786,17 +833,32 @@ function ChatView({ messages, input, setInput, onSubmit, loading, inputRef, chat
               Ask Oracle anything — tasks, calendar, reflections, or just a chat.
             </div>
           )}
-          {messages.map((m, i) => (
-            <div key={i} style={{ display: 'flex', gap: 10, maxWidth: '85%', alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start', flexDirection: m.role === 'user' ? 'row-reverse' : 'row' }}>
-              <div style={{ width: 28, height: 28, borderRadius: '50%', flexShrink: 0, marginTop: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', background: m.role === 'oracle' ? 'rgba(255,122,101,0.15)' : '#7B3FE4', border: m.role === 'oracle' ? '1px solid rgba(255,122,101,0.3)' : 'none', fontSize: 11, fontWeight: 600, color: 'white' }}>
-                {m.role === 'oracle' ? <OracleRobot size={16} /> : 'I'}
+          {messages.map((m, i) => {
+            const isError = m.role === 'oracle' && m.text.startsWith('⚠️')
+            // Find the last user message before this one so we can retry it
+            const prevUser = isError ? [...messages].slice(0, i).reverse().find(x => x.role === 'user') : null
+            return (
+              <div key={i} style={{ display: 'flex', gap: 10, maxWidth: '85%', alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start', flexDirection: m.role === 'user' ? 'row-reverse' : 'row' }}>
+                <div style={{ width: 28, height: 28, borderRadius: '50%', flexShrink: 0, marginTop: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', background: m.role === 'oracle' ? 'rgba(255,122,101,0.15)' : '#7B3FE4', border: m.role === 'oracle' ? '1px solid rgba(255,122,101,0.3)' : 'none', fontSize: 11, fontWeight: 600, color: 'white' }}>
+                  {m.role === 'oracle' ? <OracleRobot size={16} /> : 'I'}
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div
+                    style={{ padding: '10px 14px', borderRadius: 12, fontSize: 13, lineHeight: 1.6, background: isError ? 'rgba(255,100,80,0.08)' : m.role === 'oracle' ? 'rgba(255,122,101,0.1)' : '#7B3FE4', border: isError ? '1px solid rgba(255,100,80,0.25)' : m.role === 'oracle' ? '1px solid rgba(255,122,101,0.2)' : 'none', color: 'rgba(255,255,255,0.88)' }}
+                    dangerouslySetInnerHTML={{ __html: renderMarkdown(m.text) }}
+                  />
+                  {isError && prevUser && (
+                    <button
+                      onClick={() => { setInput(prevUser.text.startsWith('📎') ? '' : prevUser.text); void onSubmit() }}
+                      style={{ alignSelf: 'flex-start', background: 'rgba(255,122,101,0.15)', border: '1px solid rgba(255,122,101,0.35)', borderRadius: 8, padding: '5px 12px', color: '#FF7A65', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}
+                    >
+                      ↩ Retry
+                    </button>
+                  )}
+                </div>
               </div>
-              <div
-                style={{ padding: '10px 14px', borderRadius: 12, fontSize: 13, lineHeight: 1.6, background: m.role === 'oracle' ? 'rgba(255,122,101,0.1)' : '#7B3FE4', border: m.role === 'oracle' ? '1px solid rgba(255,122,101,0.2)' : 'none', color: 'rgba(255,255,255,0.88)' }}
-                dangerouslySetInnerHTML={{ __html: renderMarkdown(m.text) }}
-              />
-            </div>
-          ))}
+            )
+          })}
           {loading && messages[messages.length - 1]?.role !== 'oracle' && (
             <div style={{ display: 'flex', gap: 10, alignSelf: 'flex-start' }}>
               <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(255,122,101,0.15)', border: '1px solid rgba(255,122,101,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -938,12 +1000,36 @@ function CheckinInputView({ mode, context, input, setInput, onSubmit, onClose }:
   context: MorningContext | null
   input: string
   setInput: (v: string) => void
-  onSubmit: () => void
+  onSubmit: (attachments?: Array<{ type: 'file' | 'image'; name: string; content: string; mimeType?: string }>) => void
   onClose: () => void
 }) {
   const isLoading = mode === 'checkin-loading' || mode === 'checkin-thinking'
   const [isRecording, setIsRecording] = React.useState(false)
+  const [checkinAttachments, setCheckinAttachments] = React.useState<Array<{ type: 'file' | 'image'; name: string; content: string; mimeType?: string }>>([])
   const recognitionRef = React.useRef<SpeechRecognition | null>(null)
+  const checkinFileInputRef = React.useRef<HTMLInputElement>(null)
+
+  async function handleCheckinFileAttach(file: File) {
+    const isImage = file.type.startsWith('image/')
+    const isPdf = file.type === 'application/pdf'
+    if (isImage || isPdf) {
+      const reader = new FileReader()
+      reader.onload = async () => {
+        let base64 = (reader.result as string).split(',')[1] ?? ''
+        let finalMimeType = file.type
+        if (isImage) {
+          const compressed = await compressImage(base64, file.type)
+          base64 = compressed.base64
+          finalMimeType = compressed.mimeType
+        }
+        setCheckinAttachments(prev => [...prev, { type: isImage ? 'image' : 'file', name: file.name, content: base64, mimeType: finalMimeType }])
+      }
+      reader.readAsDataURL(file)
+    } else {
+      const text = await file.text()
+      setCheckinAttachments(prev => [...prev, { type: 'file', name: file.name, content: text, mimeType: file.type }])
+    }
+  }
 
   function stopVoice() {
     if (!isRecording) return
@@ -964,9 +1050,22 @@ function CheckinInputView({ mode, context, input, setInput, onSubmit, onClose }:
     recognitionRef.current = rec
     setIsRecording(true)
     rec.onresult = (e: SpeechRecognitionEvent) => {
-      let t = ''
-      for (let i = 0; i < e.results.length; i++) t += e.results[i][0].transcript
-      setInput(t)
+      let finalText = ''
+      let interimText = ''
+      for (let i = 0; i < e.results.length; i++) {
+        const chunk = e.results[i][0].transcript
+        if (e.results[i].isFinal) {
+          const trimmed = chunk.trim()
+          if (trimmed) {
+            const capped = trimmed.charAt(0).toUpperCase() + trimmed.slice(1)
+            const punctuated = /[.!?,]$/.test(capped) ? capped : capped + '.'
+            finalText += punctuated + ' '
+          }
+        } else {
+          interimText += chunk
+        }
+      }
+      setInput((finalText + interimText).trimEnd())
     }
     rec.onerror = () => { setIsRecording(false) }
     rec.onend = () => {
@@ -980,7 +1079,7 @@ function CheckinInputView({ mode, context, input, setInput, onSubmit, onClose }:
 
   function handleSubmit() {
     stopVoice()
-    void onSubmit()
+    void onSubmit(checkinAttachments.length > 0 ? checkinAttachments : undefined)
   }
 
   return (
@@ -1035,7 +1134,58 @@ function CheckinInputView({ mode, context, input, setInput, onSubmit, onClose }:
               placeholder={isRecording ? 'Listening…' : 'e.g. Slept okay, feeling a bit tired but motivated. Big interview at 11, then I need to work on the app. Also need to plan Croatia trip...'}
               style={{ flex: 1, background: isRecording ? 'rgba(255,107,157,0.06)' : 'rgba(255,255,255,0.05)', border: `1px solid ${isRecording ? 'rgba(255,107,157,0.3)' : 'rgba(255,255,255,0.1)'}`, borderRadius: 12, padding: '14px 16px', color: 'white', fontSize: 13, fontFamily: 'inherit', outline: 'none', resize: 'none', lineHeight: 1.7, marginBottom: 14, transition: 'border-color 0.15s, background 0.15s' }}
             />
+            {/* Attachment preview */}
+            {checkinAttachments.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+                {checkinAttachments.map((att, idx) => (
+                  att.type === 'image' ? (
+                    <div key={idx} style={{ position: 'relative', display: 'inline-flex' }}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={`data:${att.mimeType ?? 'image/jpeg'};base64,${att.content}`} alt={att.name} style={{ height: 48, maxWidth: 72, objectFit: 'cover', borderRadius: 8, border: '1px solid rgba(255,255,255,0.15)' }} />
+                      <button onClick={() => setCheckinAttachments(p => p.filter((_, i) => i !== idx))} style={{ position: 'absolute', top: -6, right: -6, width: 16, height: 16, borderRadius: '50%', background: 'rgba(30,20,50,0.9)', border: '1px solid rgba(255,255,255,0.2)', color: 'white', fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
+                    </div>
+                  ) : (
+                    <div key={idx} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: 'rgba(123,63,228,0.15)', border: '1px solid rgba(123,63,228,0.3)', borderRadius: 8, padding: '4px 10px', fontSize: 11, color: 'rgba(255,255,255,0.8)', maxWidth: 180 }}>
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="rgba(123,63,228,0.9)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{att.name}</span>
+                      <button onClick={() => setCheckinAttachments(p => p.filter((_, i) => i !== idx))} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', fontSize: 13, cursor: 'pointer', lineHeight: 1, padding: 0 }}>×</button>
+                    </div>
+                  )
+                ))}
+              </div>
+            )}
+
+            {/* Hidden file input */}
+            <input
+              ref={checkinFileInputRef}
+              type="file"
+              accept="image/*,.pdf,.html,.htm,.txt,.md,.csv"
+              multiple
+              style={{ display: 'none' }}
+              onChange={e => {
+                Array.from(e.target.files ?? []).forEach(f => void handleCheckinFileAttach(f))
+                e.target.value = ''
+              }}
+            />
+
             <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+              {/* Paperclip button */}
+              <button
+                type="button"
+                onClick={() => checkinFileInputRef.current?.click()}
+                aria-label="Attach file or photo"
+                style={{
+                  width: 40, height: 40, borderRadius: 10, flexShrink: 0,
+                  background: 'rgba(255,255,255,0.06)',
+                  border: '1px solid rgba(255,255,255,0.12)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer', transition: 'all 0.15s',
+                }}
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.55)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+                </svg>
+              </button>
               {/* Voice button */}
               <button
                 type="button"
@@ -1067,8 +1217,8 @@ function CheckinInputView({ mode, context, input, setInput, onSubmit, onClose }:
               </button>
               <button
                 onClick={handleSubmit}
-                disabled={!input.trim()}
-                style={{ flex: 1, background: input.trim() ? '#FF7A65' : 'rgba(255,122,101,0.25)', border: 'none', borderRadius: 10, padding: '11px', color: 'white', fontSize: 13, fontWeight: 600, cursor: input.trim() ? 'pointer' : 'default', fontFamily: 'inherit', transition: 'background 0.15s' }}
+                disabled={!input.trim() && checkinAttachments.length === 0}
+                style={{ flex: 1, background: (input.trim() || checkinAttachments.length > 0) ? '#FF7A65' : 'rgba(255,122,101,0.25)', border: 'none', borderRadius: 10, padding: '11px', color: 'white', fontSize: 13, fontWeight: 600, cursor: (input.trim() || checkinAttachments.length > 0) ? 'pointer' : 'default', fontFamily: 'inherit', transition: 'background 0.15s' }}
               >
                 Start my day →
               </button>

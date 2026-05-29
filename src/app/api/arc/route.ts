@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { consultArc } from '@/lib/agents/arc'
 
+// Increase body size limit for this route — needed for multi-image payloads
+export const maxDuration = 60  // seconds (allows time to process many images)
+// Next.js App Router doesn't expose a per-route bodyParser limit,
+// but with client-side compression active, payloads stay well under 10 MB.
+
 export async function POST(req: NextRequest) {
   try {
     if (!process.env.ANTHROPIC_API_KEY) {

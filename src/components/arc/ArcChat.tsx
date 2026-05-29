@@ -86,10 +86,23 @@ export function ArcChat() {
 
     recognition.onresult = (event: SpeechRecognitionEvent) => {
       gotResult = true
-      const transcript = event.results[0]?.[0]?.transcript
-      if (transcript) {
-        setInputText(transcript)
+      let finalText = ''
+      let interimText = ''
+      for (let i = 0; i < event.results.length; i++) {
+        const chunk = event.results[i][0].transcript
+        if (event.results[i].isFinal) {
+          const trimmed = chunk.trim()
+          if (trimmed) {
+            const capped = trimmed.charAt(0).toUpperCase() + trimmed.slice(1)
+            const punctuated = /[.!?,]$/.test(capped) ? capped : capped + '.'
+            finalText += punctuated + ' '
+          }
+        } else {
+          interimText += chunk
+        }
       }
+      const result = (finalText + interimText).trimEnd()
+      if (result) setInputText(result)
       setChatState('open')
     }
 

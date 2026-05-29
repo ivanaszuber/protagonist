@@ -543,24 +543,29 @@ export async function consultArc(input: ArcInput): Promise<ArcOutput> {
   let fileContextBlock = ''
   const pdfAttachments: Array<{ name: string; content: string }> = []
 
-  for (const att of allAttachments) {
-    const isImage = att.type === 'image'
-    const isPdf = att.mimeType === 'application/pdf'
-    const isText = !isImage && !isPdf
+  // Separate by type first
+  const imageAttachments = allAttachments.filter(a => a.type === 'image')
+  const pdfAtts = allAttachments.filter(a => a.mimeType === 'application/pdf')
+  const textAtts = allAttachments.filter(a => a.type !== 'image' && a.mimeType !== 'application/pdf')
 
-    if (isImage) {
-      try {
-        const description = await processPhotoAndStore(att.content, att.mimeType ?? 'image/jpeg', userId)
-        if (description) {
-          photoContextBlock += (photoContextBlock ? '\n\n' : '') + `PHOTO SHARED (${att.name}):\n${description}`
-        }
-      } catch { /* continue */ }
-    } else if (isPdf) {
-      pdfAttachments.push({ name: att.name, content: att.content })
-    } else if (isText) {
-      const truncated = att.content.length > 8000 ? att.content.slice(0, 8000) + '\n\n[... file truncated ...]' : att.content
-      fileContextBlock += (fileContextBlock ? '\n\n' : '') + `FILE SHARED (${att.name}):\n${truncated}`
+  // Process all images in parallel (not sequentially) — avoids timeout with many photos
+  const photoDescriptions = await Promise.allSettled(
+    imageAttachments.map(att => processPhotoAndStore(att.content, att.mimeType ?? 'image/jpeg', userId)
+      .then(desc => ({ name: att.name, desc }))
+    )
+  )
+  for (const result of photoDescriptions) {
+    if (result.status === 'fulfilled' && result.value.desc) {
+      photoContextBlock += (photoContextBlock ? '\n\n' : '') + `PHOTO SHARED (${result.value.name}):\n${result.value.desc}`
     }
+  }
+
+  for (const att of pdfAtts) {
+    pdfAttachments.push({ name: att.name, content: att.content })
+  }
+  for (const att of textAtts) {
+    const truncated = att.content.length > 8000 ? att.content.slice(0, 8000) + '\n\n[... file truncated ...]' : att.content
+    fileContextBlock += (fileContextBlock ? '\n\n' : '') + `FILE SHARED (${att.name}):\n${truncated}`
   }
 
   // Build conversation history block (last 10 exchanges so Arc remembers the thread)
