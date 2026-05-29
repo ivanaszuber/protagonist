@@ -51,6 +51,14 @@ interface TaskRow {
   xp_reward: number
 }
 
+interface UnlinkedTaskRow {
+  id: string
+  title: string
+  completed: boolean
+  xp_reward: number
+  dimension: string
+}
+
 interface MainQuest {
   id: string
   dimension: Dimension
@@ -356,6 +364,7 @@ export default function DashboardPage() {
   const [witnessInsight, setWitnessInsight] = useState<string | null>(null)
   const [witnessDismissed, setWitnessDismissed] = useState(false)
   const [quests, setQuests] = useState<MainQuest[]>(() => _cache?.quests ?? [])
+  const [unlinkedTasks, setUnlinkedTasks] = useState<UnlinkedTaskRow[]>([])
   const [events, setEvents] = useState<CalendarEventRow[]>(() => _cache?.events ?? [])
   const [hpDisplay, setHpDisplay] = useState<number | null>(null)
   const [xpToast, setXpToast] = useState<XpToast | null>(null)
@@ -464,6 +473,7 @@ export default function DashboardPage() {
         setDimXpMap(xm)
         next.dimXpMap = xm
       }
+      setUnlinkedTasks((questsRes.value.unlinked_tasks ?? []) as UnlinkedTaskRow[])
     }
     if (medalsRes.status === 'fulfilled') {
       const mm = (medalsRes.value.earned ?? {}) as Record<string, string[]>
@@ -520,6 +530,7 @@ export default function DashboardPage() {
       const qs = (questsRes.value.quests ?? []) as MainQuest[]
       setQuests(qs)
       if (questsRes.value.dimXpMap) setDimXpMap(questsRes.value.dimXpMap as Record<string, number>)
+      setUnlinkedTasks((questsRes.value.unlinked_tasks ?? []) as UnlinkedTaskRow[])
       if (_cache) { _cache.quests = qs; _cache.dateStr = dateStr }
     }
     if (calRes.status === 'fulfilled') {
@@ -710,6 +721,23 @@ export default function DashboardPage() {
       }
     }
 
+    // Include tasks that aren't linked to any active quest dimension
+    for (const task of unlinkedTasks) {
+      const dim = task.dimension as Dimension
+      items.push({
+        id: task.id,
+        type: 'task',
+        title: task.title,
+        time: null,
+        timeEnd: null,
+        endIso: null,
+        dimension: dim in CHARACTERS ? dim : null,
+        completed: task.completed,
+        xp_reward: task.xp_reward ?? 50,
+        color: dim in CHARACTERS ? CHARACTERS[dim as Dimension].color : '#8B7FAA',
+      })
+    }
+
     for (const ev of events) {
       items.push({
         id: ev.id,
@@ -742,7 +770,7 @@ export default function DashboardPage() {
     })
 
     return items
-  }, [quests, events])
+  }, [quests, unlinkedTasks, events])
 
 
   function handleMoodSelect(score: number) {
@@ -772,6 +800,10 @@ export default function DashboardPage() {
           t.id === item.id ? { ...t, completed: true } : t
         ),
       }))
+    )
+    // Optimistic update for tasks not tied to an active quest
+    setUnlinkedTasks((prev) =>
+      prev.map((t) => (t.id === item.id ? { ...t, completed: true } : t))
     )
 
     try {
@@ -827,6 +859,7 @@ export default function DashboardPage() {
         todays_tasks: q.todays_tasks?.filter((t) => t.id !== id),
       }))
     )
+    setUnlinkedTasks((prev) => prev.filter((t) => t.id !== id))
     setExpandedTaskId(null)
     try {
       await fetch(`/api/quests/tasks/${id}`, {
@@ -851,6 +884,7 @@ export default function DashboardPage() {
         ),
       }))
     )
+    setUnlinkedTasks((prev) => prev.map((t) => (t.id === id ? { ...t, title: trimmed } : t)))
     setEditingTaskId(null)
     await fetch(`/api/quests/tasks/${id}`, {
       method: 'PATCH',

@@ -150,7 +150,22 @@ export async function GET(request: Request) {
     }
   }
 
-  return NextResponse.json({ quests: enriched, dimXpMap })
+  // Fetch tasks for today that don't belong to any active quest dimension,
+  // so the dashboard can display them even without a matching main quest.
+  const coveredDims = new Set((quests ?? []).map((q) => q.dimension as string))
+  let unlinkedTasks: Array<{ id: string; title: string; completed: boolean; xp_reward: number; dimension: string }> = []
+  if (coveredDims.size < 7) {
+    const { data: allTodayTasks } = await supabase
+      .from('tasks')
+      .select('id, title, completed, xp_reward, dimension')
+      .eq('user_id', userId)
+      .eq('task_date', today)
+      .order('created_at')
+    unlinkedTasks = ((allTodayTasks ?? []) as Array<{ id: string; title: string; completed: boolean; xp_reward: number; dimension: string }>)
+      .filter((t) => !coveredDims.has(t.dimension))
+  }
+
+  return NextResponse.json({ quests: enriched, dimXpMap, unlinked_tasks: unlinkedTasks })
 }
 
 export async function POST(request: Request) {

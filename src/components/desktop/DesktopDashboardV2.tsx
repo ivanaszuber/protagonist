@@ -304,7 +304,7 @@ export default function DesktopDashboardV2(props: DesktopDashboardV2Props) {
     if (!showQuickAdd || !userId || !quickDim) return
     if (dimMilestones[quickDim] !== undefined) return
     setLoadingMilestones(true)
-    fetch(`/api/quests/character/${quickDim}`)
+    fetch(`/api/quests/character/${quickDim}?userId=${encodeURIComponent(userId)}`)
       .then(r => r.json())
       .then((data: { quest?: { milestones?: Array<{ id: string; title: string }> } }) => {
         setDimMilestones(prev => ({
