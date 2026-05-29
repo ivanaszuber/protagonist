@@ -399,9 +399,9 @@ export function DesktopCharacterPage({ dimension }: DesktopCharacterPageProps) {
 
       {/* ── Center panel ─────────────────────────────────────────────────── */}
       <div style={{
-        flex: 1, display: 'flex', flexDirection: 'column',
+        flex: 1,
         overflowY: 'auto', background: '#0D0820',
-        padding: '28px 28px 300px',
+        padding: '28px 28px 320px',
         minWidth: 0,
       }}>
 

@@ -72,18 +72,25 @@ function TaskRow({
   accentColor,
   userId,
   onToggle,
+  onUpdate,
 }: {
   task: MilestoneTask
   accentColor: string
   userId?: string
   onToggle: (taskId: string, completed: boolean) => void
+  onUpdate?: (taskId: string, changes: Partial<MilestoneTask>) => void
 }) {
   const [toggling, setToggling] = useState(false)
+  const [editing, setEditing]   = useState(false)
+  const [editTitle, setEditTitle] = useState(task.title)
+  const [editDate,  setEditDate]  = useState(task.task_date ?? '')
+  const [saving, setSaving]       = useState(false)
+
   const dueDate = task.task_date ? fmtDate(task.task_date) : null
   const isOverdue = task.task_date && !task.completed && daysUntil(task.task_date) < 0
 
   async function handleToggle() {
-    if (toggling || !userId) return
+    if (toggling || !userId || editing) return
     setToggling(true)
     try {
       if (!task.completed) {
@@ -105,13 +112,85 @@ function TaskRow({
     }
   }
 
+  function openEdit() {
+    setEditTitle(task.title)
+    setEditDate(task.task_date ?? '')
+    setEditing(true)
+  }
+
+  function cancelEdit() { setEditing(false) }
+
+  async function saveEdit() {
+    const title = editTitle.trim()
+    if (!title || !userId || saving) return
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/quests/tasks/${task.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, title, task_date: editDate || null }),
+      })
+      if (res.ok) {
+        onUpdate?.(task.id, { title, task_date: editDate || null })
+        setEditing(false)
+      }
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const rowStyle: React.CSSProperties = {
+    display: 'flex', alignItems: 'center', gap: 10,
+    padding: '7px 14px',
+    opacity: toggling ? 0.5 : 1,
+    transition: 'opacity 0.15s',
+  }
+
+  // ── Edit mode ──────────────────────────────────────────────────────────────
+  if (editing) {
+    return (
+      <div style={{ padding: '6px 14px 8px' }}>
+        <div style={{ display: 'flex', gap: 5, alignItems: 'center', marginBottom: 4 }}>
+          <input
+            autoFocus type="text" value={editTitle}
+            onChange={e => setEditTitle(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') void saveEdit(); if (e.key === 'Escape') cancelEdit() }}
+            style={{
+              flex: 1, background: '#0D0820', border: `1px solid ${accentColor}55`,
+              borderRadius: 6, padding: '4px 8px', fontSize: 12, color: '#E8E0F0',
+              outline: 'none', fontFamily: 'inherit',
+            }}
+          />
+          <button type="button" onClick={cancelEdit}
+            style={{ background: 'transparent', border: 'none', fontSize: 15, color: '#3D2878', cursor: 'pointer', padding: 0, lineHeight: 1, flexShrink: 0 }}
+          >×</button>
+        </div>
+        <div style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
+          <input type="date" value={editDate}
+            onChange={e => setEditDate(e.target.value)}
+            style={{
+              flex: 1, background: '#0D0820', border: `1px solid ${accentColor}33`,
+              borderRadius: 6, padding: '4px 7px', fontSize: 11,
+              color: editDate ? '#E8E0F0' : '#5A4A7A', outline: 'none',
+              colorScheme: 'dark' as const, fontFamily: 'inherit',
+            }}
+          />
+          <button type="button" onClick={() => void saveEdit()} disabled={!editTitle.trim() || saving}
+            style={{
+              background: accentColor, border: 'none', borderRadius: 6,
+              padding: '4px 12px', fontSize: 11, fontWeight: 600, color: '#0D0820',
+              cursor: editTitle.trim() && !saving ? 'pointer' : 'default',
+              opacity: editTitle.trim() && !saving ? 1 : 0.4, fontFamily: 'inherit', flexShrink: 0,
+            }}
+          >{saving ? '…' : 'Save'}</button>
+        </div>
+      </div>
+    )
+  }
+
+  // ── Normal row ─────────────────────────────────────────────────────────────
   return (
-    <div style={{
-      display: 'flex', alignItems: 'center', gap: 10,
-      padding: '7px 14px',
-      opacity: toggling ? 0.5 : 1,
-      transition: 'opacity 0.15s',
-    }}>
+    <div style={rowStyle}>
       {/* Checkbox */}
       <button
         type="button"
@@ -131,26 +210,38 @@ function TaskRow({
         )}
       </button>
 
-      {/* Title */}
-      <span style={{
-        flex: 1, fontSize: 12,
-        color: task.completed ? 'rgba(255,255,255,0.28)' : 'rgba(255,255,255,0.72)',
-        textDecoration: task.completed ? 'line-through' : 'none',
-        lineHeight: 1.4,
-      }}>
+      {/* Title — click to edit */}
+      <span
+        role="button" tabIndex={0}
+        onClick={() => !task.completed && openEdit()}
+        onKeyDown={e => { if (!task.completed && (e.key === 'Enter' || e.key === ' ')) openEdit() }}
+        style={{
+          flex: 1, fontSize: 12,
+          color: task.completed ? 'rgba(255,255,255,0.28)' : 'rgba(255,255,255,0.72)',
+          textDecoration: task.completed ? 'line-through' : 'none',
+          lineHeight: 1.4,
+          cursor: task.completed ? 'default' : 'text',
+        }}
+      >
         {task.title}
       </span>
 
-      {/* Due date */}
-      {dueDate && (
-        <span style={{
+      {/* Due date — click to edit */}
+      <span
+        role="button" tabIndex={0}
+        onClick={() => !task.completed && openEdit()}
+        onKeyDown={e => { if (!task.completed && e.key === 'Enter') openEdit() }}
+        style={{
           fontSize: 10, flexShrink: 0,
-          color: isOverdue ? '#FF7A65' : 'rgba(255,255,255,0.28)',
+          color: dueDate
+            ? (isOverdue ? '#FF7A65' : 'rgba(255,255,255,0.28)')
+            : `${accentColor}50`,
           fontWeight: isOverdue ? 600 : 400,
-        }}>
-          {dueDate}
-        </span>
-      )}
+          cursor: task.completed ? 'default' : 'pointer',
+        }}
+      >
+        {dueDate ?? '+ date'}
+      </span>
     </div>
   )
 }
@@ -289,6 +380,13 @@ export function MainQuestsSection({
     setTasksById(prev => ({
       ...prev,
       [milestoneId]: (prev[milestoneId] ?? []).map(t => t.id === taskId ? { ...t, completed } : t),
+    }))
+  }
+
+  function handleTaskUpdate(milestoneId: string, taskId: string, changes: Partial<MilestoneTask>) {
+    setTasksById(prev => ({
+      ...prev,
+      [milestoneId]: (prev[milestoneId] ?? []).map(t => t.id === taskId ? { ...t, ...changes } : t),
     }))
   }
 
@@ -503,7 +601,8 @@ export function MainQuestsSection({
                           {/* Open tasks first */}
                           {tasks.filter(t => !t.completed).map(task => (
                             <TaskRow key={task.id} task={task} accentColor={accentColor} userId={userId}
-                              onToggle={(taskId, completed) => handleTaskToggle(m.id, taskId, completed)} />
+                              onToggle={(taskId, completed) => handleTaskToggle(m.id, taskId, completed)}
+                              onUpdate={(taskId, changes) => handleTaskUpdate(m.id, taskId, changes)} />
                           ))}
                           {/* Divider before completed */}
                           {tasks.some(t => t.completed) && tasks.some(t => !t.completed) && (
@@ -512,7 +611,8 @@ export function MainQuestsSection({
                           {/* Completed tasks */}
                           {tasks.filter(t => t.completed).map(task => (
                             <TaskRow key={task.id} task={task} accentColor={accentColor} userId={userId}
-                              onToggle={(taskId, completed) => handleTaskToggle(m.id, taskId, completed)} />
+                              onToggle={(taskId, completed) => handleTaskToggle(m.id, taskId, completed)}
+                              onUpdate={(taskId, changes) => handleTaskUpdate(m.id, taskId, changes)} />
                           ))}
                         </div>
                       )}
