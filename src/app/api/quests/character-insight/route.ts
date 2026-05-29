@@ -126,29 +126,35 @@ export async function GET(request: Request) {
 
 ${contextBlock || 'No data yet — this person is just getting started.'}
 
-Generate a character page insight panel for the ${dimension} dimension. Return JSON only, no markdown:
+Generate a character page insight panel. Return ONLY valid JSON — no markdown, no explanation, no prose outside the JSON object.
+
+STRICT FORMAT:
 {
-  "narrative": "2-3 sentences in Oracle's voice capturing the real story of where this person is in their ${dimension} right now. Be specific to the actual memories and context — no generic platitudes. Reference real patterns, real names, real moments if present.",
+  "narrative": "2-3 sentences in Oracle's voice. Cover the SITUATION — what's happening in their ${dimension} life right now. Be specific to real names, real context from the data above. This is the 'what's going on' summary.",
   "lessons": [
-    "One specific lesson they're learning right now — drawn from an actual pattern in the data. Under 20 words.",
-    "A second lesson. Under 20 words."
+    "A PITHY INSIGHT or realisation they are learning — NOT a fact description. Think: what pattern or truth is emerging? E.g. 'Feeling safe doesn't mean the relationship is boring — it means it's real.' Max 20 words.",
+    "A second distinct lesson or emerging realisation. Different angle from the first. Max 20 words."
   ],
   "growthEdges": [
-    {"text": "A specific thing they're working on. Under 18 words.", "urgency": "high"},
-    {"text": "A second growth edge. Under 18 words.", "urgency": "medium"}
+    {"text": "One specific BEHAVIOUR or HABIT they are working on building or breaking. Start with a verb. E.g. 'Staying present when Ale goes quiet instead of filling silence with worst-case stories.' Max 18 words.", "urgency": "high"},
+    {"text": "A second concrete growth edge — different from the first. Max 18 words.", "urgency": "medium"}
   ],
   "timeline": [
-    {"date": "recent date like '3 Jun'", "type": "win", "text": "A specific positive moment from the data. Under 15 words."},
-    {"date": "earlier date", "type": "shift", "text": "A meaningful realisation or turning point. Under 15 words."},
-    {"date": "earlier still", "type": "hard", "text": "A challenge they faced. Under 15 words."}
+    {"date": "e.g. '3 Jun'", "type": "win", "text": "A specific POSITIVE moment, achievement, or breakthrough. Under 12 words."},
+    {"date": "e.g. '28 May'", "type": "shift", "text": "A meaningful realisation or turning point. Under 12 words."},
+    {"date": "e.g. '20 May'", "type": "hard", "text": "A challenge, setback, or hard moment they faced. Under 12 words."}
   ],
-  "lastWord": "One line in Oracle's voice — the single most important thing to hold right now. Max 20 words."
+  "lastWord": "One punchy Oracle line — the single most important thing for them to hold right now. NOT a restatement of their quest. A real insight. Max 18 words."
 }
 
-If data is sparse, still write something honest and grounded — acknowledge the blank slate as the starting point.
-Lesson type is always "insight". Timeline type must be one of: win, shift, hard.
-Dates in timeline should be formatted like "3 Jun" or "28 May".
-${hasData ? 'Draw from the real data above — be specific.' : 'Be encouraging about starting the tracking journey.'}`
+RULES:
+- lessons = insights/realisations/truths being learned. NOT biographical facts. NOT repetition of narrative.
+- growthEdges = concrete behaviours/habits/edges. Start each with a verb.
+- timeline dates: use real approximate dates from the data if possible, otherwise invent plausible recent ones.
+- timeline type must be exactly one of: win, shift, hard
+- lastWord must be a genuine insight, not a restatement of their quest vision
+- If data is sparse, be honest and grounded — don't fabricate specifics you don't have
+${hasData ? '- Draw from the real data above. Be specific to real context.' : '- Encourage starting the tracking journey.'}`
 
   try {
     const msg = await client.messages.create({
@@ -190,7 +196,9 @@ ${hasData ? 'Draw from the real data above — be specific.' : 'Be encouraging a
         type: 'win',
         text: t.replace('✓ ', ''),
       })),
-      lastWord: questVision ? `Your quest: "${questVision.slice(0, 60)}${questVision.length > 60 ? '…' : ''}"` : '',
+      lastWord: dimMemories.length > 0
+        ? dimMemories[0].replace(/^\[.*?\] /, '').slice(0, 100)
+        : 'The work of showing up consistently is the foundation everything else is built on.',
     })
   }
 }

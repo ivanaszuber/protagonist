@@ -258,7 +258,7 @@ export function DesktopCharacterPage({ dimension }: DesktopCharacterPageProps) {
       .catch(() => {})
 
     // Fetch Oracle character insight (narrative, lessons, growth edges, timeline)
-    const insightCacheKey = `protagonist-char-insight-${userId}-${dimension}`
+    const insightCacheKey = `protagonist-char-insight-v2-${userId}-${dimension}`
     try {
       const cached = localStorage.getItem(insightCacheKey)
       if (cached) {
@@ -585,7 +585,8 @@ export function DesktopCharacterPage({ dimension }: DesktopCharacterPageProps) {
         )}
 
         {/* ── Oracle's Read — dimension insight + conversation notes ── */}
-        {(dimensionInsight || recentNotes.length > 0) && (
+        {/* Suppressed when charInsight is present — Oracle's Story covers this */}
+        {!charInsight && (dimensionInsight || recentNotes.length > 0) && (
           <div style={{ marginBottom: 20 }}>
 
             {/* Oracle's Read card */}
