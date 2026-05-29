@@ -432,6 +432,10 @@ export default function DesktopDashboardV2(props: DesktopDashboardV2Props) {
               style={{ color: 'rgba(255,255,255,0.6)', padding: '6px 14px', fontSize: 13, background: 'transparent', border: 'none', cursor: 'pointer', ...font }}>
               Journal
             </button>
+            <button type="button" onClick={() => router.push('/memories')}
+              style={{ color: 'rgba(255,255,255,0.6)', padding: '6px 14px', fontSize: 13, background: 'transparent', border: 'none', cursor: 'pointer', ...font }}>
+              Memories
+            </button>
           </div>
 
           <div style={{ flex: 1 }} />

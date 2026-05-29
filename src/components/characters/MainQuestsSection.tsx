@@ -295,11 +295,12 @@ export function MainQuestsSection({
     const title = newTaskTitle.trim()
     if (!title || !userId || addingTask) return
     setAddingTask(true)
+    const today = new Date().toISOString().split('T')[0]
     try {
       const res = await fetch('/api/quests/tasks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, dimension: dimension ?? 'career', title, milestoneId }),
+        body: JSON.stringify({ userId, dimension: dimension ?? 'career', title, milestoneId, taskDate: today }),
       })
       const data = (await res.json()) as { task?: MilestoneTask }
       if (res.ok && data.task) {
