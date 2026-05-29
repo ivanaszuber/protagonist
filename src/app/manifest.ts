@@ -5,7 +5,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: 'Protagonist',
     short_name: 'Protagonist',
     description: 'Your AI life coach. Daily quests. Real progress.',
-    start_url: '/quests',
+    start_url: '/dashboard',
     display: 'standalone',
     background_color: '#0D0820',
     theme_color: '#0D0820',
