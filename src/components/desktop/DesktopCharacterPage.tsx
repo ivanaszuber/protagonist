@@ -356,7 +356,7 @@ export function DesktopCharacterPage({ dimension }: DesktopCharacterPageProps) {
       <div style={{
         flex: 1, display: 'flex', flexDirection: 'column',
         overflowY: 'auto', background: '#0D0820',
-        padding: '28px 28px 100px',
+        padding: '28px 28px 300px',
         minWidth: 0,
       }}>
 
@@ -511,18 +511,18 @@ export function DesktopCharacterPage({ dimension }: DesktopCharacterPageProps) {
           />
         )}
 
-        {/* Medals — reuse MedalsRow with existing SVG icons */}
-        <MedalsRow
-          definitions={medalDefs}
-          earned={earnedMedals}
-          accentColor={accentColor}
-        />
-
-        {/* Score block — at the bottom since it changes rarely */}
+        {/* Score block */}
         <ScoreBlock
           dimension={dimension}
           xp={xp}
           userId={userId}
+          accentColor={accentColor}
+        />
+
+        {/* Medals */}
+        <MedalsRow
+          definitions={medalDefs}
+          earned={earnedMedals}
           accentColor={accentColor}
         />
       </div>
