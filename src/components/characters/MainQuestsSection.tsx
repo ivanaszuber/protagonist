@@ -190,6 +190,7 @@ export function MainQuestsSection({
   // Inline add-task state per milestone
   const [addingTaskFor, setAddingTaskFor] = useState<string | null>(null)
   const [newTaskTitle, setNewTaskTitle] = useState('')
+  const [newTaskDate, setNewTaskDate] = useState('')
   const [addingTask, setAddingTask] = useState(false)
 
   const incomplete = milestones.filter((m) => !m.completed)
@@ -296,11 +297,12 @@ export function MainQuestsSection({
     if (!title || !userId || addingTask) return
     setAddingTask(true)
     const today = new Date().toISOString().split('T')[0]
+    const taskDate = newTaskDate || today
     try {
       const res = await fetch('/api/quests/tasks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, dimension: dimension ?? 'career', title, milestoneId, taskDate: today }),
+        body: JSON.stringify({ userId, dimension: dimension ?? 'career', title, milestoneId, taskDate }),
       })
       const data = (await res.json()) as { task?: MilestoneTask }
       if (res.ok && data.task) {
@@ -309,6 +311,7 @@ export function MainQuestsSection({
           [milestoneId]: [...(prev[milestoneId] ?? []), data.task!],
         }))
         setNewTaskTitle('')
+        setNewTaskDate('')
         setAddingTaskFor(null)
       }
     } finally {
@@ -516,28 +519,36 @@ export function MainQuestsSection({
 
                       {/* Add task inline form */}
                       {addingTaskFor === m.id ? (
-                        <div style={{ padding: '6px 14px 10px', display: 'flex', gap: 6, alignItems: 'center' }}>
-                          <input
-                            autoFocus type="text" placeholder="New task title…"
-                            value={newTaskTitle} onChange={e => setNewTaskTitle(e.target.value)}
-                            onKeyDown={e => {
-                              if (e.key === 'Enter') void handleAddTask(m.id)
-                              if (e.key === 'Escape') { setAddingTaskFor(null); setNewTaskTitle('') }
-                            }}
-                            style={{ ...inputStyle, flex: 1, padding: '5px 9px' }}
-                          />
-                          <button type="button" onClick={() => void handleAddTask(m.id)}
-                            disabled={!newTaskTitle.trim() || addingTask}
-                            style={{
-                              background: accentColor, border: 'none', borderRadius: 6, padding: '5px 12px',
-                              fontSize: 11, fontWeight: 600, color: '#0D0820',
-                              cursor: newTaskTitle.trim() && !addingTask ? 'pointer' : 'default',
-                              opacity: newTaskTitle.trim() && !addingTask ? 1 : 0.4, fontFamily: 'inherit',
-                            }}
-                          >{addingTask ? '…' : 'Add'}</button>
-                          <button type="button" onClick={() => { setAddingTaskFor(null); setNewTaskTitle('') }}
-                            style={{ background: 'transparent', border: 'none', fontSize: 16, color: '#3D2878', cursor: 'pointer', padding: 0, lineHeight: 1 }}
-                          >×</button>
+                        <div style={{ padding: '6px 14px 10px' }}>
+                          <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 5 }}>
+                            <input
+                              autoFocus type="text" placeholder="New task title…"
+                              value={newTaskTitle} onChange={e => setNewTaskTitle(e.target.value)}
+                              onKeyDown={e => {
+                                if (e.key === 'Enter') void handleAddTask(m.id)
+                                if (e.key === 'Escape') { setAddingTaskFor(null); setNewTaskTitle(''); setNewTaskDate('') }
+                              }}
+                              style={{ ...inputStyle, flex: 1, padding: '5px 9px' }}
+                            />
+                            <button type="button" onClick={() => { setAddingTaskFor(null); setNewTaskTitle(''); setNewTaskDate('') }}
+                              style={{ background: 'transparent', border: 'none', fontSize: 16, color: '#3D2878', cursor: 'pointer', padding: 0, lineHeight: 1, flexShrink: 0 }}
+                            >×</button>
+                          </div>
+                          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                            <input type="date" value={newTaskDate}
+                              onChange={e => setNewTaskDate(e.target.value)}
+                              style={{ ...inputStyle, flex: 1, padding: '4px 8px', fontSize: 11, color: newTaskDate ? '#E8E0F0' : '#5A4A7A', colorScheme: 'dark' as const }}
+                            />
+                            <button type="button" onClick={() => void handleAddTask(m.id)}
+                              disabled={!newTaskTitle.trim() || addingTask}
+                              style={{
+                                background: accentColor, border: 'none', borderRadius: 6, padding: '5px 14px',
+                                fontSize: 11, fontWeight: 600, color: '#0D0820',
+                                cursor: newTaskTitle.trim() && !addingTask ? 'pointer' : 'default',
+                                opacity: newTaskTitle.trim() && !addingTask ? 1 : 0.4, fontFamily: 'inherit', flexShrink: 0,
+                              }}
+                            >{addingTask ? '…' : 'Add'}</button>
+                          </div>
                         </div>
                       ) : (
                         <button type="button"

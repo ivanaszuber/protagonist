@@ -39,6 +39,8 @@ import {
 
 interface Milestone extends MainQuestMilestone {}
 
+interface UnlinkedTask { id: string; title: string; task_date: string | null; completed: boolean; xp_reward: number }
+
 interface Task {
   id: string
   title: string
@@ -151,6 +153,12 @@ export function DesktopCharacterPage({ dimension }: DesktopCharacterPageProps) {
   const [dimensionInsight, setDimensionInsight] = useState<string | null>(null)
   const [recentNotes, setRecentNotes] = useState<Array<{ id: string; content: string; brief: string | null; createdAt: string }>>([])
 
+  // ── Unlinked tasks ────────────────────────────────────────────────────────
+  const [unlinkedTasks, setUnlinkedTasks]     = useState<UnlinkedTask[]>([])
+  const [unlinkedExpanded, setUnlinkedExpanded] = useState(false)
+  const [unlinkedLoading,  setUnlinkedLoading]  = useState(false)
+  const [unlinkedLoaded,   setUnlinkedLoaded]   = useState(false)
+
   // ── Data loading ──────────────────────────────────────────────────────────
 
   async function loadBossAndMedals(uid: string) {
@@ -240,6 +248,43 @@ export function DesktopCharacterPage({ dimension }: DesktopCharacterPageProps) {
       .catch(() => {})
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, dimension])
+
+  async function loadUnlinkedTasks() {
+    if (unlinkedLoading || unlinkedLoaded) return
+    setUnlinkedLoading(true)
+    try {
+      const res = await fetch(`/api/quests/tasks?userId=${encodeURIComponent(userId)}&dimension=${encodeURIComponent(dimension)}&unlinked=true`)
+      const data = (await res.json()) as { tasks?: UnlinkedTask[] }
+      setUnlinkedTasks(data.tasks ?? [])
+      setUnlinkedLoaded(true)
+    } catch {
+      setUnlinkedTasks([])
+    } finally {
+      setUnlinkedLoading(false)
+    }
+  }
+
+  async function toggleUnlinkedTask(task: UnlinkedTask) {
+    const nextCompleted = !task.completed
+    // Optimistic
+    setUnlinkedTasks(prev => prev.map(t => t.id === task.id ? { ...t, completed: nextCompleted } : t))
+    try {
+      if (nextCompleted) {
+        await fetch(`/api/quests/tasks/${task.id}/complete`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId }),
+        })
+      } else {
+        await fetch(`/api/quests/tasks/${task.id}`, {
+          method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, completed: false }),
+        })
+      }
+    } catch {
+      // Revert on failure
+      setUnlinkedTasks(prev => prev.map(t => t.id === task.id ? { ...t, completed: task.completed } : t))
+    }
+  }
 
   // ── Handlers ──────────────────────────────────────────────────────────────
 
@@ -510,6 +555,104 @@ export function DesktopCharacterPage({ dimension }: DesktopCharacterPageProps) {
             }
           />
         )}
+
+        {/* ── Unlinked Tasks ── */}
+        <section style={{ marginBottom: 20 }}>
+          {/* Header — always visible, click to expand */}
+          <button
+            type="button"
+            onClick={() => { setUnlinkedExpanded(v => !v); if (!unlinkedExpanded) void loadUnlinkedTasks() }}
+            style={{
+              width: '100%', background: 'transparent', border: 'none', padding: 0,
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              marginBottom: unlinkedExpanded ? 8 : 0, cursor: 'pointer',
+            }}
+          >
+            <span style={{ ...font, fontSize: 11, fontWeight: 600, color: '#9B8EC4', letterSpacing: '0.06em' }}>
+              Free Tasks
+              {unlinkedLoaded && unlinkedTasks.length > 0 && (
+                <span style={{ marginLeft: 7, fontSize: 9, color: '#5A4A7A' }}>
+                  {unlinkedTasks.filter(t => !t.completed).length} open
+                </span>
+              )}
+            </span>
+            <svg width="12" height="12" viewBox="0 0 14 14" fill="none"
+              style={{ flexShrink: 0, transition: 'transform 0.2s', transform: unlinkedExpanded ? 'rotate(180deg)' : 'rotate(0deg)' }}>
+              <polyline points="3,5 7,9 11,5" stroke="#3D2878" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+
+          {/* Expanded task list */}
+          {unlinkedExpanded && (
+            <div style={{ background: '#140C28', borderRadius: 12, border: '0.5px solid #2D1B55', overflow: 'hidden' }}>
+              {/* Left accent bar */}
+              <div style={{ position: 'relative' }}>
+                <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, background: accentColor, opacity: 0.4 }} />
+              </div>
+
+              {unlinkedLoading ? (
+                <div style={{ ...font, padding: '10px 14px', fontSize: 11, color: 'rgba(255,255,255,0.25)' }}>Loading…</div>
+              ) : unlinkedTasks.length === 0 ? (
+                <div style={{ ...font, padding: '12px 14px', fontSize: 11, color: 'rgba(255,255,255,0.25)', fontStyle: 'italic' }}>
+                  No free tasks — all tasks are linked to milestones.
+                </div>
+              ) : (
+                <div style={{ paddingTop: 4, paddingBottom: 4 }}>
+                  {/* Open tasks */}
+                  {unlinkedTasks.filter(t => !t.completed).map(task => {
+                    const today = new Date().toISOString().split('T')[0]
+                    const isOverdue = task.task_date && task.task_date < today
+                    return (
+                      <div key={task.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 14px 7px 17px' }}>
+                        <button type="button" onClick={() => void toggleUnlinkedTask(task)}
+                          style={{
+                            width: 17, height: 17, borderRadius: 4, flexShrink: 0,
+                            border: '1.5px solid rgba(255,255,255,0.2)',
+                            background: 'transparent',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            cursor: 'pointer', padding: 0,
+                          }}
+                        />
+                        <span style={{ ...font, flex: 1, fontSize: 12, color: 'rgba(255,255,255,0.72)', lineHeight: 1.4 }}>
+                          {task.title}
+                        </span>
+                        {task.task_date && (
+                          <span style={{ ...font, fontSize: 10, flexShrink: 0, color: isOverdue ? '#FF7A65' : 'rgba(255,255,255,0.28)', fontWeight: isOverdue ? 600 : 400 }}>
+                            {task.task_date === today ? 'Today' : new Date(task.task_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                          </span>
+                        )}
+                      </div>
+                    )
+                  })}
+                  {/* Divider */}
+                  {unlinkedTasks.some(t => t.completed) && unlinkedTasks.some(t => !t.completed) && (
+                    <div style={{ height: '0.5px', background: 'rgba(255,255,255,0.04)', margin: '4px 14px' }} />
+                  )}
+                  {/* Completed tasks */}
+                  {unlinkedTasks.filter(t => t.completed).map(task => (
+                    <div key={task.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 14px 7px 17px' }}>
+                      <button type="button" onClick={() => void toggleUnlinkedTask(task)}
+                        style={{
+                          width: 17, height: 17, borderRadius: 4, flexShrink: 0,
+                          border: 'none', background: '#6EE7A4',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          cursor: 'pointer', padding: 0,
+                        }}
+                      >
+                        <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                          <polyline points="2,5 4,7.5 8,3" stroke="#0D0820" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </button>
+                      <span style={{ ...font, flex: 1, fontSize: 12, color: 'rgba(255,255,255,0.28)', textDecoration: 'line-through', lineHeight: 1.4 }}>
+                        {task.title}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </section>
 
         {/* Score block */}
         <ScoreBlock

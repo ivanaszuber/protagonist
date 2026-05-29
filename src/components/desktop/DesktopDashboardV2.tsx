@@ -249,6 +249,16 @@ export default function DesktopDashboardV2(props: DesktopDashboardV2Props) {
   const [eventPickerId,    setEventPickerId]     = useState<string | null>(null)
   const [deletingEventId,  setDeletingEventId]   = useState<string | null>(null)
 
+  // ── Quick-add task form ───────────────────────────────────────────────────
+  const [showQuickAdd,       setShowQuickAdd]       = useState(false)
+  const [quickTitle,         setQuickTitle]         = useState('')
+  const [quickDim,           setQuickDim]           = useState<Dimension>('career')
+  const [quickMilestoneId,   setQuickMilestoneId]   = useState<string>('none')
+  const [quickAdding,        setQuickAdding]        = useState(false)
+  // Cache of milestone lists per dimension
+  const [dimMilestones, setDimMilestones] = useState<Record<string, Array<{ id: string; title: string }>>>({})
+  const [loadingMilestones, setLoadingMilestones] = useState(false)
+
   useEffect(() => {
     const uid = document.cookie.split('; ').find(r => r.startsWith('protagonist_user_id='))?.split('=')[1] ?? ''
     setUserId(uid)
@@ -285,6 +295,52 @@ export default function DesktopDashboardV2(props: DesktopDashboardV2Props) {
     }
   }
 
+
+  // Fetch milestones for a dimension (cached) when quick-add form is open
+  useEffect(() => {
+    if (!showQuickAdd || !userId || !quickDim) return
+    if (dimMilestones[quickDim] !== undefined) return
+    setLoadingMilestones(true)
+    fetch(`/api/quests/character/${quickDim}`)
+      .then(r => r.json())
+      .then((data: { quest?: { milestones?: Array<{ id: string; title: string }> } }) => {
+        setDimMilestones(prev => ({
+          ...prev,
+          [quickDim]: (data.quest?.milestones ?? []).filter(m => !(m as { completed?: boolean }).completed),
+        }))
+      })
+      .catch(() => setDimMilestones(prev => ({ ...prev, [quickDim]: [] })))
+      .finally(() => setLoadingMilestones(false))
+  }, [showQuickAdd, userId, quickDim, dimMilestones])
+
+  async function handleQuickAdd() {
+    const title = quickTitle.trim()
+    if (!title || !userId || quickAdding) return
+    setQuickAdding(true)
+    const taskDate = selectedDateStr
+    try {
+      const res = await fetch('/api/quests/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId,
+          dimension: quickDim,
+          title,
+          taskDate,
+          milestoneId: quickMilestoneId === 'none' ? undefined : quickMilestoneId,
+        }),
+      })
+      if (res.ok) {
+        setQuickTitle('')
+        setQuickMilestoneId('none')
+        setShowQuickAdd(false)
+        // Trigger a refresh of today's tasks
+        window.dispatchEvent(new Event('protagonist:tasks-updated'))
+      }
+    } finally {
+      setQuickAdding(false)
+    }
+  }
 
   const font: CSSProperties = { fontFamily: "'Space Grotesk', system-ui, sans-serif" }
   const colScroll: CSSProperties = { overflowY: 'auto', overflowX: 'hidden', scrollbarWidth: 'none' }
@@ -663,14 +719,100 @@ export default function DesktopDashboardV2(props: DesktopDashboardV2Props) {
                 )}
 
                 {/* ── Tasks ── */}
-                {taskItems.length > 0 && (
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 9 }}>
+                <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: showQuickAdd ? 10 : 9 }}>
                       <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="2" strokeLinecap="round">
                         <polyline points="9 11 12 14 22 4" /><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
                       </svg>
                       <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 9, fontWeight: 600, letterSpacing: '1.4px' }}>TASKS</span>
+                      <button type="button"
+                        onClick={() => { setShowQuickAdd(v => !v); setQuickTitle(''); setQuickMilestoneId('none') }}
+                        style={{
+                          marginLeft: 'auto', background: 'transparent', border: 'none',
+                          color: showQuickAdd ? 'rgba(255,255,255,0.35)' : 'rgba(168,126,248,0.7)',
+                          fontSize: 11, cursor: 'pointer', padding: '0 2px', ...font,
+                        }}
+                      >{showQuickAdd ? '✕' : '+ Add task'}</button>
                     </div>
+
+                    {/* Quick-add task form */}
+                    {showQuickAdd && (
+                      <div style={{
+                        background: 'rgba(255,255,255,0.03)',
+                        border: '0.5px solid rgba(255,255,255,0.1)',
+                        borderRadius: 10, padding: '12px 14px', marginBottom: 12,
+                      }}>
+                        {/* Title input */}
+                        <input
+                          autoFocus
+                          type="text"
+                          placeholder="Task name…"
+                          value={quickTitle}
+                          onChange={e => setQuickTitle(e.target.value)}
+                          onKeyDown={e => { if (e.key === 'Enter') void handleQuickAdd(); if (e.key === 'Escape') setShowQuickAdd(false) }}
+                          style={{
+                            width: '100%', background: '#0D0820', border: '0.5px solid rgba(255,255,255,0.12)',
+                            borderRadius: 8, padding: '8px 11px', fontSize: 13, color: '#E8E0F0',
+                            outline: 'none', boxSizing: 'border-box', ...font, marginBottom: 8,
+                          }}
+                        />
+                        <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', marginBottom: 8 }}>
+                          {/* Dimension selector */}
+                          <select
+                            value={quickDim}
+                            onChange={e => { setQuickDim(e.target.value as Dimension); setQuickMilestoneId('none') }}
+                            style={{
+                              background: '#0D0820', border: '0.5px solid rgba(255,255,255,0.12)',
+                              borderRadius: 8, padding: '6px 9px', fontSize: 11, color: '#E8E0F0',
+                              outline: 'none', cursor: 'pointer', ...font, flex: 1,
+                            }}
+                          >
+                            {Object.entries(CATEGORY_LABELS).map(([dim, label]) => (
+                              <option key={dim} value={dim}>{label}</option>
+                            ))}
+                          </select>
+                          {/* Milestone selector */}
+                          <select
+                            value={quickMilestoneId}
+                            onChange={e => setQuickMilestoneId(e.target.value)}
+                            disabled={loadingMilestones}
+                            style={{
+                              background: '#0D0820', border: '0.5px solid rgba(255,255,255,0.12)',
+                              borderRadius: 8, padding: '6px 9px', fontSize: 11,
+                              color: quickMilestoneId === 'none' ? 'rgba(255,255,255,0.35)' : '#E8E0F0',
+                              outline: 'none', cursor: 'pointer', ...font, flex: 1,
+                              opacity: loadingMilestones ? 0.5 : 1,
+                            }}
+                          >
+                            <option value="none">No milestone</option>
+                            {(dimMilestones[quickDim] ?? []).map(m => (
+                              <option key={m.id} value={m.id}>{m.title}</option>
+                            ))}
+                          </select>
+                        </div>
+                        {/* Date display + Save */}
+                        <div style={{ display: 'flex', gap: 7, alignItems: 'center' }}>
+                          <div style={{
+                            flex: 1, fontSize: 11, color: 'rgba(255,255,255,0.4)',
+                            background: '#0D0820', border: '0.5px solid rgba(255,255,255,0.08)',
+                            borderRadius: 8, padding: '6px 10px',
+                          }}>
+                            📅 {selectedDate.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}
+                          </div>
+                          <button type="button"
+                            onClick={() => void handleQuickAdd()}
+                            disabled={!quickTitle.trim() || quickAdding}
+                            style={{
+                              background: '#7B3FE4', border: 'none', borderRadius: 8,
+                              padding: '6px 18px', fontSize: 12, fontWeight: 600,
+                              color: 'white', cursor: quickTitle.trim() && !quickAdding ? 'pointer' : 'default',
+                              opacity: quickTitle.trim() && !quickAdding ? 1 : 0.4, ...font, flexShrink: 0,
+                            }}
+                          >{quickAdding ? '…' : 'Add'}</button>
+                        </div>
+                      </div>
+                    )}
+
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                       {(() => {
                         const sorted = [...taskItems].sort((a, b) => {
@@ -803,13 +945,12 @@ export default function DesktopDashboardV2(props: DesktopDashboardV2Props) {
                         })
                       })()}
                     </div>
-                  </div>
-                )}
+                </div>
 
-                {/* Empty state */}
-                {calendarEvents.length === 0 && taskItems.length === 0 && (
-                  <div style={{ textAlign: 'center', padding: '48px 0' }}>
-                    <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.3)', marginBottom: 14 }}>Nothing scheduled here.</div>
+                {/* Empty state — only when no calendar events and no tasks */}
+                {calendarEvents.length === 0 && taskItems.length === 0 && !showQuickAdd && (
+                  <div style={{ textAlign: 'center', padding: '32px 0 0' }}>
+                    <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.22)', marginBottom: 12 }}>No tasks scheduled yet.</div>
                     <button type="button" onClick={() => openOracle()}
                       style={{ background: 'rgba(123,63,228,0.1)', border: '0.5px solid rgba(123,63,228,0.3)', borderRadius: 20, color: '#A87EF8', fontSize: 12, padding: '8px 20px', cursor: 'pointer', ...font }}>
                       Ask Oracle to plan your day

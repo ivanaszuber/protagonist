@@ -559,6 +559,14 @@ export default function DashboardPage() {
   }, [refreshCalendarEvents])
 
   useEffect(() => {
+    function onTasksUpdated() {
+      void loadDashboard(toDateStr(selectedDateRef.current))
+    }
+    window.addEventListener('protagonist:tasks-updated', onTasksUpdated)
+    return () => window.removeEventListener('protagonist:tasks-updated', onTasksUpdated)
+  }, [loadDashboard])
+
+  useEffect(() => {
     const dismissKey = `witness_dismissed_${new Date().toISOString().slice(0, 7)}`
     if (localStorage.getItem(dismissKey) === 'true') {
       setWitnessDismissed(true)

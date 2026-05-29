@@ -7,6 +7,7 @@ export async function GET(request: Request) {
   const userId = searchParams.get('userId')
   const date = searchParams.get('date')
   const someday = searchParams.get('someday') === 'true'
+  const unlinked = searchParams.get('unlinked') === 'true'
   const dimension = searchParams.get('dimension')
   const milestoneId = searchParams.get('milestoneId')
 
@@ -27,6 +28,8 @@ export async function GET(request: Request) {
 
   if (milestoneId) {
     query = query.eq('milestone_id', milestoneId)
+  } else if (unlinked) {
+    query = query.is('milestone_id', null)
   } else if (someday) {
     query = query.is('task_date', null)
   } else if (date) {
