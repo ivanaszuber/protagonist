@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Restore Protagonist User ID</title>
+  <style>
+    body { font-family: system-ui, sans-serif; background: #0D0820; color: #F0ECFF; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
+    .card { background: #1A1238; border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 32px; max-width: 480px; width: 100%; }
+    h2 { margin: 0 0 8px; font-size: 20px; }
+    p { color: rgba(255,255,255,0.55); font-size: 14px; margin: 0 0 24px; }
+    button { display: block; width: 100%; padding: 14px; border-radius: 10px; border: none; cursor: pointer; font-size: 14px; font-family: inherit; margin-bottom: 10px; transition: background 0.15s; }
+    .id-btn { background: rgba(123,63,228,0.2); border: 1px solid rgba(123,63,228,0.4) !important; border-radius: 10px; color: #C4A8FF; text-align: left; font-size: 12px; font-family: monospace; padding: 12px 16px; word-break: break-all; }
+    .id-btn:hover { background: rgba(123,63,228,0.35); }
+    .primary { background: #FF7A65; color: white; font-weight: 600; }
+    .primary:hover { background: #e86a55; }
+    .success { background: rgba(110,231,164,0.15); border: 1px solid rgba(110,231,164,0.3); border-radius: 10px; padding: 14px; color: #6EE7A4; font-size: 13px; display: none; margin-top: 16px; }
+    label { font-size: 11px; letter-spacing: 1.2px; text-transform: uppercase; color: rgba(255,255,255,0.4); display: block; margin-bottom: 8px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>🔮 Restore Your Data</h2>
+    <p>Pick your original user ID — the one with all your tasks, memories, and quests.</p>
+
+    <label>Choose your ID</label>
+    <button class="id-btn" onclick="select('0efc73bb-7d81-47f1-8837-43f79d45cb80')">
+      0efc73bb-7d81-47f1-8837-43f79d45cb80
+    </button>
+    <button class="id-btn" onclick="select('8e0c10be-f4e0-4a30-8967-5eafb0ab238f')">
+      8e0c10be-f4e0-4a30-8967-5eafb0ab238f
+    </button>
+
+    <div id="confirm" style="display:none; margin-top:20px;">
+      <label>Selected</label>
+      <div id="selected-id" style="font-family:monospace; font-size:12px; color:#C4A8FF; background:rgba(123,63,228,0.1); border:1px solid rgba(123,63,228,0.3); border-radius:8px; padding:10px 14px; margin-bottom:16px; word-break:break-all;"></div>
+      <button class="primary" onclick="restore()">Restore this ID →</button>
+    </div>
+
+    <div class="success" id="success">
+      ✓ Done! Your user ID has been restored. <strong>Refreshing in 2 seconds…</strong>
+    </div>
+  </div>
+
+  <script>
+    let chosen = null
+
+    function select(id) {
+      chosen = id
+      document.getElementById('selected-id').textContent = id
+      document.getElementById('confirm').style.display = 'block'
+    }
+
+    function restore() {
+      if (!chosen) return
+      // Set localStorage
+      localStorage.setItem('protagonist_user_id', chosen)
+      // Set cookie (1 year)
+      const expires = new Date()
+      expires.setFullYear(expires.getFullYear() + 1)
+      document.cookie = 'protagonist_user_id=' + encodeURIComponent(chosen) + '; expires=' + expires.toUTCString() + '; path=/; SameSite=Lax'
+      document.getElementById('success').style.display = 'block'
+      setTimeout(() => { window.location.href = '/dashboard' }, 2000)
+    }
+  </script>
+</body>
+</html>
