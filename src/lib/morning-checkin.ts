@@ -37,6 +37,7 @@ export interface MorningCheckinClaudeResult {
   focus_list: Array<{ text: string; dimension: string | null }>
   suggestions: Array<{ text: string; dimension: string }>
   oracle_message: string
+  oracle_reflection: string
 }
 
 export interface CreatedMorningTask extends MorningCheckinTaskInput {
@@ -234,7 +235,9 @@ Read the transcript carefully. Do the following:
 
 5. **suggestions** — 1–2 additional things worth doing today based on their active quests and readiness. E.g. a quest that hasn't been touched in 3+ days, or a quick win if energy is high. Only suggest things not already covered in focus_list.
 
-6. **oracle_message** — one punchy, personal line. Max 20 words. Reference something specific from their transcript. Energising, not generic. Don't start with "Remember" or "You've got this".
+6. **oracle_reflection** — 2–4 sentences that genuinely respond to what they shared. Acknowledge the emotional tone first (if they're going through something hard, say so). Be warm, direct, specific — reference actual details from their transcript. This is not a pep talk, it's a real response from someone who listened. Don't be generic. Don't list things.
+
+7. **oracle_message** — one punchy, personal tagline. Max 15 words. Reference something specific. Energising, not generic. Don't start with "Remember" or "You've got this".
 
 Respond ONLY with valid JSON:
 {
@@ -254,6 +257,7 @@ Respond ONLY with valid JSON:
   "suggestions": [
     { "text": "...", "dimension": "career" }
   ],
+  "oracle_reflection": "...",
   "oracle_message": "..."
 }`
 }
@@ -297,6 +301,7 @@ function parseClaudeJson(raw: string): MorningCheckinClaudeResult {
         dimension: String(s.dimension ?? 'career'),
       })
     ),
+    oracle_reflection: String(parsed.oracle_reflection ?? ''),
     oracle_message: String(parsed.oracle_message ?? ''),
   }
 }
@@ -310,6 +315,7 @@ export async function runMorningCheckin(
   focus_list: Array<{ text: string; dimension: string | null }>
   suggestions: Array<{ text: string; dimension: string }>
   oracle_message: string
+  oracle_reflection: string
   mood_signal: string
 }> {
   const today = new Date().toISOString().split('T')[0]
@@ -360,7 +366,8 @@ export async function runMorningCheckin(
   const createdTasks: CreatedMorningTask[] = []
   if (isQuestDbConfigured()) {
     for (const task of result.new_tasks) {
-      const { data, error } = await supabase
+      // Use admin client to bypass RLS — server-side insert on behalf of user
+      const { data, error } = await supabaseAdmin
         .from('tasks')
         .insert({
           user_id: userId,
@@ -372,6 +379,9 @@ export async function runMorningCheckin(
         .select('id')
         .single()
 
+      if (error) {
+        console.error('[morning-checkin] task insert error:', error.message)
+      }
       if (!error && data) {
         createdTasks.push({ ...task, id: data.id as string })
       }
@@ -381,7 +391,7 @@ export async function runMorningCheckin(
     const { error: noteError } = await supabaseAdmin.from('voice_notes').insert({
       user_id: userId,
       content: transcript,
-      oracle_reply: result.oracle_message,
+      oracle_reply: result.oracle_reflection || result.oracle_message,
       mood_signal: result.mood_signal || null,
       focus_list: result.focus_list.map((f) => ({ ...f, done: false })),
       suggestions: result.suggestions,
@@ -398,6 +408,7 @@ export async function runMorningCheckin(
     focus_list: result.focus_list,
     suggestions: result.suggestions,
     oracle_message: result.oracle_message,
+    oracle_reflection: result.oracle_reflection,
     mood_signal: result.mood_signal,
   }
 }

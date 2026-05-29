@@ -22,6 +22,7 @@ interface MorningCheckinResult {
   focus_list: Array<{ text: string; dimension: string | null }>
   suggestions: Array<{ text: string; dimension: string }>
   oracle_message: string
+  oracle_reflection: string
   mood_signal: string
 }
 
@@ -1086,6 +1087,23 @@ function CheckinDoneView({ result, context, onClose, onAskArc }: {
       {/* Right */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '20px 22px', overflowY: 'auto', gap: 18, scrollbarWidth: 'none' }}>
 
+        {/* Oracle's reflection — shown first, most important */}
+        {result.oracle_reflection && (
+          <div style={{
+            background: 'linear-gradient(135deg, rgba(255,122,101,0.1) 0%, rgba(123,63,228,0.08) 100%)',
+            border: '1px solid rgba(255,122,101,0.22)',
+            borderRadius: 12, padding: '14px 16px',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+              <OracleRobot size={18} />
+              <span style={{ fontSize: 10, fontWeight: 700, color: '#FF7A65', letterSpacing: '1.2px', textTransform: 'uppercase' as const }}>Oracle's take</span>
+            </div>
+            <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.82)', lineHeight: 1.7, margin: 0, fontStyle: 'italic' }}>
+              {result.oracle_reflection}
+            </p>
+          </div>
+        )}
+
         {/* Focus items */}
         {result.focus_list && result.focus_list.length > 0 && (
           <div>
@@ -1113,7 +1131,7 @@ function CheckinDoneView({ result, context, onClose, onAskArc }: {
                     <div style={{ width: 8, height: 8, borderRadius: '50%', background: color, flexShrink: 0 }} />
                     <div style={{ color: 'rgba(255,255,255,0.85)', fontSize: 13, flex: 1 }}>{t.title}</div>
                     <div style={{ background: `${color}18`, color, fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 6 }}>
-                      {CHARACTERS[t.dimension as Dimension]?.name ?? t.dimension}
+                      {CHARACTERS[t.dimension as Dimension]?.categoryLabel ?? t.dimension}
                     </div>
                   </div>
                 )
