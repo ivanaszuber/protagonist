@@ -527,7 +527,12 @@ export function DesktopOracleModal() {
         setChatMessages(prev => [...prev, { role: 'oracle', text: reply }])
       } else {
         // CHAT / NOTE — send to Arc for a conversational reply (streamed)
-        const reply = await streamArcReply({ message: text, userId })
+        // Pass conversation history so Arc remembers context from earlier in the session
+        const reply = await streamArcReply({
+          message: text,
+          userId,
+          conversationHistory: chatMessages.slice(-16),
+        })
         // Save all chat + note exchanges to voice_notes so they appear in the journal stream
         fetch('/api/notes', {
           method: 'POST',

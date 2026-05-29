@@ -153,6 +153,16 @@ export function DesktopCharacterPage({ dimension }: DesktopCharacterPageProps) {
   const [dimensionInsight, setDimensionInsight] = useState<string | null>(null)
   const [recentNotes, setRecentNotes] = useState<Array<{ id: string; content: string; brief: string | null; createdAt: string }>>([])
 
+  // ── Oracle character insight (narrative, lessons, growth edges, timeline) ──
+  interface CharInsight {
+    narrative: string
+    lessons: string[]
+    growthEdges: Array<{ text: string; urgency: string }>
+    timeline: Array<{ date: string; type: string; text: string }>
+    lastWord: string
+  }
+  const [charInsight, setCharInsight] = useState<CharInsight | null>(null)
+
   // ── Unlinked tasks ────────────────────────────────────────────────────────
   const [unlinkedTasks, setUnlinkedTasks]     = useState<UnlinkedTask[]>([])
   const [unlinkedExpanded, setUnlinkedExpanded] = useState(false)
@@ -244,6 +254,26 @@ export function DesktopCharacterPage({ dimension }: DesktopCharacterPageProps) {
       .then(r => r.json())
       .then((d: { entries?: Array<{ id: string; content: string; brief: string | null; createdAt: string }> }) => {
         setRecentNotes(d.entries?.slice(0, 3) ?? [])
+      })
+      .catch(() => {})
+
+    // Fetch Oracle character insight (narrative, lessons, growth edges, timeline)
+    const insightCacheKey = `protagonist-char-insight-${userId}-${dimension}`
+    try {
+      const cached = localStorage.getItem(insightCacheKey)
+      if (cached) {
+        const { data, ts } = JSON.parse(cached) as { data: CharInsight; ts: number }
+        if (Date.now() - ts < 4 * 60 * 60 * 1000) setCharInsight(data) // 4-hour cache
+      }
+    } catch { /* ignore */ }
+
+    fetch(`/api/quests/character-insight?userId=${encodeURIComponent(userId)}&dimension=${encodeURIComponent(dimension)}`)
+      .then(r => r.ok ? r.json() : null)
+      .then((d: CharInsight | null) => {
+        if (d?.narrative) {
+          setCharInsight(d)
+          try { localStorage.setItem(insightCacheKey, JSON.stringify({ data: d, ts: Date.now() })) } catch { /* ignore */ }
+        }
       })
       .catch(() => {})
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -466,6 +496,86 @@ export function DesktopCharacterPage({ dimension }: DesktopCharacterPageProps) {
           userId={userId}
           onQuestSaved={(v) => setQuest(prev => prev ? { ...prev, vision: v } : { id: '', vision: v, character_name: char.name, character_class: 'Adventurer', milestones: [], recent_tasks: [], xp: 0 })}
         />
+
+        {/* ── Oracle's Story — narrative + lessons + growth edges ──────── */}
+        {charInsight && (
+          <div style={{ marginBottom: 20 }}>
+
+            {/* Narrative */}
+            <div style={{
+              background: `${accentColor}14`,
+              border: `1.5px solid ${accentColor}35`,
+              borderRadius: 14, padding: '16px 18px', marginBottom: 10,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 10 }}>
+                <svg width="11" height="11" viewBox="0 0 24 24" fill={accentColor}>
+                  <path d="M12 2l2.4 7.6H22l-6.4 4.6 2.4 7.6L12 17.2l-6 4.6 2.4-7.6L2 9.6h7.6L12 2z"/>
+                </svg>
+                <span style={{ ...font, fontSize: 9, fontWeight: 700, color: accentColor, letterSpacing: '1.4px', textTransform: 'uppercase' as const }}>
+                  Oracle&apos;s Story · {char.categoryLabel}
+                </span>
+              </div>
+              <p style={{ ...font, fontSize: 13.5, color: 'rgba(255,255,255,0.82)', lineHeight: 1.75, margin: 0 }}>
+                {charInsight.narrative}
+              </p>
+            </div>
+
+            {/* Lessons in progress */}
+            {charInsight.lessons.length > 0 && (
+              <div style={{ marginBottom: 10 }}>
+                <div style={{ ...font, fontSize: 9, fontWeight: 700, color: '#5A4A7A', letterSpacing: '0.1em', textTransform: 'uppercase' as const, marginBottom: 7 }}>
+                  Lessons in progress
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {charInsight.lessons.map((lesson, i) => (
+                    <div key={i} style={{
+                      display: 'flex', alignItems: 'flex-start', gap: 10,
+                      background: '#100828', border: `0.5px solid ${accentColor}25`,
+                      borderRadius: 10, padding: '9px 13px',
+                    }}>
+                      <svg style={{ flexShrink: 0, marginTop: 1 }} width="13" height="13" viewBox="0 0 24 24" fill="none">
+                        <circle cx="12" cy="12" r="10" stroke="#F0C840" strokeWidth="2"/>
+                        <path d="M12 7v5l3 3" stroke="#F0C840" strokeWidth="2" strokeLinecap="round"/>
+                      </svg>
+                      <span style={{ ...font, fontSize: 12.5, color: 'rgba(255,255,255,0.72)', lineHeight: 1.55 }}>
+                        {lesson}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Growth edges */}
+            {charInsight.growthEdges.length > 0 && (
+              <div style={{
+                background: '#140C28', border: '0.5px solid #2D1B55',
+                borderRadius: 12, padding: '12px 14px',
+              }}>
+                <div style={{ ...font, fontSize: 9, fontWeight: 700, color: '#5A4A7A', letterSpacing: '0.1em', textTransform: 'uppercase' as const, marginBottom: 8 }}>
+                  Growth edges
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+                  {charInsight.growthEdges.map((edge, i) => (
+                    <div key={i} style={{
+                      display: 'flex', alignItems: 'center', gap: 10,
+                      padding: '8px 0',
+                      borderBottom: i < charInsight.growthEdges.length - 1 ? '0.5px solid #1A0D35' : 'none',
+                    }}>
+                      <div style={{
+                        width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
+                        background: edge.urgency === 'high' ? '#F0882A' : edge.urgency === 'medium' ? `${accentColor}` : '#1D9E75',
+                      }} />
+                      <span style={{ ...font, fontSize: 12.5, color: 'rgba(255,255,255,0.68)', lineHeight: 1.45 }}>
+                        {edge.text}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* ── Vault Net Worth (wealth dimension only) ──────────────────── */}
         {dimension === 'wealth' && (
@@ -727,6 +837,63 @@ export function DesktopCharacterPage({ dimension }: DesktopCharacterPageProps) {
             Chat with Oracle →
           </button>
         </div>
+
+        {/* ── Growth timeline ─────────────────────────────────────────── */}
+        {charInsight && charInsight.timeline.length > 0 && (
+          <div style={{ marginBottom: 20 }}>
+            <span style={{ ...font, fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.3)', letterSpacing: '1.4px', textTransform: 'uppercase' as const, display: 'block', marginBottom: 10 }}>
+              Growth timeline
+            </span>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              {charInsight.timeline.map((event, i) => {
+                const dotColor = event.type === 'win' ? '#1D9E75' : event.type === 'shift' ? accentColor : '#F05050'
+                const badgeBg = event.type === 'win' ? '#0A2010' : event.type === 'shift' ? `${accentColor}20` : '#2A0808'
+                const badgeColor = event.type === 'win' ? '#1D9E75' : event.type === 'shift' ? accentColor : '#F05050'
+                const badgeLabel = event.type === 'win' ? 'win' : event.type === 'shift' ? 'shift' : 'hard'
+                return (
+                  <div key={i} style={{ display: 'flex', gap: 10, paddingBottom: 14 }}>
+                    <div style={{ fontSize: 9, color: '#4A3A6A', width: 36, flexShrink: 0, paddingTop: 3, textAlign: 'right', fontFamily: "'Space Grotesk', sans-serif" }}>
+                      {event.date}
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                      <div style={{ width: 8, height: 8, borderRadius: '50%', background: dotColor, flexShrink: 0, marginTop: 3 }} />
+                      {i < charInsight.timeline.length - 1 && (
+                        <div style={{ width: 1, flex: 1, background: '#2D1B55', marginTop: 4, minHeight: 12 }} />
+                      )}
+                    </div>
+                    <div style={{ flex: 1, paddingBottom: 2 }}>
+                      <span style={{
+                        display: 'inline-block', fontSize: 10, padding: '2px 7px', borderRadius: 10,
+                        background: badgeBg, color: badgeColor, border: `0.5px solid ${badgeColor}50`,
+                        fontFamily: "'Space Grotesk', sans-serif", marginBottom: 4,
+                      }}>
+                        {badgeLabel}
+                      </span>
+                      <p style={{ ...font, fontSize: 11.5, color: 'rgba(255,255,255,0.6)', lineHeight: 1.5, margin: 0 }}>
+                        {event.text}
+                      </p>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* ── Oracle's last word ───────────────────────────────────────── */}
+        {charInsight?.lastWord && (
+          <div style={{
+            background: '#0F071A', border: `0.5px solid ${accentColor}40`,
+            borderRadius: 10, padding: '12px 14px', marginBottom: 20,
+          }}>
+            <span style={{ ...font, fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.25)', letterSpacing: '1.4px', textTransform: 'uppercase' as const, display: 'block', marginBottom: 8 }}>
+              Oracle&apos;s last word
+            </span>
+            <p style={{ ...font, fontSize: 12, color: 'rgba(255,255,255,0.7)', lineHeight: 1.65, margin: 0, fontStyle: 'italic' }}>
+              &ldquo;{charInsight.lastWord}&rdquo;
+            </p>
+          </div>
+        )}
 
         {/* Active challenge */}
         <BossCard

@@ -163,6 +163,11 @@ export interface ArcInput {
   /** Base64-encoded image — processed via Haiku vision then stored as memory */
   imageBase64?: string
   imageMimeType?: string
+  /**
+   * Recent conversation history from the current session.
+   * Injected as context so Arc remembers what was said earlier in the chat.
+   */
+  conversationHistory?: Array<{ role: 'user' | 'oracle'; text: string }>
   /** If provided, Arc will stream text chunks to this callback instead of returning the full response at once */
   onChunk?: (chunk: string) => void
 }
@@ -378,18 +383,86 @@ Focus on the human experience, not technical image details.`,
   return (memoryIdx >= 0 ? text.slice(0, memoryIdx) : text).trim()
 }
 
+async function loadRecentJournalContext(userId: string): Promise<string> {
+  try {
+    const { supabaseAdmin } = await import('@/lib/supabase')
+    const { data: notes } = await supabaseAdmin
+      .from('voice_notes')
+      .select('content, brief, oracle_reply, created_at')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(6)
+
+    if (!notes?.length) return ''
+
+    return notes
+      .map(n => {
+        const date = new Date(n.created_at as string).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+        const text = (n.brief as string | null) ?? (n.content as string).slice(0, 300)
+        return `[${date}] ${text}`
+      })
+      .join('\n')
+  } catch {
+    return ''
+  }
+}
+
+async function loadActiveQuestsContext(userId: string): Promise<string> {
+  try {
+    const { supabaseAdmin } = await import('@/lib/supabase')
+    const { data: quests } = await supabaseAdmin
+      .from('main_quests')
+      .select('dimension, vision, character_name')
+      .eq('user_id', userId)
+      .eq('active', true)
+      .order('created_at')
+
+    if (!quests?.length) return ''
+
+    // Also grab active milestones for each quest
+    const { data: milestones } = await supabaseAdmin
+      .from('milestones')
+      .select('title, target_date, dimension')
+      .eq('user_id', userId)
+      .eq('completed', false)
+      .order('sort_order')
+      .limit(10)
+
+    const milestonesByDim: Record<string, string[]> = {}
+    for (const m of milestones ?? []) {
+      const dim = m.dimension as string
+      if (!milestonesByDim[dim]) milestonesByDim[dim] = []
+      milestonesByDim[dim].push(m.title as string)
+    }
+
+    return quests
+      .map(q => {
+        const dim = q.dimension as string
+        const ms = milestonesByDim[dim]?.slice(0, 2).join(', ')
+        return `${dim.toUpperCase()}: "${q.vision}"${ms ? ` → milestones: ${ms}` : ''}`
+      })
+      .join('\n')
+  } catch {
+    return ''
+  }
+}
+
 export async function consultArc(input: ArcInput): Promise<ArcOutput> {
   const { userMessage, userId, checkInData, fileContent, fileName, fileBase64, fileMimeType, imageBase64, imageMimeType } = input
 
   // Load profile, arc relationship memories, and all external context in parallel
-  const [loadedOura, { calendarContext, freeBlocks }, profileResult, arcMemories, gmailDigestResult] = await Promise.all([
+  const [loadedOura, { calendarContext, freeBlocks }, profileResult, arcMemories, gmailDigestResult, recentJournalEntries, activeQuestsResult] = await Promise.all([
     input.ouraData !== undefined
       ? Promise.resolve({ payload: input.ouraData, contextBlock: '' })
       : loadOuraContextForUser(userId),
     loadCalendarContextForUser(userId),
     getUserProfile(userId).catch(() => null),
-    getDimensionMemories('arc', 15, userId).catch(() => [] as string[]),
+    getDimensionMemories('arc', 25, userId).catch(() => [] as string[]),  // increased from 15
     getGmailDigest(userId).catch(() => null),
+    // Fetch recent journal entries / voice notes for richer conversation context
+    loadRecentJournalContext(userId).catch(() => ''),
+    // Fetch active main quests so Arc knows what they're working toward
+    loadActiveQuestsContext(userId).catch(() => ''),
   ])
 
   const ouraContextBlock = loadedOura.contextBlock
@@ -403,7 +476,7 @@ export async function consultArc(input: ArcInput): Promise<ArcOutput> {
   const memoriesByDimension = await Promise.all(
     allDimensions.map(async (dim) => ({
       dim,
-      memories: await getDimensionMemories(toPersistenceId(dim), 8, userId),
+      memories: await getDimensionMemories(toPersistenceId(dim), 15, userId),  // increased from 8
     }))
   )
   const memoryMap = Object.fromEntries(
@@ -471,15 +544,28 @@ export async function consultArc(input: ArcInput): Promise<ArcOutput> {
     fileContextBlock = `FILE SHARED BY USER (${fileName}):\n${truncated}`
   }
 
+  // Build conversation history block (last 10 exchanges so Arc remembers the thread)
+  const historyBlock = input.conversationHistory && input.conversationHistory.length > 0
+    ? `EARLIER IN THIS CONVERSATION (most recent last):\n${
+        input.conversationHistory
+          .slice(-10)
+          .map(m => `${m.role === 'user' ? 'User' : 'Oracle'}: ${m.text}`)
+          .join('\n')
+      }`
+    : ''
+
   const contextSection = [
     personContextBlock ? personContextBlock : '',
     arcMemoryBlock,
+    activeQuestsResult ? `WHAT THEY'RE WORKING ON (active quests):\n${activeQuestsResult}` : '',
+    recentJournalEntries ? `RECENT JOURNAL / VOICE REFLECTIONS:\n${recentJournalEntries}` : '',
     ouraContextBlock
       ? `BIODATA FOR TODAY (from Oura Ring — use for energy/recovery calibration):\n${ouraContextBlock}`
       : '',
     calendarContext ? `SCHEDULE FOR TODAY:\n${calendarContext}` : '',
     freeBlocks.length > 0 ? `FREE BLOCKS FOR DEEP WORK:\n${freeBlocks.join('\n')}` : '',
     gmailContext ? `INBOX STATUS:\n${gmailContext}` : '',
+    historyBlock,
     photoContextBlock,
     fileContextBlock,
   ]

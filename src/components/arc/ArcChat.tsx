@@ -42,7 +42,15 @@ export function ArcChat() {
       const res = await fetch('/api/arc', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text, userId: getUserId() }),
+        body: JSON.stringify({
+          message: text,
+          userId: getUserId(),
+          // Pass conversation history so Oracle remembers what was said earlier
+          conversationHistory: messages.slice(-16).map(m => ({
+            role: m.role === 'arc' ? 'oracle' : 'user' as 'user' | 'oracle',
+            text: m.text,
+          })),
+        }),
       })
 
       const data = await res.json()
@@ -56,7 +64,7 @@ export function ArcChat() {
       setChatState('open')
       setTimeout(scrollToBottom, 50)
     }
-  }, [])
+  }, [messages])
 
   const startVoice = useCallback(() => {
     const SpeechRecognitionCtor =

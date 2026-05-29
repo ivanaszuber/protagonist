@@ -520,12 +520,17 @@ export function OracleSheet() {
       const res = await fetch('/api/arc', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text, userId }),
+        body: JSON.stringify({
+          message: text,
+          userId,
+          // Include recent conversation history so Oracle remembers context
+          conversationHistory: chatMessages.slice(-16),
+        }),
       })
       const data = await res.json()
       return (data.response as string) ?? data.oracleReply ?? "I'm here with you."
     },
-    [userId]
+    [userId, chatMessages]
   )
 
   const handleSubmit = useCallback(async () => {

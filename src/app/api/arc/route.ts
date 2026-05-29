@@ -21,7 +21,20 @@ export async function POST(req: NextRequest) {
       fileMimeType,
       imageBase64,
       imageMimeType,
-    } = await req.json()
+      conversationHistory,
+    } = await req.json() as {
+      message?: string
+      userId?: string
+      ouraData?: { sleepScore?: number; readiness?: number; hrv?: number }
+      checkInData?: { energyLevel: number; mood: string }
+      fileContent?: string
+      fileName?: string
+      fileBase64?: string
+      fileMimeType?: string
+      imageBase64?: string
+      imageMimeType?: string
+      conversationHistory?: Array<{ role: 'user' | 'oracle'; text: string }>
+    }
 
     if (!message?.trim() && !fileContent && !fileBase64 && !imageBase64) {
       return NextResponse.json({ error: 'No message provided' }, { status: 400 })
@@ -43,6 +56,7 @@ export async function POST(req: NextRequest) {
             fileMimeType,
             imageBase64,
             imageMimeType,
+            conversationHistory,
             onChunk: (chunk) => {
               controller.enqueue(encoder.encode(chunk))
             },
