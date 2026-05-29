@@ -154,7 +154,7 @@ export function DesktopOracleModal() {
   const [chatInput, setChatInput] = useState('')
   const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'oracle'; text: string }[]>([])
   const [chatLoading, setChatLoading] = useState(false)
-  const [attachment, setAttachment] = useState<Attachment | null>(null)
+  const [attachments, setAttachments] = useState<Attachment[]>([])
   const chatEndRef = useRef<HTMLDivElement>(null)
   const chatInputRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -176,7 +176,7 @@ export function DesktopOracleModal() {
     setMode('closed')
     setChatInput('')
     setCheckinInput('')
-    setAttachment(null)
+    setAttachments([])
     // Don't clear chatMessages — they persist for next open
     window.dispatchEvent(new CustomEvent('protagonist:oracle-closed'))
   }, [])
@@ -276,13 +276,13 @@ export function DesktopOracleModal() {
         const dataUrl = reader.result as string
         // dataUrl is "data:<mimeType>;base64,<data>" — strip the prefix
         const base64 = dataUrl.split(',')[1] ?? dataUrl
-        setAttachment({ type: isImage ? 'image' : 'file', name: file.name, content: base64, mimeType: file.type })
+        setAttachments(prev => [...prev, { type: isImage ? 'image' : 'file', name: file.name, content: base64, mimeType: file.type }])
       }
       reader.readAsDataURL(file)
     } else {
       // Read as text (HTML, MD, TXT, etc.)
       const text = await file.text()
-      setAttachment({ type: 'file', name: file.name, content: text, mimeType: file.type })
+      setAttachments(prev => [...prev, { type: 'file', name: file.name, content: text, mimeType: file.type }])
     }
   }, [])
 
@@ -328,32 +328,22 @@ export function DesktopOracleModal() {
   // ── Chat submit ─────────────────────────────────────────────────────────────
   const handleChatSubmit = useCallback(async () => {
     const text = chatInput.trim()
-    const hasAttachment = !!attachment
-    if ((!text && !hasAttachment) || chatLoading) return
-    const displayText = text || (attachment ? `📎 ${attachment.name}` : '')
+    const hasAttachments = attachments.length > 0
+    if ((!text && !hasAttachments) || chatLoading) return
+    const displayText = text || (hasAttachments ? `📎 ${attachments.map(a => a.name).join(', ')}` : '')
     setChatInput('')
-    const currentAttachment = attachment
-    setAttachment(null)
+    const currentAttachments = attachments
+    setAttachments([])
     setChatMessages(prev => [...prev, { role: 'user', text: displayText }])
     setChatLoading(true)
     try {
-      // If there's an attachment, skip classify and go straight to Arc
-      if (currentAttachment) {
-        const body: Record<string, unknown> = { message: text || `I've shared a file: ${currentAttachment.name}`, userId }
-        if (currentAttachment.type === 'image') {
-          body.imageBase64 = currentAttachment.content
-          body.imageMimeType = currentAttachment.mimeType ?? 'image/jpeg'
-          body.fileName = currentAttachment.name
-        } else {
-          const isPdf = currentAttachment.mimeType === 'application/pdf'
-          if (isPdf) {
-            body.fileBase64 = currentAttachment.content
-            body.fileMimeType = 'application/pdf'
-            body.fileName = currentAttachment.name
-          } else {
-            body.fileContent = currentAttachment.content
-            body.fileName = currentAttachment.name
-          }
+      // If there are attachments, skip classify and go straight to Arc with multi-attachment payload
+      if (currentAttachments.length > 0) {
+        const body: Record<string, unknown> = {
+          message: text || `I've shared ${currentAttachments.length > 1 ? 'some files' : 'a file'}: ${currentAttachments.map(a => a.name).join(', ')}`,
+          userId,
+          attachments: currentAttachments,
+          conversationHistory: chatMessages.slice(-16),
         }
         await streamArcReply(body)
         return  // finally will still run
@@ -547,7 +537,7 @@ export function DesktopOracleModal() {
     } finally {
       setChatLoading(false)
     }
-  }, [chatInput, chatLoading, userId, attachment])
+  }, [chatInput, chatLoading, userId, attachments, chatMessages, streamArcReply])
 
   // ── Check-in submit ─────────────────────────────────────────────────────────
   const handleCheckinSubmit = useCallback(async () => {
@@ -615,9 +605,9 @@ export function DesktopOracleModal() {
           inputRef={chatInputRef}
           chatEndRef={chatEndRef}
           onClose={close}
-          attachment={attachment}
+          attachments={attachments}
           onAttach={handleFileAttach}
-          onClearAttach={() => setAttachment(null)}
+          onRemoveAttach={(index) => setAttachments(prev => prev.filter((_, i) => i !== index))}
           fileInputRef={fileInputRef}
           onClearHistory={() => {
             setChatMessages([])
@@ -649,7 +639,7 @@ export function DesktopOracleModal() {
 
 // ── Chat view ─────────────────────────────────────────────────────────────────
 
-function ChatView({ messages, input, setInput, onSubmit, loading, inputRef, chatEndRef, onClose, attachment, onAttach, onClearAttach, fileInputRef, onClearHistory }: {
+function ChatView({ messages, input, setInput, onSubmit, loading, inputRef, chatEndRef, onClose, attachments, onAttach, onRemoveAttach, fileInputRef, onClearHistory }: {
   messages: { role: 'user' | 'oracle'; text: string }[]
   input: string
   setInput: (v: string) => void
@@ -658,9 +648,9 @@ function ChatView({ messages, input, setInput, onSubmit, loading, inputRef, chat
   inputRef: React.RefObject<HTMLTextAreaElement | null>
   chatEndRef: React.RefObject<HTMLDivElement | null>
   onClose: () => void
-  attachment: { type: 'file' | 'image'; name: string; content: string; mimeType?: string } | null
+  attachments: { type: 'file' | 'image'; name: string; content: string; mimeType?: string }[]
   onAttach: (file: File) => void
-  onClearAttach: () => void
+  onRemoveAttach: (index: number) => void
   fileInputRef: React.RefObject<HTMLInputElement | null>
   onClearHistory: () => void
 }) {
@@ -824,28 +814,30 @@ function ChatView({ messages, input, setInput, onSubmit, loading, inputRef, chat
 
         {/* Input */}
         <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', padding: '12px 16px' }}>
-          {/* Attachment preview */}
-          {attachment && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-              {attachment.type === 'image' ? (
-                <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={`data:${attachment.mimeType ?? 'image/jpeg'};base64,${attachment.content}`}
-                    alt={attachment.name}
-                    style={{ height: 52, maxWidth: 80, objectFit: 'cover', borderRadius: 8, border: '1px solid rgba(255,255,255,0.15)' }}
-                  />
-                  <button onClick={onClearAttach} style={{ position: 'absolute', top: -6, right: -6, width: 16, height: 16, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', border: 'none', color: 'white', fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}>×</button>
-                </div>
-              ) : (
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(123,63,228,0.15)', border: '1px solid rgba(123,63,228,0.3)', borderRadius: 8, padding: '5px 10px', fontSize: 12, color: 'rgba(255,255,255,0.8)', maxWidth: 260 }}>
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="rgba(123,63,228,0.9)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
-                  </svg>
-                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{attachment.name}</span>
-                  <button onClick={onClearAttach} style={{ marginLeft: 2, background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', fontSize: 14, cursor: 'pointer', lineHeight: 1, padding: 0 }}>×</button>
-                </div>
-              )}
+          {/* Attachment preview — thumbnail grid for multiple files */}
+          {attachments.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+              {attachments.map((att, idx) => (
+                att.type === 'image' ? (
+                  <div key={idx} style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={`data:${att.mimeType ?? 'image/jpeg'};base64,${att.content}`}
+                      alt={att.name}
+                      style={{ height: 52, maxWidth: 80, objectFit: 'cover', borderRadius: 8, border: '1px solid rgba(255,255,255,0.15)' }}
+                    />
+                    <button onClick={() => onRemoveAttach(idx)} style={{ position: 'absolute', top: -6, right: -6, width: 16, height: 16, borderRadius: '50%', background: 'rgba(30,20,50,0.9)', border: '1px solid rgba(255,255,255,0.2)', color: 'white', fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}>×</button>
+                  </div>
+                ) : (
+                  <div key={idx} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(123,63,228,0.15)', border: '1px solid rgba(123,63,228,0.3)', borderRadius: 8, padding: '5px 10px', fontSize: 12, color: 'rgba(255,255,255,0.8)', maxWidth: 220 }}>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="rgba(123,63,228,0.9)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
+                    </svg>
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{att.name}</span>
+                    <button onClick={() => onRemoveAttach(idx)} style={{ marginLeft: 2, background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', fontSize: 14, cursor: 'pointer', lineHeight: 1, padding: 0 }}>×</button>
+                  </div>
+                )
+              ))}
             </div>
           )}
 
@@ -856,10 +848,11 @@ function ChatView({ messages, input, setInput, onSubmit, loading, inputRef, chat
               ref={fileInputRef}
               type="file"
               accept="image/*,.pdf,.html,.htm,.txt,.md,.csv"
+              multiple
               style={{ display: 'none' }}
               onChange={e => {
-                const file = e.target.files?.[0]
-                if (file) onAttach(file)
+                const files = Array.from(e.target.files ?? [])
+                files.forEach(file => onAttach(file))
                 e.target.value = ''
               }}
             />
@@ -917,15 +910,15 @@ function ChatView({ messages, input, setInput, onSubmit, loading, inputRef, chat
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSubmit() } }}
-              placeholder={isRecording ? 'Listening…' : attachment ? 'Add a message (or just send the file)…' : 'Ask Oracle anything…'}
+              placeholder={isRecording ? 'Listening…' : attachments.length > 0 ? 'Add a message (or just send the files)…' : 'Ask Oracle anything…'}
               rows={1}
               style={{ flex: 1, background: isRecording ? 'rgba(255,107,157,0.06)' : 'rgba(255,255,255,0.06)', border: `1px solid ${isRecording ? 'rgba(255,107,157,0.3)' : 'rgba(255,255,255,0.1)'}`, borderRadius: 10, padding: '10px 14px', color: 'white', fontSize: 13, fontFamily: 'inherit', outline: 'none', resize: 'none', lineHeight: 1.5, transition: 'border-color 0.15s, background 0.15s', overflowY: 'auto', minHeight: 40, maxHeight: 160 }}
             />
             <button
               type="button"
               onClick={handleSubmit}
-              disabled={(!input.trim() && !attachment) || loading}
-              style={{ background: (input.trim() || attachment) && !loading ? '#FF7A65' : 'rgba(255,255,255,0.08)', border: 'none', borderRadius: 10, width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: (input.trim() || attachment) && !loading ? 'pointer' : 'default', flexShrink: 0, transition: 'background 0.15s' }}
+              disabled={(!input.trim() && attachments.length === 0) || loading}
+              style={{ background: (input.trim() || attachments.length > 0) && !loading ? '#FF7A65' : 'rgba(255,255,255,0.08)', border: 'none', borderRadius: 10, width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: (input.trim() || attachments.length > 0) && !loading ? 'pointer' : 'default', flexShrink: 0, transition: 'background 0.15s' }}
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>

@@ -164,6 +164,11 @@ export interface ArcInput {
   imageBase64?: string
   imageMimeType?: string
   /**
+   * Multiple attachments — images, PDFs, or text files sent together with a message.
+   * When provided, takes precedence over the individual imageBase64/fileBase64/fileContent fields.
+   */
+  attachments?: Array<{ type: 'file' | 'image'; name: string; content: string; mimeType?: string }>
+  /**
    * Recent conversation history from the current session.
    * Injected as context so Arc remembers what was said earlier in the chat.
    */
@@ -523,25 +528,39 @@ export async function consultArc(input: ArcInput): Promise<ArcOutput> {
       ? `EMOTIONAL & RELATIONAL MEMORY (what you know about how this person feels, relates, and patterns):\n${arcMemories.join('\n')}`
       : ''
 
-  // ── Process image attachment (vision pre-processing) ──────────────────────
-  let photoContextBlock = ''
-  if (imageBase64 && imageMimeType) {
-    try {
-      const description = await processPhotoAndStore(imageBase64, imageMimeType, userId)
-      photoContextBlock = description
-        ? `PHOTO SHARED BY USER:\n${description}`
-        : ''
-    } catch {
-      // Continue without photo context if vision fails
-    }
+  // ── Process attachments (multi-file support) ──────────────────────────────
+  // Merge legacy single-attachment fields with the new attachments[] array
+  const allAttachments: Array<{ type: 'file' | 'image'; name: string; content: string; mimeType?: string }> = []
+  if (input.attachments && input.attachments.length > 0) {
+    allAttachments.push(...input.attachments)
+  } else {
+    if (imageBase64 && imageMimeType) allAttachments.push({ type: 'image', name: fileName ?? 'image', content: imageBase64, mimeType: imageMimeType })
+    else if (fileBase64 && fileMimeType) allAttachments.push({ type: 'file', name: fileName ?? 'file', content: fileBase64, mimeType: fileMimeType })
+    else if (fileContent && fileName) allAttachments.push({ type: 'file', name: fileName, content: fileContent, mimeType: 'text/plain' })
   }
 
-  // ── Build file context block ───────────────────────────────────────────────
+  let photoContextBlock = ''
   let fileContextBlock = ''
-  if (fileContent && fileName) {
-    // Plain text file — truncate if too large (keep first 8000 chars)
-    const truncated = fileContent.length > 8000 ? fileContent.slice(0, 8000) + '\n\n[... file truncated ...]' : fileContent
-    fileContextBlock = `FILE SHARED BY USER (${fileName}):\n${truncated}`
+  const pdfAttachments: Array<{ name: string; content: string }> = []
+
+  for (const att of allAttachments) {
+    const isImage = att.type === 'image'
+    const isPdf = att.mimeType === 'application/pdf'
+    const isText = !isImage && !isPdf
+
+    if (isImage) {
+      try {
+        const description = await processPhotoAndStore(att.content, att.mimeType ?? 'image/jpeg', userId)
+        if (description) {
+          photoContextBlock += (photoContextBlock ? '\n\n' : '') + `PHOTO SHARED (${att.name}):\n${description}`
+        }
+      } catch { /* continue */ }
+    } else if (isPdf) {
+      pdfAttachments.push({ name: att.name, content: att.content })
+    } else if (isText) {
+      const truncated = att.content.length > 8000 ? att.content.slice(0, 8000) + '\n\n[... file truncated ...]' : att.content
+      fileContextBlock += (fileContextBlock ? '\n\n' : '') + `FILE SHARED (${att.name}):\n${truncated}`
+    }
   }
 
   // Build conversation history block (last 10 exchanges so Arc remembers the thread)
@@ -574,18 +593,20 @@ export async function consultArc(input: ArcInput): Promise<ArcOutput> {
 
   const contextSectionBlock = contextSection ? `\n\n${contextSection}` : ''
 
-  // Build the user message line — include filename hint if file is attached
-  const fileHint = fileName && (fileContent || fileBase64 || imageBase64)
-    ? ` [Attached: ${fileName}]`
-    : ''
-  const effectiveUserMessage = userMessage || (fileName ? `I've shared a file: ${fileName}` : '')
+  // Build the user message line — include filenames hint if files are attached
+  const attachedNames = allAttachments.map(a => a.name)
+  const fileHint = attachedNames.length > 0 ? ` [Attached: ${attachedNames.join(', ')}]` : ''
+  const effectiveUserMessage = userMessage || (attachedNames.length > 0 ? `I've shared ${attachedNames.length > 1 ? 'files' : 'a file'}: ${attachedNames.join(', ')}` : '')
 
-  // For PDF files, build a native document message
-  const arcUserContent: Parameters<typeof anthropic.messages.create>[0]['messages'][0]['content'] | null =
-    fileBase64 && fileMimeType === 'application/pdf'
+  // Build Claude content array — PDFs as native documents, text message last
+  type ClaudeContentBlock =
+    | { type: 'document'; source: { type: 'base64'; media_type: 'application/pdf'; data: string } }
+    | { type: 'text'; text: string }
+  const arcUserContent: ClaudeContentBlock[] | null =
+    pdfAttachments.length > 0
       ? [
-          { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: fileBase64 } } as { type: 'document'; source: { type: 'base64'; media_type: 'application/pdf'; data: string } },
-          { type: 'text', text: effectiveUserMessage || 'Please review this document and help me understand how to use it.' },
+          ...pdfAttachments.map(p => ({ type: 'document' as const, source: { type: 'base64' as const, media_type: 'application/pdf' as const, data: p.content } })),
+          { type: 'text' as const, text: effectiveUserMessage || 'Please review this document and share your thoughts.' },
         ]
       : null
 
