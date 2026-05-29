@@ -8,10 +8,11 @@ export async function PATCH(
 ) {
   const { id } = await params
   const body = await request.json()
-  const { userId, task_date, title } = body as {
+  const { userId, task_date, title, completed } = body as {
     userId?: string
     task_date?: string | null
     title?: string
+    completed?: boolean
   }
 
   if (!userId) {
@@ -24,6 +25,7 @@ export async function PATCH(
   const updates: Record<string, unknown> = {}
   if (task_date !== undefined) updates.task_date = task_date ?? null
   if (title !== undefined) updates.title = title.trim()
+  if (completed !== undefined) updates.completed = completed
 
   const { data, error } = await supabase
     .from('tasks')

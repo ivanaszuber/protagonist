@@ -493,6 +493,7 @@ export function DesktopCharacterPage({ dimension }: DesktopCharacterPageProps) {
             accentColor={accentColor}
             questId={quest.id}
             userId={userId}
+            dimension={dimension}
             onAdd={m => setQuest(prev => prev ? { ...prev, milestones: [...prev.milestones, m] } : prev)}
             onDelete={id => void deleteMilestone(id)}
             onUpdate={(id, changes) =>

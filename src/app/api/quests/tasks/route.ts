@@ -8,6 +8,7 @@ export async function GET(request: Request) {
   const date = searchParams.get('date')
   const someday = searchParams.get('someday') === 'true'
   const dimension = searchParams.get('dimension')
+  const milestoneId = searchParams.get('milestoneId')
 
   if (!userId) {
     return NextResponse.json({ error: 'userId required' }, { status: 400 })
@@ -21,9 +22,12 @@ export async function GET(request: Request) {
     .from('tasks')
     .select('*')
     .eq('user_id', userId)
+    .order('completed', { ascending: true })
     .order('created_at', { ascending: true })
 
-  if (someday) {
+  if (milestoneId) {
+    query = query.eq('milestone_id', milestoneId)
+  } else if (someday) {
     query = query.is('task_date', null)
   } else if (date) {
     query = query.eq('task_date', date)
