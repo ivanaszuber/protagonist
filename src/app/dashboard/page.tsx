@@ -62,6 +62,7 @@ interface MainQuest {
 
 interface CalendarEventRow {
   id: string
+  googleEventId?: string
   title: string
   start: string
   end: string
@@ -712,7 +713,7 @@ export default function DashboardPage() {
     for (const ev of events) {
       items.push({
         id: ev.id,
-        googleEventId: (ev as { googleEventId?: string }).googleEventId ?? ev.id,
+        googleEventId: ev.googleEventId || ev.id,
         type: 'event',
         title: ev.title,
         time: formatTimeFromIso(ev.start),

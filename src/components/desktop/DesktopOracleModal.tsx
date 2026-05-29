@@ -214,7 +214,7 @@ export function DesktopOracleModal() {
           .catch(() => setMode('checkin-input'))
       } else {
         if (detail?.prefill) {
-          setChatMessages([])
+          // Pre-fill the input but keep existing conversation history
           setChatInput(detail.prefill)
         }
         setMode('chat')

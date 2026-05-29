@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useEffect, useState, type ComponentType, type CSSProperties, type ReactNode } from 'react'
 import { useIsDesktop } from '@/lib/useIsDesktop'
 import { DesktopCharacterPage } from '@/components/desktop/DesktopCharacterPage'
+import { DesktopFinancePage } from '@/components/desktop/DesktopFinancePage'
 import {
   BlazeCharacterLarge,
   EchoCharacterLarge,
@@ -330,6 +331,7 @@ export function CharacterPage({ dimension }: CharacterPageProps) {
     quest?.milestones.find((m) => !m.completed) ??
     null
 
+  if (isDesktop && dimension === 'wealth') return <DesktopFinancePage />
   if (isDesktop) return <DesktopCharacterPage dimension={dimension} />
 
   const pageShellStyle: CSSProperties = {

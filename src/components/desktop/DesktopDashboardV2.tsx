@@ -7,6 +7,7 @@ import { ALL_DIMENSIONS, type Dimension } from '@/lib/character'
 import { DIMENSION_TO_SLUG } from '@/lib/tierName'
 import { getLevel, getLevelProgress } from '@/lib/xp'
 import { openOracle } from '@/lib/oracle-events'
+import { getUserId } from '@/lib/user'
 import type { DesktopDashboardProps } from './DesktopDashboard'
 import { DesktopLeftSidebar, DIM_COLORS } from './DesktopLeftSidebar'
 import { isCheckinDoneToday } from './DesktopOracleModal'
@@ -244,10 +245,12 @@ export default function DesktopDashboardV2(props: DesktopDashboardV2Props) {
   }, [])
 
   // ── Calendar event actions ────────────────────────────────────────────────
-  const [userId, setUserId] = useState('')
+  const userId = getUserId()
   const [expandedEventId,  setExpandedEventId]  = useState<string | null>(null)
   const [eventPickerId,    setEventPickerId]     = useState<string | null>(null)
   const [deletingEventId,  setDeletingEventId]   = useState<string | null>(null)
+  // IDs optimistically removed from the UI immediately on delete click
+  const [hiddenEventIds,   setHiddenEventIds]    = useState<Set<string>>(new Set())
 
   // ── Quick-add task form ───────────────────────────────────────────────────
   const [showQuickAdd,       setShowQuickAdd]       = useState(false)
@@ -259,13 +262,11 @@ export default function DesktopDashboardV2(props: DesktopDashboardV2Props) {
   const [dimMilestones, setDimMilestones] = useState<Record<string, Array<{ id: string; title: string }>>>({})
   const [loadingMilestones, setLoadingMilestones] = useState(false)
 
-  useEffect(() => {
-    const uid = document.cookie.split('; ').find(r => r.startsWith('protagonist_user_id='))?.split('=')[1] ?? ''
-    setUserId(uid)
-  }, [])
-
   async function handleDeleteEvent(googleEventId: string, evId: string) {
     if (!userId || !googleEventId) return
+    // Optimistically hide the event immediately
+    setHiddenEventIds(prev => new Set([...prev, evId]))
+    setExpandedEventId(null)
     setDeletingEventId(evId)
     try {
       await fetch('/api/calendar/delete', {
@@ -274,9 +275,11 @@ export default function DesktopDashboardV2(props: DesktopDashboardV2Props) {
         body: JSON.stringify({ userId, eventId: googleEventId }),
       })
       window.dispatchEvent(new Event('protagonist:calendar-updated'))
+    } catch {
+      // On failure, un-hide so user can try again
+      setHiddenEventIds(prev => { const s = new Set(prev); s.delete(evId); return s })
     } finally {
       setDeletingEventId(null)
-      setExpandedEventId(null)
     }
   }
 
@@ -374,8 +377,8 @@ export default function DesktopDashboardV2(props: DesktopDashboardV2Props) {
     })
   ) as Partial<Record<Dimension, number>>
 
-  // Today's items split
-  const calendarEvents = todayItems.filter(i => i.type === 'event')
+  // Today's items split — filter out optimistically-deleted events
+  const calendarEvents = todayItems.filter(i => i.type === 'event' && !hiddenEventIds.has(i.id))
   const taskItems      = todayItems.filter(i => i.type === 'task')
 
   // Weekly progress (Mon–Fri of the current week)
@@ -560,7 +563,7 @@ export default function DesktopDashboardV2(props: DesktopDashboardV2Props) {
                   {getGreeting()}
                 </span>
                 <span style={{ color: '#FF7A65', fontSize: 36, fontStyle: 'italic', fontWeight: 700, lineHeight: 1.05 }}>
-                  Ivana.
+                  Ivana
                 </span>
               </div>
               {!isToday && (
