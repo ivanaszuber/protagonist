@@ -42,13 +42,19 @@ export async function POST(request: Request) {
   }
 
   const today = new Date().toISOString().split('T')[0]
-  const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0]
+  // Sync 7 days ahead so date navigation always has fresh data
+  const sevenDaysAhead = new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0]
 
   try {
-    const events = await fetchCalendarEvents(accessToken, today, tomorrow)
+    const events = await fetchCalendarEvents(accessToken, today, sevenDaysAhead)
 
-    await deleteCalendarEventsForDate(userId, today)
-    await deleteCalendarEventsForDate(userId, tomorrow)
+    // Delete and replace all days in the sync window
+    const daysToDelete: string[] = []
+    for (let i = 0; i <= 7; i++) {
+      daysToDelete.push(new Date(Date.now() + i * 86400000).toISOString().split('T')[0])
+    }
+    await Promise.all(daysToDelete.map(d => deleteCalendarEventsForDate(userId, d)))
+
     await saveCalendarEvents(
       userId,
       events.map((e) => ({

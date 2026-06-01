@@ -401,6 +401,7 @@ export default function DashboardPage() {
   const [quickAddError, setQuickAddError] = useState('')
   const [quickAddLoading, setQuickAddLoading] = useState(false)
   const [weeklyTaskCounts, setWeeklyTaskCounts] = useState<Record<string, number>>({})
+  const [calendarDisconnected, setCalendarDisconnected] = useState(false)
 
   const refreshCalendarEvents = useCallback(async (dateStr?: string) => {
     const uid = userIdRef.current
@@ -429,7 +430,7 @@ export default function DashboardPage() {
     const hasCache = _cache != null
     if (!hasCache) setVitalityLoading(true)
 
-    // Fire Oura sync in the background — don't await it, it's slow
+    // Fire Oura sync + calendar sync in the background — don't await, they're slow
     fetch('/api/oura/sync', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -437,6 +438,24 @@ export default function DashboardPage() {
     }).catch(() => {})
 
     const dateStr = dateOverride ?? toDateStr(new Date())
+
+    // Always sync calendar before fetching events so we get fresh data
+    try {
+      const syncRes = await fetch('/api/calendar/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: uid }),
+      })
+      const syncData = await syncRes.json() as { connected?: boolean; error?: string }
+      if (syncData.connected === false) {
+        // Token expired or not connected — surface to user
+        setCalendarDisconnected(true)
+      } else {
+        setCalendarDisconnected(false)
+      }
+    } catch {
+      // Sync failed silently — don't block the rest of the load
+    }
 
     const [vitalityRes, questsRes, calRes, checkInRes, medalsRes, scoresRes] = await Promise.allSettled([
       fetch(`/api/dashboard/vitality?userId=${encodeURIComponent(uid)}`).then((r) => r.json()),
@@ -488,23 +507,6 @@ export default function DashboardPage() {
       const eventsData = (calRes.value.events ?? []) as CalendarEventRow[]
       setEvents(eventsData)
       next.events = eventsData
-      // If nothing returned, try a calendar sync then re-fetch once
-      if (eventsData.length === 0) {
-        fetch('/api/calendar/sync', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId: uid }),
-        })
-          .then(() => fetch(`/api/calendar/next?userId=${encodeURIComponent(uid)}&limit=10&date=${encodeURIComponent(dateStr)}`))
-          .then((r) => r.json())
-          .then((d: { events?: CalendarEventRow[] }) => {
-            if (d.events?.length) {
-              setEvents(d.events)
-              if (_cache) _cache.events = d.events
-            }
-          })
-          .catch(() => {})
-      }
     }
     if (checkInRes.status === 'fulfilled') {
       const v = Boolean(checkInRes.value.hasCheckIn)
@@ -1561,6 +1563,11 @@ export default function DashboardPage() {
                 <div style={{ height: 10, borderRadius: 5, background: '#1E0D40', width: `${w * 100}%`, maxWidth: 200 }} />
               </div>
             ))}
+          </div>
+        ) : calendarDisconnected ? (
+          <div style={{ padding: '20px 8px', textAlign: 'center' }}>
+            <div style={{ fontSize: 12, color: '#5A4A7A', marginBottom: 10 }}>Google Calendar disconnected.</div>
+            <a href="/settings" style={{ fontSize: 12, color: '#9333EA', textDecoration: 'none' }}>Reconnect in Settings →</a>
           </div>
         ) : todayItems.length === 0 ? (
           <button

@@ -636,14 +636,15 @@ export function DesktopCharacterPage({ dimension }: DesktopCharacterPageProps) {
             {/* Non-love: Identity context card (left 220px) + Oracle's Story (right) */}
             {charInsight ? (
               <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: 12, marginBottom: 20 }}>
-                {/* Left: dimension identity card */}
-                <div>
+                {/* Left: dimension identity card + must-haves */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   {dimension === 'vitality' && <VitalityContextCard userId={userId} />}
                   {dimension === 'mind' && <MindContextCard userId={userId} />}
                   {dimension === 'career' && <CareerContextCard userId={userId} />}
                   {dimension === 'wealth' && <WealthContextCard userId={userId} />}
                   {dimension === 'social' && <SocialContextCard userId={userId} />}
                   {dimension === 'family' && <FamilyContextCard userId={userId} />}
+                  <DimensionPillars dimension={dimension} userId={userId} accentColor={accentColor} />
                 </div>
                 {/* Right: Oracle's Story */}
                 <div style={{ background: `${accentColor}08`, border: `1px solid ${accentColor}28`, borderRadius: 14, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -686,14 +687,21 @@ export function DesktopCharacterPage({ dimension }: DesktopCharacterPageProps) {
                 </div>
               </div>
             ) : (
-              /* No Oracle insight yet — just show identity card full width */
-              <div style={{ marginBottom: 20 }}>
-                {dimension === 'vitality' && <VitalityContextCard userId={userId} />}
-                {dimension === 'mind' && <MindContextCard userId={userId} />}
-                {dimension === 'career' && <CareerContextCard userId={userId} />}
-                {dimension === 'wealth' && <WealthContextCard userId={userId} />}
-                {dimension === 'social' && <SocialContextCard userId={userId} />}
-                {dimension === 'family' && <FamilyContextCard userId={userId} />}
+              /* No Oracle insight yet — show identity card + must-haves side by side */
+              <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: 12, marginBottom: 20 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {dimension === 'vitality' && <VitalityContextCard userId={userId} />}
+                  {dimension === 'mind' && <MindContextCard userId={userId} />}
+                  {dimension === 'career' && <CareerContextCard userId={userId} />}
+                  {dimension === 'wealth' && <WealthContextCard userId={userId} />}
+                  {dimension === 'social' && <SocialContextCard userId={userId} />}
+                  {dimension === 'family' && <FamilyContextCard userId={userId} />}
+                  <DimensionPillars dimension={dimension} userId={userId} accentColor={accentColor} />
+                </div>
+                {/* Right column empty until Oracle has enough data */}
+                <div style={{ background: 'rgba(255,255,255,0.02)', border: '0.5px solid #2D1B55', borderRadius: 14, padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <span style={{ fontFamily: "'Space Grotesk', system-ui, sans-serif", fontSize: 11, color: 'rgba(255,255,255,0.2)', fontStyle: 'italic' }}>Oracle&apos;s story will appear after your first check-in</span>
+                </div>
               </div>
             )}
           </>
