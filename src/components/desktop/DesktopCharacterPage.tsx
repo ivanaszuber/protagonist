@@ -22,6 +22,12 @@ import { DimensionPillars } from '@/components/dimension/DimensionPillars'
 import { DimensionTopOfMind } from '@/components/dimension/DimensionTopOfMind'
 import { DimensionConversationSeeds } from '@/components/dimension/DimensionConversationSeeds'
 import { RelationshipContextCard } from '@/components/dimension/RelationshipContextCard'
+import { VitalityContextCard } from '@/components/dimension/VitalityContextCard'
+import { MindContextCard } from '@/components/dimension/MindContextCard'
+import { CareerContextCard } from '@/components/dimension/CareerContextCard'
+import { WealthContextCard } from '@/components/dimension/WealthContextCard'
+import { SocialContextCard } from '@/components/dimension/SocialContextCard'
+import { FamilyContextCard } from '@/components/dimension/FamilyContextCard'
 import { DimensionSettingsPanel, useDimensionSettings } from '@/components/dimension/DimensionSettingsPanel'
 import {
   ForgeCharacterLarge,
@@ -627,42 +633,67 @@ export function DesktopCharacterPage({ dimension }: DesktopCharacterPageProps) {
           </div>
         ) : (
           <>
-            {/* Non-love: Oracle's Story full width */}
-            {charInsight && (
-              <div style={{ marginBottom: 20 }}>
-                <div style={{ background: `${accentColor}14`, border: `1.5px solid ${accentColor}35`, borderRadius: 14, padding: '16px 18px', marginBottom: 10 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 10 }}>
-                    <svg width="11" height="11" viewBox="0 0 24 24" fill={accentColor}><path d="M12 2l2.4 7.6H22l-6.4 4.6 2.4 7.6L12 17.2l-6 4.6 2.4-7.6L2 9.6h7.6L12 2z"/></svg>
+            {/* Non-love: Identity context card (left 220px) + Oracle's Story (right) */}
+            {charInsight ? (
+              <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: 12, marginBottom: 20 }}>
+                {/* Left: dimension identity card */}
+                <div>
+                  {dimension === 'vitality' && <VitalityContextCard userId={userId} />}
+                  {dimension === 'mind' && <MindContextCard userId={userId} />}
+                  {dimension === 'career' && <CareerContextCard userId={userId} />}
+                  {dimension === 'wealth' && <WealthContextCard userId={userId} />}
+                  {dimension === 'social' && <SocialContextCard userId={userId} />}
+                  {dimension === 'family' && <FamilyContextCard userId={userId} />}
+                </div>
+                {/* Right: Oracle's Story */}
+                <div style={{ background: `${accentColor}08`, border: `1px solid ${accentColor}28`, borderRadius: 14, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill={accentColor}><path d="M12 2l2.4 7.6H22l-6.4 4.6 2.4 7.6L12 17.2l-6 4.6 2.4-7.6L2 9.6h7.6L12 2z"/></svg>
                     <span style={{ ...font, fontSize: 9, fontWeight: 700, color: accentColor, letterSpacing: '1.4px', textTransform: 'uppercase' as const }}>Oracle&apos;s Story · {char.categoryLabel}</span>
                   </div>
-                  <p style={{ ...font, fontSize: 13.5, color: 'rgba(255,255,255,0.82)', lineHeight: 1.75, margin: 0 }}>{charInsight.narrative}</p>
+                  <p style={{ ...font, fontSize: 12.5, color: 'rgba(255,255,255,0.78)', lineHeight: 1.7, margin: 0 }}>{charInsight.narrative}</p>
+                  {charInsight.lessons.length > 0 && (
+                    <div>
+                      <div style={{ ...font, fontSize: 8, fontWeight: 700, color: '#1D9E75', letterSpacing: '1.1px', textTransform: 'uppercase' as const, marginBottom: 6 }}>Lessons showing up</div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                        {charInsight.lessons.map((lesson, i) => (
+                          <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 7 }}>
+                            <svg style={{ flexShrink: 0, marginTop: 2 }} width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#1D9E75" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                            <span style={{ ...font, fontSize: 11.5, color: 'rgba(255,255,255,0.65)', lineHeight: 1.5 }}>{lesson}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {charInsight.growthEdges.length > 0 && (
+                    <div>
+                      <div style={{ ...font, fontSize: 8, fontWeight: 700, color: '#F0882A', letterSpacing: '1.1px', textTransform: 'uppercase' as const, marginBottom: 6 }}>Growth edges</div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                        {charInsight.growthEdges.map((edge, i) => (
+                          <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                            <div style={{
+                              fontSize: 8, fontWeight: 700, flexShrink: 0, marginTop: 2, padding: '1px 6px', borderRadius: 4,
+                              background: edge.urgency === 'high' ? 'rgba(240,136,42,0.12)' : 'rgba(240,136,42,0.06)',
+                              border: `0.5px solid ${edge.urgency === 'high' ? 'rgba(240,136,42,0.3)' : 'rgba(240,136,42,0.15)'}`,
+                              color: edge.urgency === 'high' ? '#F0882A' : 'rgba(240,136,42,0.6)',
+                            }}>{edge.urgency === 'high' ? 'pressing' : 'ongoing'}</div>
+                            <span style={{ ...font, fontSize: 11.5, color: 'rgba(255,255,255,0.62)', lineHeight: 1.45 }}>{edge.text}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
-                {charInsight.lessons.length > 0 && (
-                  <div style={{ marginBottom: 10 }}>
-                    <div style={{ ...font, fontSize: 9, fontWeight: 700, color: '#5A4A7A', letterSpacing: '0.1em', textTransform: 'uppercase' as const, marginBottom: 7 }}>Lessons in progress</div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                      {charInsight.lessons.map((lesson, i) => (
-                        <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, background: '#100828', border: `0.5px solid ${accentColor}25`, borderRadius: 10, padding: '9px 13px' }}>
-                          <svg style={{ flexShrink: 0, marginTop: 1 }} width="13" height="13" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="#F0C840" strokeWidth="2"/><path d="M12 7v5l3 3" stroke="#F0C840" strokeWidth="2" strokeLinecap="round"/></svg>
-                          <span style={{ ...font, fontSize: 12.5, color: 'rgba(255,255,255,0.72)', lineHeight: 1.55 }}>{lesson}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {charInsight.growthEdges.length > 0 && (
-                  <div style={{ background: '#140C28', border: '0.5px solid #2D1B55', borderRadius: 12, padding: '12px 14px' }}>
-                    <div style={{ ...font, fontSize: 9, fontWeight: 700, color: '#5A4A7A', letterSpacing: '0.1em', textTransform: 'uppercase' as const, marginBottom: 8 }}>Growth edges</div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-                      {charInsight.growthEdges.map((edge, i) => (
-                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: i < charInsight.growthEdges.length - 1 ? '0.5px solid #1A0D35' : 'none' }}>
-                          <div style={{ width: 7, height: 7, borderRadius: '50%', flexShrink: 0, background: edge.urgency === 'high' ? '#F0882A' : edge.urgency === 'medium' ? accentColor : '#1D9E75' }} />
-                          <span style={{ ...font, fontSize: 12.5, color: 'rgba(255,255,255,0.68)', lineHeight: 1.45 }}>{edge.text}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
+              </div>
+            ) : (
+              /* No Oracle insight yet — just show identity card full width */
+              <div style={{ marginBottom: 20 }}>
+                {dimension === 'vitality' && <VitalityContextCard userId={userId} />}
+                {dimension === 'mind' && <MindContextCard userId={userId} />}
+                {dimension === 'career' && <CareerContextCard userId={userId} />}
+                {dimension === 'wealth' && <WealthContextCard userId={userId} />}
+                {dimension === 'social' && <SocialContextCard userId={userId} />}
+                {dimension === 'family' && <FamilyContextCard userId={userId} />}
               </div>
             )}
           </>

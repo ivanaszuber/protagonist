@@ -14,12 +14,13 @@ export interface DimSettings {
 }
 
 const DEFAULTS: DimSettings = {
-  showQuests: true, showMilestones: true, showTasks: true,
-  showPillars: true, showTopOfMind: true, showConversationSeeds: true,
+  showQuests: false, showMilestones: false, showTasks: true,
+  showPillars: true, showTopOfMind: true, showConversationSeeds: false,
 }
 
+// Love keeps conversation seeds on; all others off by default
 const LOVE_DEFAULTS: DimSettings = {
-  ...DEFAULTS, showQuests: false, showMilestones: false,
+  ...DEFAULTS, showConversationSeeds: true,
 }
 
 interface Props {

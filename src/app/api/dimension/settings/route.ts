@@ -12,18 +12,18 @@ export interface DimensionSettings {
 }
 
 const DEFAULTS: DimensionSettings = {
-  showQuests: true,
-  showMilestones: true,
+  showQuests: false,
+  showMilestones: false,
   showTasks: true,
   showPillars: true,
   showTopOfMind: true,
-  showPatternLog: true,
-  showConversationSeeds: true,
+  showPatternLog: false,
+  showConversationSeeds: false,
 }
 
-// love dimension hides quests/milestones by default
+// love gets conversation seeds on by default
 const DIMENSION_DEFAULTS: Record<string, Partial<DimensionSettings>> = {
-  love: { showQuests: false, showMilestones: false },
+  love: { showConversationSeeds: true },
 }
 
 export async function GET(req: NextRequest) {
