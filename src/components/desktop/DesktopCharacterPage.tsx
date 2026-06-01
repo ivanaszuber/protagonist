@@ -465,33 +465,37 @@ export function DesktopCharacterPage({ dimension }: DesktopCharacterPageProps) {
                 {char.name}
               </span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
-              <span style={{ fontSize: 11, color: accentColor, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-                {tierLabel}
-              </span>
-              <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>·</span>
-              <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>
-                Lv {level}
-              </span>
-              {killStats.slain > 0 && (
-                <>
+            {dimSettings.showQuests && (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 11, color: accentColor, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                    {tierLabel}
+                  </span>
                   <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>·</span>
                   <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>
-                    <strong style={{ color: accentColor }}>{killStats.slain}</strong> challenges won
+                    Lv {level}
                   </span>
-                </>
-              )}
-            </div>
-            {/* XP bar */}
-            <div style={{ maxWidth: 320 }}>
-              <div style={{ height: 4, background: '#1E0D40', borderRadius: 3, overflow: 'hidden', marginBottom: 3 }}>
-                <div style={{ height: '100%', width: `${Math.round((xpInLevel / 500) * 100)}%`, background: accentColor, borderRadius: 3, transition: 'width 1s ease' }} />
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: 9, color: '#5A4A7A' }}>{xpInLevel} XP</span>
-                <span style={{ fontSize: 9, color: '#5A4A7A' }}>500 to Level {level + 1}</span>
-              </div>
-            </div>
+                  {killStats.slain > 0 && (
+                    <>
+                      <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>·</span>
+                      <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>
+                        <strong style={{ color: accentColor }}>{killStats.slain}</strong> challenges won
+                      </span>
+                    </>
+                  )}
+                </div>
+                {/* XP bar */}
+                <div style={{ maxWidth: 320 }}>
+                  <div style={{ height: 4, background: '#1E0D40', borderRadius: 3, overflow: 'hidden', marginBottom: 3 }}>
+                    <div style={{ height: '100%', width: `${Math.round((xpInLevel / 500) * 100)}%`, background: accentColor, borderRadius: 3, transition: 'width 1s ease' }} />
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: 9, color: '#5A4A7A' }}>{xpInLevel} XP</span>
+                    <span style={{ fontSize: 9, color: '#5A4A7A' }}>500 to Level {level + 1}</span>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </div>
 
@@ -793,20 +797,24 @@ export function DesktopCharacterPage({ dimension }: DesktopCharacterPageProps) {
           )}
         </section>}
 
-        {/* Score block */}
-        <ScoreBlock
-          dimension={dimension}
-          xp={xp}
-          userId={userId}
-          accentColor={accentColor}
-        />
+        {/* Score block — only shown when quests are on */}
+        {dimSettings.showQuests && (
+          <ScoreBlock
+            dimension={dimension}
+            xp={xp}
+            userId={userId}
+            accentColor={accentColor}
+          />
+        )}
 
-        {/* Medals */}
-        <MedalsRow
-          definitions={medalDefs}
-          earned={earnedMedals}
-          accentColor={accentColor}
-        />
+        {/* Medals — only shown when quests are on */}
+        {dimSettings.showQuests && (
+          <MedalsRow
+            definitions={medalDefs}
+            earned={earnedMedals}
+            accentColor={accentColor}
+          />
+        )}
       </div>
 
       {/* ── Right panel ──────────────────────────────────────────────────── */}
@@ -944,24 +952,28 @@ export function DesktopCharacterPage({ dimension }: DesktopCharacterPageProps) {
           />
         </div>
 
-        {/* Active challenge */}
-        <BossCard
-          characterName={char.name}
-          dimensionLabel={char.categoryLabel}
-          dimension={dimension}
-          mainQuestTitle={activeMilestone?.title ?? null}
-          boss={boss}
-          escapedBoss={escapedBoss}
-          tasks={bossTasks}
-          onTaskComplete={handleBossTaskComplete}
-          onBossSlain={refreshAfterBossSlain}
-        />
+        {/* Active challenge — only shown when quests are on */}
+        {dimSettings.showQuests && (
+          <BossCard
+            characterName={char.name}
+            dimensionLabel={char.categoryLabel}
+            dimension={dimension}
+            mainQuestTitle={activeMilestone?.title ?? null}
+            boss={boss}
+            escapedBoss={escapedBoss}
+            tasks={bossTasks}
+            onTaskComplete={handleBossTaskComplete}
+            onBossSlain={refreshAfterBossSlain}
+          />
+        )}
 
-        {/* Hall of Victories */}
-        <HallOfKills
-          kills={bossKills}
-          stats={killStats}
-        />
+        {/* Hall of Victories — only shown when quests are on */}
+        {dimSettings.showQuests && (
+          <HallOfKills
+            kills={bossKills}
+            stats={killStats}
+          />
+        )}
       </div>
 
       </div>{/* end three-columns */}
