@@ -10,13 +10,12 @@ export interface DimSettings {
   showTasks: boolean
   showPillars: boolean
   showTopOfMind: boolean
-  showPatternLog: boolean
   showConversationSeeds: boolean
 }
 
 const DEFAULTS: DimSettings = {
   showQuests: true, showMilestones: true, showTasks: true,
-  showPillars: true, showTopOfMind: true, showPatternLog: true, showConversationSeeds: true,
+  showPillars: true, showTopOfMind: true, showConversationSeeds: true,
 }
 
 const LOVE_DEFAULTS: DimSettings = {
@@ -37,7 +36,6 @@ const TOGGLES: Array<{ key: keyof DimSettings; label: string; loveOnly?: boolean
   { key: 'showPillars',           label: 'Non-negotiables / pillars' },
   { key: 'showTopOfMind',         label: 'Top of mind' },
   { key: 'showConversationSeeds', label: 'Conversation seeds', loveOnly: true },
-  { key: 'showPatternLog',        label: 'Pattern log', loveOnly: true },
   { key: 'showQuests',            label: 'Quests' },
   { key: 'showMilestones',        label: 'Milestones' },
   { key: 'showTasks',             label: 'Tasks' },

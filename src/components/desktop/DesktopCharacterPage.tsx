@@ -20,10 +20,9 @@ import { openOracle } from '@/lib/oracle-events'
 import { VaultNetWorthCard } from '@/components/vault/VaultNetWorthCard'
 import { DimensionPillars } from '@/components/dimension/DimensionPillars'
 import { DimensionTopOfMind } from '@/components/dimension/DimensionTopOfMind'
-import { DimensionPatternLog } from '@/components/dimension/DimensionPatternLog'
 import { DimensionConversationSeeds } from '@/components/dimension/DimensionConversationSeeds'
-import { OracleCurrentRead } from '@/components/dimension/OracleCurrentRead'
 import { RelationshipContextCard } from '@/components/dimension/RelationshipContextCard'
+import { DimensionGrowthTimeline } from '@/components/dimension/DimensionGrowthTimeline'
 import { DimensionSettingsPanel, useDimensionSettings } from '@/components/dimension/DimensionSettingsPanel'
 import {
   ForgeCharacterLarge,
@@ -665,16 +664,8 @@ export function DesktopCharacterPage({ dimension }: DesktopCharacterPageProps) {
           <DimensionTopOfMind dimension={dimension} userId={userId} accentColor={accentColor} />
         )}
 
-        {dimension === 'love' && (
-          <OracleCurrentRead dimension={dimension} userId={userId} accentColor={accentColor} />
-        )}
-
         {dimension === 'love' && dimSettings.showConversationSeeds && (
           <DimensionConversationSeeds dimension={dimension} userId={userId} accentColor={accentColor} />
-        )}
-
-        {dimension === 'love' && dimSettings.showPatternLog && (
-          <DimensionPatternLog dimension={dimension} userId={userId} accentColor={accentColor} />
         )}
 
         {/* Main Quests / Milestones */}
@@ -932,6 +923,15 @@ export function DesktopCharacterPage({ dimension }: DesktopCharacterPageProps) {
             </p>
           </div>
         )}
+
+        {/* ── Growth timeline ──────────────────────────────────────────── */}
+        <div style={{ marginBottom: 20 }}>
+          <DimensionGrowthTimeline
+            dimension={dimension}
+            userId={userId}
+            accentColor={accentColor}
+          />
+        </div>
 
         {/* ── Page settings ────────────────────────────────────────────── */}
         <div style={{ marginBottom: 20 }}>
