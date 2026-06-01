@@ -590,6 +590,18 @@ export function DesktopOracleModal() {
       setMode('checkin-done')
       saveCheckinToCache(data)
       window.dispatchEvent(new CustomEvent('protagonist:task-added'))
+      // Persist the check-in to voice_notes so Oracle has context in future chat sessions
+      if (data.oracle_reflection) {
+        fetch('/api/notes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId,
+            content: `Morning check-in: ${text}`,
+            oracleReply: data.oracle_reflection,
+          }),
+        }).catch(() => {})
+      }
     } catch {
       setMode('checkin-input')
     } finally {
@@ -661,7 +673,25 @@ export function DesktopOracleModal() {
           onClose={close}
           onAskArc={() => {
             setMode('chat')
-            setChatMessages([])
+            // Seed chatMessages with the morning brief so Oracle has full context
+            const taskSummary = checkinResult.new_tasks.length > 0
+              ? `Tasks added: ${checkinResult.new_tasks.map(t => `"${t.title}"`).join(', ')}.`
+              : 'No new tasks were added.'
+            const calSummary = checkinResult.calendar_matches.length > 0
+              ? `Calendar today: ${checkinResult.calendar_matches.join('; ')}.`
+              : ''
+            const briefContext = [
+              checkinResult.oracle_reflection,
+              taskSummary,
+              calSummary,
+              checkinResult.focus_list.length > 0
+                ? `Focus areas: ${checkinResult.focus_list.map(f => f.text).join('; ')}.`
+                : '',
+            ].filter(Boolean).join(' ')
+            setChatMessages([
+              { role: 'user', text: 'We just did my morning check-in.' },
+              { role: 'oracle', text: `Morning brief done. ${briefContext}` },
+            ])
           }}
         />}
         </div>
@@ -700,14 +730,14 @@ function ChatView({ messages, input, setInput, onSubmit, loading, inputRef, chat
     isNearBottomRef.current = (el.scrollHeight - el.scrollTop - el.clientHeight) < 80
   }, [])
 
-  // Sticky-scroll: instant snap when near bottom (no smooth = no bouncing during streaming)
+  // Sticky-scroll: defer to rAF so DOM has painted the new content before measuring scrollHeight.
+  // Using scrollIntoView on the sentinel div is smoother than setting scrollTop directly.
   React.useEffect(() => {
-    const el = scrollContainerRef.current
-    if (!el) return
-    if (isNearBottomRef.current) {
-      el.scrollTop = el.scrollHeight
-    }
-  }, [messages])
+    if (!isNearBottomRef.current) return
+    requestAnimationFrame(() => {
+      chatEndRef.current?.scrollIntoView({ block: 'end' })
+    })
+  }, [messages, chatEndRef])
 
   // Auto-grow textarea
   React.useEffect(() => {
@@ -719,8 +749,9 @@ function ChatView({ messages, input, setInput, onSubmit, loading, inputRef, chat
 
   function stopVoice() {
     if (!isRecording) return
-    recognitionRef.current?.stop()
-    recognitionRef.current = null
+    const rec = recognitionRef.current
+    recognitionRef.current = null  // null FIRST so onresult bails if it fires during stop
+    rec?.stop()
     setIsRecording(false)
   }
 
@@ -736,6 +767,8 @@ function ChatView({ messages, input, setInput, onSubmit, loading, inputRef, chat
     recognitionRef.current = rec
     setIsRecording(true)
     rec.onresult = (e: SpeechRecognitionEvent) => {
+      // Guard: if ref was nulled by stopVoice, ignore any trailing onresult events
+      if (recognitionRef.current !== rec) return
       let finalText = ''
       let interimText = ''
       for (let i = 0; i < e.results.length; i++) {
@@ -743,7 +776,6 @@ function ChatView({ messages, input, setInput, onSubmit, loading, inputRef, chat
         if (e.results[i].isFinal) {
           const trimmed = chunk.trim()
           if (trimmed) {
-            // Capitalise first letter, ensure sentence ends with punctuation
             const capped = trimmed.charAt(0).toUpperCase() + trimmed.slice(1)
             const punctuated = /[.!?,]$/.test(capped) ? capped : capped + '.'
             finalText += punctuated + ' '
@@ -757,7 +789,7 @@ function ChatView({ messages, input, setInput, onSubmit, loading, inputRef, chat
     rec.onerror = () => { setIsRecording(false) }
     rec.onend = () => {
       setIsRecording(s => {
-        if (s) { try { rec.start() } catch { return false } }
+        if (s && recognitionRef.current === rec) { try { rec.start() } catch { return false } }
         return s
       })
     }
