@@ -144,72 +144,50 @@ export function RelationshipContextCard({ userId, accentColor }: Props) {
   const stage        = ctx.relationship_stage ?? 'Established'
 
   return (
-    <div style={{ background: '#140C28', border: '0.5px solid #2D1B55', borderRadius: 14, padding: '16px 18px', marginBottom: 14 }}>
-      {/* Partner row */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          {/* You */}
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 }}>
-            <div style={{
-              width: 44, height: 44, borderRadius: '50%',
-              background: `${accentColor}15`, border: `1.5px solid ${accentColor}35`,
-              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20,
-            }}>🧑</div>
-            <span style={{ ...font, fontSize: 9, color: 'rgba(255,255,255,0.3)', letterSpacing: '0.05em' }}>You</span>
-          </div>
-          {/* Heart connector */}
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
-            <svg width="28" height="20" viewBox="0 0 28 20" fill="none">
-              <path d="M2 10 Q6 3 14 10 Q22 3 26 10" stroke={`${accentColor}30`} strokeWidth="1" fill="none"/>
-              <path d="M14 7 C14 7 10 4 10 7.5 C10 10 14 13 14 13 C14 13 18 10 18 7.5 C18 4 14 7 14 7Z" fill={accentColor} opacity="0.6"/>
-            </svg>
-            {duration && <span style={{ ...font, fontSize: 8, color: `${accentColor}60`, letterSpacing: '0.05em' }}>{duration}</span>}
-          </div>
-          {/* Partner */}
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 }}>
-            <div style={{
-              width: 44, height: 44, borderRadius: '50%',
-              background: 'rgba(180,140,255,0.1)', border: '1.5px solid rgba(180,140,255,0.28)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20,
-            }}>{partnerEmoji}</div>
-            <span style={{ ...font, fontSize: 9, color: 'rgba(255,255,255,0.3)', letterSpacing: '0.05em' }}>{partnerName}</span>
+    <div style={{ background: '#140C28', border: '0.5px solid #2D1B55', borderRadius: 14, padding: '14px 15px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {/* Partner avatars row */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ width: 36, height: 36, borderRadius: '50%', background: `${accentColor}15`, border: `1.5px solid ${accentColor}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>🧑</div>
+          <svg width="20" height="16" viewBox="0 0 20 16" fill="none">
+            <path d="M10 6 C10 6 7 4 7 7 C7 9.5 10 12 10 12 C10 12 13 9.5 13 7 C13 4 10 6 10 6Z" fill={accentColor} opacity="0.5"/>
+          </svg>
+          <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'rgba(180,140,255,0.1)', border: '1.5px solid rgba(180,140,255,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>{partnerEmoji}</div>
+          <div>
+            <div style={{ ...font, fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.78)' }}>{partnerName}</div>
+            {duration && <div style={{ ...font, fontSize: 9, color: `${accentColor}60` }}>{duration}</div>}
           </div>
         </div>
-
-        {/* Right: stage + edit */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 7 }}>
-          <span style={{
-            ...font, fontSize: 9, fontWeight: 700, letterSpacing: '0.06em',
-            background: 'rgba(29,158,117,0.1)', border: '0.5px solid rgba(29,158,117,0.3)',
-            color: '#1D9E75', padding: '3px 10px', borderRadius: 20,
-          }}>{stage}</span>
-          {ctx.living_situation && (
-            <span style={{ ...font, fontSize: 9, color: 'rgba(255,255,255,0.25)' }}>{ctx.living_situation}</span>
-          )}
-          <button type="button" onClick={() => setEditing(true)} style={{
-            background: 'transparent', border: 'none',
-            color: accentColor, fontSize: 11, cursor: 'pointer', fontFamily: 'inherit', padding: 0, opacity: 0.7,
-          }}>edit</button>
-        </div>
+        <button type="button" onClick={() => setEditing(true)} style={{ background: 'transparent', border: 'none', color: accentColor, fontSize: 11, cursor: 'pointer', fontFamily: 'inherit', padding: 0, opacity: 0.7 }}>edit</button>
       </div>
 
-      {/* Info tiles */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+      {/* Meta rows */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span style={{ ...font, fontSize: 9, color: 'rgba(255,255,255,0.3)' }}>Stage</span>
+          <span style={{ ...font, fontSize: 9, fontWeight: 700, background: 'rgba(29,158,117,0.1)', border: '0.5px solid rgba(29,158,117,0.25)', color: '#1D9E75', padding: '2px 9px', borderRadius: 20 }}>{stage}</span>
+        </div>
         {ctx.together_since && (
-          <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '8px 10px' }}>
-            <div style={{ ...font, fontSize: 8, color: 'rgba(255,255,255,0.28)', letterSpacing: '0.08em', textTransform: 'uppercase' as const, marginBottom: 3 }}>Together since</div>
-            <div style={{ ...font, fontSize: 11, color: 'rgba(255,255,255,0.7)' }}>
-              {new Date(ctx.together_since).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}
-            </div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ ...font, fontSize: 9, color: 'rgba(255,255,255,0.3)' }}>Since</span>
+            <span style={{ ...font, fontSize: 9, color: 'rgba(255,255,255,0.55)' }}>{new Date(ctx.together_since).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}</span>
           </div>
         )}
-        {ctx.oracle_notes && (
-          <div style={{ background: `${accentColor}05`, border: `0.5px solid ${accentColor}15`, borderRadius: 8, padding: '8px 10px', gridColumn: ctx.together_since ? 'span 1' : 'span 2' }}>
-            <div style={{ ...font, fontSize: 8, color: `${accentColor}60`, letterSpacing: '0.08em', textTransform: 'uppercase' as const, marginBottom: 3 }}>Oracle knows</div>
-            <div style={{ ...font, fontSize: 11, color: 'rgba(255,255,255,0.6)', lineHeight: 1.45 }}>{ctx.oracle_notes}</div>
+        {ctx.living_situation && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ ...font, fontSize: 9, color: 'rgba(255,255,255,0.3)' }}>Living</span>
+            <span style={{ ...font, fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>{ctx.living_situation}</span>
           </div>
         )}
       </div>
+
+      {/* Oracle knows */}
+      {ctx.oracle_notes && (
+        <div style={{ background: `${accentColor}05`, border: `0.5px solid ${accentColor}15`, borderRadius: 8, padding: '7px 9px' }}>
+          <div style={{ ...font, fontSize: 7.5, color: `${accentColor}55`, letterSpacing: '0.08em', textTransform: 'uppercase' as const, marginBottom: 3 }}>Oracle knows</div>
+          <div style={{ ...font, fontSize: 10, color: 'rgba(255,255,255,0.5)', lineHeight: 1.45 }}>{ctx.oracle_notes}</div>
+        </div>
+      )}
     </div>
   )
 }

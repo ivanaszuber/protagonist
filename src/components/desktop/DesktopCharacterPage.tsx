@@ -22,7 +22,6 @@ import { DimensionPillars } from '@/components/dimension/DimensionPillars'
 import { DimensionTopOfMind } from '@/components/dimension/DimensionTopOfMind'
 import { DimensionConversationSeeds } from '@/components/dimension/DimensionConversationSeeds'
 import { RelationshipContextCard } from '@/components/dimension/RelationshipContextCard'
-import { DimensionGrowthTimeline } from '@/components/dimension/DimensionGrowthTimeline'
 import { DimensionSettingsPanel, useDimensionSettings } from '@/components/dimension/DimensionSettingsPanel'
 import {
   ForgeCharacterLarge,
@@ -93,6 +92,32 @@ const PAGE_CSS = `
   @keyframes dcp-orb-c    { from{transform:rotate(250deg) translateX(30px) rotate(-250deg)} to{transform:rotate(610deg) translateX(30px) rotate(-610deg)} }
   ::-webkit-scrollbar { display: none; }
 `
+
+// ── Hero pillars strip — compact pill row shown inside hero ───────────────────
+function HeroPillarsStrip({ dimension, userId, accentColor }: { dimension: Dimension; userId: string; accentColor: string }) {
+  const [pillars, setPillars] = React.useState<Array<{ id: string; text: string; emoji: string }>>([])
+  React.useEffect(() => {
+    void fetch(`/api/dimension/pillars?userId=${encodeURIComponent(userId)}&dimensionId=${encodeURIComponent(dimension)}`)
+      .then(r => r.json())
+      .then((data: Array<{ id: string; text: string; emoji: string }>) => { if (Array.isArray(data)) setPillars(data) })
+      .catch(() => {})
+  }, [userId, dimension])
+  if (pillars.length === 0) return null
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginTop: 10 }}>
+      <span style={{ fontSize: 8, fontWeight: 700, letterSpacing: '1px', textTransform: 'uppercase' as const, color: `${accentColor}50`, flexShrink: 0 }}>Must-haves</span>
+      {pillars.map(p => (
+        <span key={p.id} style={{
+          background: 'rgba(255,255,255,0.04)', border: `0.5px solid ${accentColor}20`,
+          borderRadius: 20, padding: '3px 10px', fontSize: 10,
+          color: 'rgba(255,255,255,0.6)', display: 'flex', alignItems: 'center', gap: 4,
+        }}>
+          <span style={{ fontSize: 11 }}>{p.emoji}</span>{p.text}
+        </span>
+      ))}
+    </div>
+  )
+}
 
 // ── Score ring SVG ────────────────────────────────────────────────────────────
 
@@ -168,6 +193,9 @@ export function DesktopCharacterPage({ dimension }: DesktopCharacterPageProps) {
     lastWord: string
   }
   const [charInsight, setCharInsight] = useState<CharInsight | null>(null)
+
+  // ── Score editor toggle ───────────────────────────────────────────────────
+  const [showScoreEditor, setShowScoreEditor] = useState(false)
 
   // ── Dimension settings (per-page toggles) ────────────────────────────────
   const [dimSettings, saveDimSettings] = useDimensionSettings(userId, dimension)
@@ -447,9 +475,41 @@ export function DesktopCharacterPage({ dimension }: DesktopCharacterPageProps) {
         {/* Hero section */}
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 28, marginBottom: 24 }}>
 
-          {/* Score ring */}
-          <div style={{ flexShrink: 0 }}>
+          {/* Score ring + edit button */}
+          <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
             <ScoreRing score={currentScore} color={accentColor} size={112} />
+            <button
+              type="button"
+              onClick={() => setShowScoreEditor(prev => !prev)}
+              style={{ background: 'none', border: 'none', color: accentColor, fontSize: 10, cursor: 'pointer', fontFamily: 'inherit', padding: 0, opacity: 0.65 }}
+            >
+              edit score
+            </button>
+            {showScoreEditor && (
+              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', maxWidth: 112, justifyContent: 'center', marginTop: 4 }}>
+                {[1,2,3,4,5,6,7,8,9,10].map(n => (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={async () => {
+                      setDimScores(prev => ({ ...prev, [dimension]: n }))
+                      setShowScoreEditor(false)
+                      await fetch('/api/dimension-score', {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ userId, dimension, baseline: n }),
+                      })
+                    }}
+                    style={{
+                      width: 22, height: 22, borderRadius: '50%', border: 'none',
+                      background: n === currentScore ? accentColor : 'rgba(255,255,255,0.1)',
+                      color: n === currentScore ? '#0D0820' : 'rgba(255,255,255,0.6)',
+                      fontSize: 9, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+                    }}
+                  >{n}</button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Character art */}
@@ -496,18 +556,10 @@ export function DesktopCharacterPage({ dimension }: DesktopCharacterPageProps) {
                 </div>
               </>
             )}
+            {/* Non-negotiable pills (all dimensions, when pillars enabled) */}
+            {dimSettings.showPillars && <HeroPillarsStrip dimension={dimension} userId={userId} accentColor={accentColor} />}
           </div>
         </div>
-
-        {/* ── Relationship Context (love only) ────────────────────────── */}
-        {dimension === 'love' && (
-          <RelationshipContextCard userId={userId} accentColor={accentColor} />
-        )}
-
-        {/* ── Dimension Pillars (all dimensions, if enabled) ───────────── */}
-        {dimSettings.showPillars && (
-          <DimensionPillars dimension={dimension} userId={userId} accentColor={accentColor} />
-        )}
 
         {/* Quest vision */}
         {dimSettings.showQuests && <LegendCard
@@ -520,84 +572,98 @@ export function DesktopCharacterPage({ dimension }: DesktopCharacterPageProps) {
           onQuestSaved={(v) => setQuest(prev => prev ? { ...prev, vision: v } : { id: '', vision: v, character_name: char.name, character_class: 'Adventurer', milestones: [], recent_tasks: [], xp: 0 })}
         />}
 
-        {/* ── Oracle's Story — narrative + lessons + growth edges ──────── */}
-        {charInsight && (
-          <div style={{ marginBottom: 20 }}>
-
-            {/* Narrative */}
-            <div style={{
-              background: `${accentColor}14`,
-              border: `1.5px solid ${accentColor}35`,
-              borderRadius: 14, padding: '16px 18px', marginBottom: 10,
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 10 }}>
-                <svg width="11" height="11" viewBox="0 0 24 24" fill={accentColor}>
+        {/* ── Relationship context + Oracle's Story side-by-side (love) ── */}
+        {dimension === 'love' && charInsight ? (
+          <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: 12, marginBottom: 20 }}>
+            {/* Relationship context — compact left card */}
+            <RelationshipContextCard userId={userId} accentColor={accentColor} />
+            {/* Oracle's Story — right, includes narrative + lessons + growth edges */}
+            <div style={{ background: `${accentColor}08`, border: `1px solid ${accentColor}28`, borderRadius: 14, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                <svg width="10" height="10" viewBox="0 0 24 24" fill={accentColor}>
                   <path d="M12 2l2.4 7.6H22l-6.4 4.6 2.4 7.6L12 17.2l-6 4.6 2.4-7.6L2 9.6h7.6L12 2z"/>
                 </svg>
                 <span style={{ ...font, fontSize: 9, fontWeight: 700, color: accentColor, letterSpacing: '1.4px', textTransform: 'uppercase' as const }}>
                   Oracle&apos;s Story · {char.categoryLabel}
                 </span>
               </div>
-              <p style={{ ...font, fontSize: 13.5, color: 'rgba(255,255,255,0.82)', lineHeight: 1.75, margin: 0 }}>
+              <p style={{ ...font, fontSize: 12.5, color: 'rgba(255,255,255,0.78)', lineHeight: 1.7, margin: 0 }}>
                 {charInsight.narrative}
               </p>
+              {charInsight.lessons.length > 0 && (
+                <div>
+                  <div style={{ ...font, fontSize: 8, fontWeight: 700, color: '#1D9E75', letterSpacing: '1.1px', textTransform: 'uppercase' as const, marginBottom: 6 }}>Lessons showing up</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                    {charInsight.lessons.map((lesson, i) => (
+                      <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 7 }}>
+                        <svg style={{ flexShrink: 0, marginTop: 2 }} width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#1D9E75" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                        <span style={{ ...font, fontSize: 11.5, color: 'rgba(255,255,255,0.65)', lineHeight: 1.5 }}>{lesson}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {charInsight.growthEdges.length > 0 && (
+                <div>
+                  <div style={{ ...font, fontSize: 8, fontWeight: 700, color: '#F0882A', letterSpacing: '1.1px', textTransform: 'uppercase' as const, marginBottom: 6 }}>Growth edges</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                    {charInsight.growthEdges.map((edge, i) => (
+                      <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                        <div style={{
+                          fontSize: 8, fontWeight: 700, flexShrink: 0, marginTop: 2, padding: '1px 6px', borderRadius: 4,
+                          background: edge.urgency === 'high' ? 'rgba(240,136,42,0.12)' : 'rgba(240,136,42,0.06)',
+                          border: `0.5px solid ${edge.urgency === 'high' ? 'rgba(240,136,42,0.3)' : 'rgba(240,136,42,0.15)'}`,
+                          color: edge.urgency === 'high' ? '#F0882A' : 'rgba(240,136,42,0.6)',
+                        }}>{edge.urgency === 'high' ? 'pressing' : 'ongoing'}</div>
+                        <span style={{ ...font, fontSize: 11.5, color: 'rgba(255,255,255,0.62)', lineHeight: 1.45 }}>{edge.text}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
-
-            {/* Lessons in progress */}
-            {charInsight.lessons.length > 0 && (
-              <div style={{ marginBottom: 10 }}>
-                <div style={{ ...font, fontSize: 9, fontWeight: 700, color: '#5A4A7A', letterSpacing: '0.1em', textTransform: 'uppercase' as const, marginBottom: 7 }}>
-                  Lessons in progress
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  {charInsight.lessons.map((lesson, i) => (
-                    <div key={i} style={{
-                      display: 'flex', alignItems: 'flex-start', gap: 10,
-                      background: '#100828', border: `0.5px solid ${accentColor}25`,
-                      borderRadius: 10, padding: '9px 13px',
-                    }}>
-                      <svg style={{ flexShrink: 0, marginTop: 1 }} width="13" height="13" viewBox="0 0 24 24" fill="none">
-                        <circle cx="12" cy="12" r="10" stroke="#F0C840" strokeWidth="2"/>
-                        <path d="M12 7v5l3 3" stroke="#F0C840" strokeWidth="2" strokeLinecap="round"/>
-                      </svg>
-                      <span style={{ ...font, fontSize: 12.5, color: 'rgba(255,255,255,0.72)', lineHeight: 1.55 }}>
-                        {lesson}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Growth edges */}
-            {charInsight.growthEdges.length > 0 && (
-              <div style={{
-                background: '#140C28', border: '0.5px solid #2D1B55',
-                borderRadius: 12, padding: '12px 14px',
-              }}>
-                <div style={{ ...font, fontSize: 9, fontWeight: 700, color: '#5A4A7A', letterSpacing: '0.1em', textTransform: 'uppercase' as const, marginBottom: 8 }}>
-                  Growth edges
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-                  {charInsight.growthEdges.map((edge, i) => (
-                    <div key={i} style={{
-                      display: 'flex', alignItems: 'center', gap: 10,
-                      padding: '8px 0',
-                      borderBottom: i < charInsight.growthEdges.length - 1 ? '0.5px solid #1A0D35' : 'none',
-                    }}>
-                      <div style={{
-                        width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
-                        background: edge.urgency === 'high' ? '#F0882A' : edge.urgency === 'medium' ? `${accentColor}` : '#1D9E75',
-                      }} />
-                      <span style={{ ...font, fontSize: 12.5, color: 'rgba(255,255,255,0.68)', lineHeight: 1.45 }}>
-                        {edge.text}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
+        ) : (
+          <>
+            {/* Non-love: Oracle's Story full width */}
+            {charInsight && (
+              <div style={{ marginBottom: 20 }}>
+                <div style={{ background: `${accentColor}14`, border: `1.5px solid ${accentColor}35`, borderRadius: 14, padding: '16px 18px', marginBottom: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 10 }}>
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill={accentColor}><path d="M12 2l2.4 7.6H22l-6.4 4.6 2.4 7.6L12 17.2l-6 4.6 2.4-7.6L2 9.6h7.6L12 2z"/></svg>
+                    <span style={{ ...font, fontSize: 9, fontWeight: 700, color: accentColor, letterSpacing: '1.4px', textTransform: 'uppercase' as const }}>Oracle&apos;s Story · {char.categoryLabel}</span>
+                  </div>
+                  <p style={{ ...font, fontSize: 13.5, color: 'rgba(255,255,255,0.82)', lineHeight: 1.75, margin: 0 }}>{charInsight.narrative}</p>
+                </div>
+                {charInsight.lessons.length > 0 && (
+                  <div style={{ marginBottom: 10 }}>
+                    <div style={{ ...font, fontSize: 9, fontWeight: 700, color: '#5A4A7A', letterSpacing: '0.1em', textTransform: 'uppercase' as const, marginBottom: 7 }}>Lessons in progress</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {charInsight.lessons.map((lesson, i) => (
+                        <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, background: '#100828', border: `0.5px solid ${accentColor}25`, borderRadius: 10, padding: '9px 13px' }}>
+                          <svg style={{ flexShrink: 0, marginTop: 1 }} width="13" height="13" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="#F0C840" strokeWidth="2"/><path d="M12 7v5l3 3" stroke="#F0C840" strokeWidth="2" strokeLinecap="round"/></svg>
+                          <span style={{ ...font, fontSize: 12.5, color: 'rgba(255,255,255,0.72)', lineHeight: 1.55 }}>{lesson}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {charInsight.growthEdges.length > 0 && (
+                  <div style={{ background: '#140C28', border: '0.5px solid #2D1B55', borderRadius: 12, padding: '12px 14px' }}>
+                    <div style={{ ...font, fontSize: 9, fontWeight: 700, color: '#5A4A7A', letterSpacing: '0.1em', textTransform: 'uppercase' as const, marginBottom: 8 }}>Growth edges</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+                      {charInsight.growthEdges.map((edge, i) => (
+                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: i < charInsight.growthEdges.length - 1 ? '0.5px solid #1A0D35' : 'none' }}>
+                          <div style={{ width: 7, height: 7, borderRadius: '50%', flexShrink: 0, background: edge.urgency === 'high' ? '#F0882A' : edge.urgency === 'medium' ? accentColor : '#1D9E75' }} />
+                          <span style={{ ...font, fontSize: 12.5, color: 'rgba(255,255,255,0.68)', lineHeight: 1.45 }}>{edge.text}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </>
         )}
 
         {/* ── Vault Net Worth (wealth dimension only) ──────────────────── */}
@@ -931,15 +997,6 @@ export function DesktopCharacterPage({ dimension }: DesktopCharacterPageProps) {
             </p>
           </div>
         )}
-
-        {/* ── Growth timeline ──────────────────────────────────────────── */}
-        <div style={{ marginBottom: 20 }}>
-          <DimensionGrowthTimeline
-            dimension={dimension}
-            userId={userId}
-            accentColor={accentColor}
-          />
-        </div>
 
         {/* ── Page settings ────────────────────────────────────────────── */}
         <div style={{ marginBottom: 20 }}>
