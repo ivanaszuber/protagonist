@@ -46,6 +46,12 @@ function SettingsContent() {
   const [profileError, setProfileError] = useState('')
   const [userId, setUserId] = useState('')
 
+  // Google Calendar connection state
+  const [calStatus, setCalStatus] = useState<'loading' | 'connected' | 'disconnected'>('loading')
+  const [calEmail, setCalEmail] = useState('')
+  const [calCalendars, setCalCalendars] = useState<Array<{ name: string; primary: boolean }>>([])
+  const [calDisconnecting, setCalDisconnecting] = useState(false)
+
   // Profile fields
   const [displayName,         setDisplayName]         = useState('')
   const [location,            setLocation]            = useState('')
@@ -102,6 +108,48 @@ function SettingsContent() {
   useEffect(() => {
     if (userId) void loadProfile(userId)
   }, [userId, loadProfile])
+
+  const loadCalStatus = useCallback(async (uid: string) => {
+    if (!uid) return
+    try {
+      const r = await fetch(`/api/calendar/debug?userId=${encodeURIComponent(uid)}`)
+      const d = await r.json() as { connected: boolean; account?: { email?: string }; calendars?: Array<{ name: string; primary: boolean }> }
+      if (d.connected) {
+        setCalStatus('connected')
+        setCalEmail(d.account?.email ?? '')
+        setCalCalendars(d.calendars ?? [])
+      } else {
+        setCalStatus('disconnected')
+      }
+    } catch {
+      setCalStatus('disconnected')
+    }
+  }, [])
+
+  useEffect(() => {
+    if (userId) void loadCalStatus(userId)
+  }, [userId, loadCalStatus])
+
+  async function handleDisconnectGoogle() {
+    if (!userId) return
+    setCalDisconnecting(true)
+    try {
+      await fetch('/api/calendar/disconnect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId }),
+      })
+      setCalStatus('disconnected')
+      setCalEmail('')
+      setCalCalendars([])
+    } finally {
+      setCalDisconnecting(false)
+    }
+  }
+
+  function handleConnectGoogle() {
+    window.location.href = `/api/calendar/connect?userId=${encodeURIComponent(userId)}`
+  }
 
   async function handleSaveProfile() {
     if (!userId) return
@@ -293,6 +341,75 @@ function SettingsContent() {
           >
             {savingProfile ? 'Saving…' : profileSaved ? '✓ Saved' : 'Save Profile'}
           </button>
+        </div>
+
+        {/* ── CONNECTED ACCOUNTS ── */}
+        <div style={{
+          background: 'rgba(123,63,228,0.07)', border: '1px solid rgba(123,63,228,0.18)',
+          borderRadius: 16, padding: '18px 18px 20px', marginBottom: 28,
+        }}>
+          {sectionHead('Connected Accounts')}
+
+          {/* Google Calendar */}
+          <div style={{
+            background: 'rgba(255,255,255,0.03)', border: '0.5px solid rgba(255,255,255,0.08)',
+            borderRadius: 12, padding: '14px 16px',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: calStatus === 'connected' ? 10 : 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                {/* Google Calendar icon */}
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <rect x="3" y="4" width="18" height="17" rx="2" stroke="#5A4A7A" strokeWidth="1.5"/>
+                  <path d="M3 9h18" stroke="#5A4A7A" strokeWidth="1.5"/>
+                  <path d="M8 2v4M16 2v4" stroke="#5A4A7A" strokeWidth="1.5" strokeLinecap="round"/>
+                  <rect x="7" y="12" width="4" height="4" rx="0.5" fill="#9333EA" opacity="0.6"/>
+                </svg>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 500, color: '#E8E0F0' }}>Google Calendar</div>
+                  {calStatus === 'loading' && <div style={{ fontSize: 11, color: '#5A4A7A', marginTop: 2 }}>Checking…</div>}
+                  {calStatus === 'connected' && <div style={{ fontSize: 11, color: '#6EE7A4', marginTop: 2 }}>● Connected · {calEmail}</div>}
+                  {calStatus === 'disconnected' && <div style={{ fontSize: 11, color: '#F87171', marginTop: 2 }}>○ Not connected</div>}
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {calStatus === 'connected' && (
+                  <>
+                    <button type="button" onClick={handleConnectGoogle}
+                      style={{ fontSize: 11, color: '#9333EA', background: 'rgba(147,51,234,0.1)', border: '0.5px solid rgba(147,51,234,0.3)', borderRadius: 8, padding: '5px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>
+                      Switch account
+                    </button>
+                    <button type="button" onClick={() => void handleDisconnectGoogle()} disabled={calDisconnecting}
+                      style={{ fontSize: 11, color: '#F87171', background: 'rgba(248,113,113,0.08)', border: '0.5px solid rgba(248,113,113,0.2)', borderRadius: 8, padding: '5px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>
+                      {calDisconnecting ? 'Disconnecting…' : 'Disconnect'}
+                    </button>
+                  </>
+                )}
+                {calStatus === 'disconnected' && (
+                  <button type="button" onClick={handleConnectGoogle}
+                    style={{ fontSize: 12, color: 'white', background: '#9333EA', border: 'none', borderRadius: 8, padding: '6px 14px', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 500 }}>
+                    Connect
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Calendar list */}
+            {calStatus === 'connected' && calCalendars.length > 0 && (
+              <div style={{ borderTop: '0.5px solid rgba(255,255,255,0.06)', paddingTop: 10 }}>
+                <div style={{ fontSize: 9, color: '#5A4A7A', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 7 }}>Syncing from</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                  {calCalendars.map((cal, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                      <div style={{ width: 6, height: 6, borderRadius: '50%', background: cal.primary ? '#9333EA' : '#5A4A7A', flexShrink: 0 }} />
+                      <span style={{ fontSize: 11, color: cal.primary ? '#C0B0E0' : '#5A4A7A' }}>
+                        {cal.name}{cal.primary ? ' (primary)' : ''}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* ── PINNED CHARACTERS ── */}
