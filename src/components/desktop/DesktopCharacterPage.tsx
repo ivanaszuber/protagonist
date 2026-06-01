@@ -104,17 +104,19 @@ function HeroPillarsStrip({ dimension, userId, accentColor }: { dimension: Dimen
   }, [userId, dimension])
   if (pillars.length === 0) return null
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginTop: 10 }}>
-      <span style={{ fontSize: 8, fontWeight: 700, letterSpacing: '1px', textTransform: 'uppercase' as const, color: `${accentColor}50`, flexShrink: 0 }}>Must-haves</span>
-      {pillars.map(p => (
-        <span key={p.id} style={{
-          background: 'rgba(255,255,255,0.04)', border: `0.5px solid ${accentColor}20`,
-          borderRadius: 20, padding: '3px 10px', fontSize: 10,
-          color: 'rgba(255,255,255,0.6)', display: 'flex', alignItems: 'center', gap: 4,
-        }}>
-          <span style={{ fontSize: 11 }}>{p.emoji}</span>{p.text}
-        </span>
-      ))}
+    <div style={{ marginTop: 12 }}>
+      <span style={{ display: 'block', fontSize: 8, fontWeight: 700, letterSpacing: '1.1px', textTransform: 'uppercase' as const, color: `${accentColor}45`, marginBottom: 7 }}>Must-haves</span>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        {pillars.map(p => (
+          <span key={p.id} style={{
+            background: 'rgba(255,255,255,0.04)', border: `0.5px solid ${accentColor}22`,
+            borderRadius: 20, padding: '4px 11px', fontSize: 10.5,
+            color: 'rgba(255,255,255,0.62)', display: 'inline-flex', alignItems: 'center', gap: 5,
+          }}>
+            <span style={{ fontSize: 12 }}>{p.emoji}</span>{p.text}
+          </span>
+        ))}
+      </div>
     </div>
   )
 }

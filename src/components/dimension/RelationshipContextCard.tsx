@@ -145,20 +145,22 @@ export function RelationshipContextCard({ userId, accentColor }: Props) {
 
   return (
     <div style={{ background: '#140C28', border: '0.5px solid #2D1B55', borderRadius: 14, padding: '14px 15px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-      {/* Partner avatars row */}
+      {/* Header: label + edit */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ width: 36, height: 36, borderRadius: '50%', background: `${accentColor}15`, border: `1.5px solid ${accentColor}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>🧑</div>
-          <svg width="20" height="16" viewBox="0 0 20 16" fill="none">
-            <path d="M10 6 C10 6 7 4 7 7 C7 9.5 10 12 10 12 C10 12 13 9.5 13 7 C13 4 10 6 10 6Z" fill={accentColor} opacity="0.5"/>
-          </svg>
-          <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'rgba(180,140,255,0.1)', border: '1.5px solid rgba(180,140,255,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>{partnerEmoji}</div>
-          <div>
-            <div style={{ ...font, fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.78)' }}>{partnerName}</div>
-            {duration && <div style={{ ...font, fontSize: 9, color: `${accentColor}60` }}>{duration}</div>}
-          </div>
+        <span style={{ ...font, fontSize: 8, fontWeight: 700, letterSpacing: '1.1px', textTransform: 'uppercase' as const, color: 'rgba(255,255,255,0.22)' }}>Relationship</span>
+        <button type="button" onClick={() => setEditing(true)} style={{ background: 'transparent', border: 'none', color: accentColor, fontSize: 10, cursor: 'pointer', fontFamily: 'inherit', padding: 0, opacity: 0.6 }}>edit</button>
+      </div>
+      {/* Partner avatars row */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ width: 36, height: 36, borderRadius: '50%', background: `${accentColor}15`, border: `1.5px solid ${accentColor}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>🧑</div>
+        <svg width="20" height="16" viewBox="0 0 20 16" fill="none">
+          <path d="M10 6 C10 6 7 4 7 7 C7 9.5 10 12 10 12 C10 12 13 9.5 13 7 C13 4 10 6 10 6Z" fill={accentColor} opacity="0.5"/>
+        </svg>
+        <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'rgba(180,140,255,0.1)', border: '1.5px solid rgba(180,140,255,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>{partnerEmoji}</div>
+        <div>
+          <div style={{ ...font, fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.78)' }}>{partnerName}</div>
+          {duration && <div style={{ ...font, fontSize: 9, color: `${accentColor}60` }}>{duration}</div>}
         </div>
-        <button type="button" onClick={() => setEditing(true)} style={{ background: 'transparent', border: 'none', color: accentColor, fontSize: 11, cursor: 'pointer', fontFamily: 'inherit', padding: 0, opacity: 0.7 }}>edit</button>
       </div>
 
       {/* Meta rows */}
