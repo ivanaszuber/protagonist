@@ -6,7 +6,7 @@ import type { Dimension } from '@/lib/character'
 
 interface PatternEntry {
   id: string
-  content: string
+  text: string
   type: 'win' | 'shift' | 'hard'
   created_at: string
 }
@@ -77,7 +77,7 @@ export function DimensionGrowthTimeline({ dimension, userId, accentColor }: Prop
                 }} />
                 <div style={{ flex: 1 }}>
                   <div style={{ ...font, fontSize: 10, color: 'rgba(255,255,255,0.62)', lineHeight: 1.45, marginBottom: 2 }}>
-                    {entry.content}
+                    {entry.text}
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
                     <span style={{ ...font, fontSize: 8, fontWeight: 600, color: cfg.labelColor }}>{cfg.label}</span>

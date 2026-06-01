@@ -30,6 +30,12 @@ export interface MorningCheckinTaskInput {
   xp_reward: number
 }
 
+export interface GrowthEntry {
+  dimension: string
+  type: 'win' | 'shift' | 'hard'
+  text: string
+}
+
 export interface MorningCheckinClaudeResult {
   calendar_matches: string[]
   new_tasks: MorningCheckinTaskInput[]
@@ -38,6 +44,7 @@ export interface MorningCheckinClaudeResult {
   suggestions: Array<{ text: string; dimension: string }>
   oracle_message: string
   oracle_reflection: string
+  growth_entries: GrowthEntry[]
 }
 
 export interface CreatedMorningTask extends MorningCheckinTaskInput {
@@ -239,6 +246,11 @@ Read the transcript carefully. Do the following:
 
 7. **oracle_message** — one punchy, personal tagline. Max 15 words. Reference something specific. Energising, not generic. Don't start with "Remember" or "You've got this".
 
+8. **growth_entries** — 0 to 3 meaningful moments from the transcript worth logging to the person's Growth Timeline. Only log something if it's genuinely notable — a real win, a hard moment they pushed through, or a meaningful mindset shift. Don't manufacture entries if the transcript is routine. Each entry:
+   - dimension: which life area it belongs to (career/social/wealth/vitality/mind/love/family)
+   - type: "win" (a success or positive outcome), "shift" (a perspective change or realisation), or "hard" (a struggle or difficult moment they named)
+   - text: 1 concise sentence, written in third person as an observation (e.g. "Stayed calm during a difficult conversation about boundaries.")
+
 Respond ONLY with valid JSON:
 {
   "calendar_matches": ["event title 1"],
@@ -258,7 +270,10 @@ Respond ONLY with valid JSON:
     { "text": "...", "dimension": "career" }
   ],
   "oracle_reflection": "...",
-  "oracle_message": "..."
+  "oracle_message": "...",
+  "growth_entries": [
+    { "dimension": "love", "type": "win", "text": "..." }
+  ]
 }`
 }
 
@@ -285,6 +300,15 @@ function parseClaudeJson(raw: string): MorningCheckinClaudeResult {
     }))
     .filter((t) => t.title.length > 0)
 
+  const growthRaw = (parsed.growth_entries as Array<Record<string, unknown>>) ?? []
+  const growth_entries: GrowthEntry[] = growthRaw
+    .map((g) => ({
+      dimension: VALID_DIMENSIONS.has(String(g.dimension)) ? String(g.dimension) : 'career',
+      type: (['win', 'shift', 'hard'].includes(String(g.type)) ? String(g.type) : 'shift') as 'win' | 'shift' | 'hard',
+      text: String(g.text ?? '').trim(),
+    }))
+    .filter((g) => g.text.length > 0)
+
   return {
     calendar_matches: ((parsed.calendar_matches as string[]) ?? []).map(String),
     new_tasks,
@@ -303,6 +327,7 @@ function parseClaudeJson(raw: string): MorningCheckinClaudeResult {
     ),
     oracle_reflection: String(parsed.oracle_reflection ?? ''),
     oracle_message: String(parsed.oracle_message ?? ''),
+    growth_entries,
   }
 }
 
@@ -414,6 +439,23 @@ export async function runMorningCheckin(
       }
       if (!error && data) {
         createdTasks.push({ ...task, id: data.id as string })
+      }
+    }
+
+    // ── Auto-write growth timeline entries detected by Oracle ─────────────
+    if (result.growth_entries.length > 0) {
+      const { error: growthError } = await supabaseAdmin
+        .from('dimension_pattern_log')
+        .insert(
+          result.growth_entries.map((g) => ({
+            user_id: userId,
+            dimension_id: g.dimension,
+            type: g.type,
+            text: g.text,
+          }))
+        )
+      if (growthError) {
+        console.error('[morning-checkin] growth_entries insert error:', growthError.message)
       }
     }
 
