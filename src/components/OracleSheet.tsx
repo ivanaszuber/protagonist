@@ -194,6 +194,7 @@ export function OracleSheet() {
   const checkinModeRef = useRef(false)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const chatEndRef = useRef<HTMLDivElement>(null)
+  const chatScrollRef = useRef<HTMLDivElement>(null)
 
   const hideFab = pathname === '/oracle'
   const prevStateRef = useRef<SheetState>('closed')
@@ -483,8 +484,8 @@ export function OracleSheet() {
 
   // Auto-scroll chat to bottom when new messages arrive
   useEffect(() => {
-    if (state === 'chat') {
-      setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
+    if (state === 'chat' && chatScrollRef.current) {
+      chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight
     }
   }, [chatMessages, state])
 
@@ -516,19 +517,47 @@ export function OracleSheet() {
   }, [inputText, userId, stopVoice])
 
   const sendChatToArc = useCallback(
-    async (text: string) => {
+    async (text: string): Promise<string> => {
       const res = await fetch('/api/arc', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: text,
           userId,
-          // Include recent conversation history so Oracle remembers context
           conversationHistory: chatMessages.slice(-16),
         }),
       })
-      const data = await res.json()
-      return (data.response as string) ?? data.oracleReply ?? "I'm here with you."
+
+      if (!res.ok || !res.body) return "I'm here with you."
+
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let accumulated = ''
+
+      // Show a streaming placeholder oracle message while reading
+      setChatMessages((prev) => [...prev, { role: 'oracle', text: '' }])
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          accumulated += decoder.decode(value, { stream: true })
+          // Update the last oracle message in place
+          setChatMessages((prev) => {
+            const next = [...prev]
+            next[next.length - 1] = { role: 'oracle', text: accumulated }
+            return next
+          })
+          // Scroll to bottom on each chunk — no jump
+          if (chatScrollRef.current) {
+            chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight
+          }
+        }
+      } finally {
+        reader.releaseLock()
+      }
+
+      return accumulated || "I'm here with you."
     },
     [userId, chatMessages]
   )
@@ -746,12 +775,19 @@ export function OracleSheet() {
         // CHAT intent — works whether starting fresh or already mid-conversation
         if (inChat) {
           setChatMessages((prev) => [...prev, { role: 'user', text }])
-          const reply = await sendChatToArc(text)
-          setChatMessages((prev) => [...prev, { role: 'oracle', text: reply }])
+          // sendChatToArc streams directly into chatMessages, no need to add reply
+          await sendChatToArc(text)
         } else {
-          const reply = data.oracleReply ?? (await sendChatToArc(text))
-          setChatMessages([{ role: 'user', text }, { role: 'oracle', text: reply }])
-          setState('chat')
+          if (data.oracleReply) {
+            // First message with a classify reply — no streaming needed
+            setChatMessages([{ role: 'user', text }, { role: 'oracle', text: data.oracleReply }])
+            setState('chat')
+          } else {
+            // First message — show user msg, then stream oracle reply
+            setChatMessages([{ role: 'user', text }])
+            setState('chat')
+            await sendChatToArc(text)
+          }
         }
       }
     } catch {
@@ -2273,6 +2309,7 @@ export function OracleSheet() {
           {state === 'chat' && (
             <>
               <div
+                ref={chatScrollRef}
                 style={{
                   maxHeight: '52vh',
                   overflowY: 'auto',
@@ -2280,6 +2317,7 @@ export function OracleSheet() {
                   display: 'flex',
                   flexDirection: 'column',
                   gap: 8,
+                  overflowAnchor: 'none',
                 }}
               >
                 {chatMessages.map((msg, i) => (
