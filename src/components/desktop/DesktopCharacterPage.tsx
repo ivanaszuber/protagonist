@@ -18,6 +18,13 @@ import DesktopTopNav from './DesktopTopNav'
 import { DesktopOracleModal } from './DesktopOracleModal'
 import { openOracle } from '@/lib/oracle-events'
 import { VaultNetWorthCard } from '@/components/vault/VaultNetWorthCard'
+import { DimensionPillars } from '@/components/dimension/DimensionPillars'
+import { DimensionTopOfMind } from '@/components/dimension/DimensionTopOfMind'
+import { DimensionPatternLog } from '@/components/dimension/DimensionPatternLog'
+import { DimensionConversationSeeds } from '@/components/dimension/DimensionConversationSeeds'
+import { OracleCurrentRead } from '@/components/dimension/OracleCurrentRead'
+import { RelationshipContextCard } from '@/components/dimension/RelationshipContextCard'
+import { DimensionSettingsPanel, useDimensionSettings } from '@/components/dimension/DimensionSettingsPanel'
 import {
   ForgeCharacterLarge,
   EchoCharacterLarge,
@@ -162,6 +169,9 @@ export function DesktopCharacterPage({ dimension }: DesktopCharacterPageProps) {
     lastWord: string
   }
   const [charInsight, setCharInsight] = useState<CharInsight | null>(null)
+
+  // ── Dimension settings (per-page toggles) ────────────────────────────────
+  const [dimSettings, saveDimSettings] = useDimensionSettings(userId, dimension)
 
   // ── Unlinked tasks ────────────────────────────────────────────────────────
   const [unlinkedTasks, setUnlinkedTasks]     = useState<UnlinkedTask[]>([])
@@ -486,8 +496,18 @@ export function DesktopCharacterPage({ dimension }: DesktopCharacterPageProps) {
           </div>
         </div>
 
+        {/* ── Relationship Context (love only) ────────────────────────── */}
+        {dimension === 'love' && (
+          <RelationshipContextCard userId={userId} accentColor={accentColor} />
+        )}
+
+        {/* ── Dimension Pillars (all dimensions, if enabled) ───────────── */}
+        {dimSettings.showPillars && (
+          <DimensionPillars dimension={dimension} userId={userId} accentColor={accentColor} />
+        )}
+
         {/* Quest vision */}
-        <LegendCard
+        {dimSettings.showQuests && <LegendCard
           characterName={char.name}
           dimensionLabel={char.categoryLabel}
           dimension={dimension}
@@ -495,7 +515,7 @@ export function DesktopCharacterPage({ dimension }: DesktopCharacterPageProps) {
           accentColor={accentColor}
           userId={userId}
           onQuestSaved={(v) => setQuest(prev => prev ? { ...prev, vision: v } : { id: '', vision: v, character_name: char.name, character_class: 'Adventurer', milestones: [], recent_tasks: [], xp: 0 })}
-        />
+        />}
 
         {/* ── Oracle's Story — narrative + lessons + growth edges ──────── */}
         {charInsight && (
@@ -640,8 +660,25 @@ export function DesktopCharacterPage({ dimension }: DesktopCharacterPageProps) {
           </div>
         )}
 
+        {/* ── New love/dimension sections ──────────────────────────────── */}
+        {dimSettings.showTopOfMind && (
+          <DimensionTopOfMind dimension={dimension} userId={userId} accentColor={accentColor} />
+        )}
+
+        {dimension === 'love' && (
+          <OracleCurrentRead dimension={dimension} userId={userId} accentColor={accentColor} />
+        )}
+
+        {dimension === 'love' && dimSettings.showConversationSeeds && (
+          <DimensionConversationSeeds dimension={dimension} userId={userId} accentColor={accentColor} />
+        )}
+
+        {dimension === 'love' && dimSettings.showPatternLog && (
+          <DimensionPatternLog dimension={dimension} userId={userId} accentColor={accentColor} />
+        )}
+
         {/* Main Quests / Milestones */}
-        {quest && (
+        {dimSettings.showMilestones && quest && (
           <MainQuestsSection
             characterName={char.name}
             dimensionLabel={char.categoryLabel}
@@ -668,7 +705,7 @@ export function DesktopCharacterPage({ dimension }: DesktopCharacterPageProps) {
         )}
 
         {/* ── Unlinked Tasks ── */}
-        <section style={{ marginBottom: 20 }}>
+        {dimSettings.showTasks && <section style={{ marginBottom: 20 }}>
           {/* Header — always visible, click to expand */}
           <button
             type="button"
@@ -763,7 +800,7 @@ export function DesktopCharacterPage({ dimension }: DesktopCharacterPageProps) {
               )}
             </div>
           )}
-        </section>
+        </section>}
 
         {/* Score block */}
         <ScoreBlock
@@ -895,6 +932,17 @@ export function DesktopCharacterPage({ dimension }: DesktopCharacterPageProps) {
             </p>
           </div>
         )}
+
+        {/* ── Page settings ────────────────────────────────────────────── */}
+        <div style={{ marginBottom: 20 }}>
+          <DimensionSettingsPanel
+            dimension={dimension}
+            userId={userId}
+            accentColor={accentColor}
+            settings={dimSettings}
+            onChange={saveDimSettings}
+          />
+        </div>
 
         {/* Active challenge */}
         <BossCard
